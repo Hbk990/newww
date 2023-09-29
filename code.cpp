@@ -1,4 +1,4 @@
-#include<iostream>
+#include <iostream>
 using namespace std;
 
 
@@ -9,6 +9,8 @@ int main(){
     y=6;
     int z = x+y;
 
-    cout<<"sum is"<<z;
+    cout<<"sum is new "<<z;
+
+
 
 }
