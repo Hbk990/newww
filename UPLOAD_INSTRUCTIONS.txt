@@ -1,0 +1,47 @@
+DR PHONE WHOLESALE — HARDENED INSTALLATION
+
+1. Open Hostinger File Manager and enter public_html.
+2. Back up the old catalog, then remove its old root folders and files from
+   public_html. Do not remove unrelated email or Hostinger system files.
+3. Upload this ZIP directly into public_html.
+4. Extract it there. Keep the private folder name unchanged.
+5. Delete the ZIP from the server after extraction.
+6. Customer catalog URL:
+   https://drphonewholesale.online/wholesale-7nQ4vK9mP2xR8cL5/
+7. Admin URL:
+   https://drphonewholesale.online/wholesale-7nQ4vK9mP2xR8cL5/admin/
+8. Confirm that https://drphonewholesale.online shows only a generic 404 page.
+9. Confirm that the customer passcode is required before the catalog opens.
+
+IMPORTANT
+- Do not rename or publicly post the private catalog folder.
+- Send customers the complete catalog URL, not only the domain.
+- Keep the customer passcode enabled and change it if the link is leaked.
+- Do not submit a sitemap for this website.
+- Do not add the catalog URL to public social-media profiles or public websites.
+- The no-index protection prevents search indexing but is not a replacement for the passcode.
+
+BULK PRODUCT PICTURES
+- Import the product CSV first so every product code/SKU already exists.
+- In Admin Dashboard > Operations, use "Bulk product pictures".
+- Name each main picture exactly as its SKU: DR-00001.jpg
+- Add gallery pictures with a number: DR-00001-2.jpg, DR-00001-3.webp
+- SKU matching is case-insensitive. Only JPG, PNG and WEBP are accepted (maximum 5 MB each).
+- Your host may limit one selection to 20 files. If so, upload the pictures in batches.
+- The dashboard reports filenames that do not match any SKU; it never guesses a product.
+- New images are resized to a maximum of 1400 px and compressed to WEBP quality 82 when Hostinger GD/WebP support is enabled.
+- Replaced main pictures are removed automatically when no product still uses them.
+- "Delete unused pictures" removes orphan files not used by the current catalog. Data backups do not contain image copies.
+- The server retains the latest 10 catalog/settings backups and automatically removes older ones.
+
+FREE OPENCV IMAGE AUDIT
+- Open Admin Dashboard > Catalog operations > OpenCV image audit.
+- "Audit new/changed" checks only pictures that do not have a current saved result.
+- "Audit entire catalog" rechecks every main product picture.
+- The audit runs locally in the admin browser and does not send images to an AI service.
+- Results measure resolution, sharpness, brightness, contrast, border-edge crop risk and background uniformity.
+- Results are screening warnings, not proof that a picture shows the correct product model.
+
+VISUAL PRODUCT VARIATIONS
+- Product options, colors, flavors, availability and per-variation quantities are managed only through visual Add/Edit/Delete controls.
+- The obsolete manual option/color/flavor/stock-override textareas have been removed from the dashboard.

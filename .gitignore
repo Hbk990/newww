@@ -1,0 +1,17 @@
+# Product photography — ~1150 files, ~20 MB. Managed through the admin
+# dashboard ("Bulk product pictures"), not through git.
+wholesale-*/uploads/
+
+# Live catalog data and store settings. settings.json holds the admin
+# password hash and the customer passcode hash.
+wholesale-*/storage/*.json
+wholesale-*/storage/backups/
+
+# Install token + customer password hash.
+wholesale-*/inc/config.php
+
+# Vendored OpenCV build used by the admin image audit (2.5 MB, unmodified).
+wholesale-*/assets/opencv.js
+
+# Build output
+*.zip

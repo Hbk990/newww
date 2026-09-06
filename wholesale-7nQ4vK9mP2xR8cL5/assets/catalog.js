@@ -1,0 +1,1294 @@
+/* DR PHONE — customer catalog
+ *
+ * Quantities are typed, not tapped: every place that shows a quantity uses the
+ * same control (a real number field between a - and a + button), so a buyer
+ * ordering 60 pieces types "60" instead of pressing + sixty times.
+ *
+ * While someone is typing we never re-render a container with innerHTML - that
+ * would destroy the field mid-keystroke. Typing takes the "surgical" path
+ * (syncQuantityUI) which touches only the numbers that actually moved; whole
+ * containers are rebuilt only on structural changes (navigation, search,
+ * opening a panel).
+ */
+(function () {
+  'use strict';
+
+  /* ---------------------------------------------------------------- state */
+
+  var catalog = [], selected = null, sortMode = 'original', selections = {},
+      cart = [], favorites = [], recent = [], recentCollapsed = false,
+      lineNotes = {}, detailProduct = null, flavorQuery = '',
+      customer = { name: '', phone: '', business: '', notes: '' }, orderReference = '';
+
+  var content = document.getElementById('content'),
+      search = document.getElementById('search');
+
+  var CART_KEY = 'dr-phone-hostinger-cart-v2';
+  var FAVORITES_KEY = 'dr-phone-favorites',
+      RECENT_KEY = 'dr-phone-recent-products',
+      RECENT_COLLAPSED_KEY = 'dr-phone-recent-collapsed',
+      CUSTOMER_KEY = 'dr-phone-order-customer',
+      REFERENCE_KEY = 'dr-phone-order-reference',
+      NOTES_KEY = 'dr-phone-line-notes';
+
+  var MAX_QTY = 999;
+
+  /* ------------------------------------------------------------- helpers */
+
+  function esc(v) {
+    return String(v == null ? '' : v).replace(/[&<>'"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[c];
+    });
+  }
+
+  function money(v) {
+    if (v == null || v === '') return 'Price on request';
+    var currency = String((window.DR_PHONE.store || {}).currency || 'USD').toUpperCase();
+    try {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency', currency: currency,
+        minimumFractionDigits: Number.isInteger(Number(v)) ? 0 : 2
+      }).format(Number(v));
+    } catch (e) {
+      return currency + ' ' + Number(v).toFixed(Number.isInteger(Number(v)) ? 0 : 2);
+    }
+  }
+
+  function motion() { return document.documentElement.getAttribute('data-motion') || 'full'; }
+
+  function allProducts() {
+    return [].concat.apply([], catalog.map(function (c) {
+      return c.products.map(function (p) { return { product: p, category: c }; });
+    }));
+  }
+  function findProduct(id) {
+    return allProducts().find(function (x) { return Number(x.product.id) === Number(id); });
+  }
+  function options(p) {
+    if (Array.isArray(p.options) && p.options.length) return p.options;
+    return typeof p.price === 'number' ? [{ name: 'Standard', price: p.price }] : [];
+  }
+  function colors(p) {
+    return Array.isArray(p.colors) && p.colors.length ? p.colors : ['Standard'];
+  }
+  function flavors(p) { return Array.isArray(p.flavors) ? p.flavors : []; }
+
+  function unitPrice(p, line) {
+    var o = options(p)[line.option],
+        base = o ? Number(o.price) : (typeof p.price === 'number' ? p.price : 0),
+        tiers = Array.isArray(p.tiers) ? p.tiers : [];
+    tiers.forEach(function (t) { if (line.quantity >= Number(t.min)) base = Number(t.price); });
+    return base;
+  }
+
+  function variantKeys(p, s) {
+    var o = options(p)[s.option];
+    return [
+      s.flavor ? 'flavor:' + s.flavor : '',
+      s.color ? 'color:' + s.color : '',
+      o && o.name ? 'option:' + o.name : ''
+    ].filter(Boolean);
+  }
+  function lineMatchesVariant(p, line, key) {
+    if (key.indexOf('flavor:') === 0) return line.flavor === key.slice(7);
+    if (key.indexOf('color:') === 0) return line.color === key.slice(6);
+    if (key.indexOf('option:') === 0) {
+      var o = options(p)[line.option];
+      return !!o && o.name === key.slice(7);
+    }
+    return false;
+  }
+
+  /* How many MORE pieces of this variant may be added, given what the cart
+     already holds. null means "no declared limit". */
+  function remainingQuantity(p, s) {
+    var limits = [], map = p.variant_quantity || {},
+        productLines = cart.filter(function (line) { return Number(line.productId) === Number(p.id); });
+    if (Number(p.stock_quantity) > 0) {
+      limits.push(Number(p.stock_quantity) - productLines.reduce(function (total, line) {
+        return total + line.quantity;
+      }, 0));
+    }
+    variantKeys(p, s).forEach(function (key) {
+      if (Object.prototype.hasOwnProperty.call(map, key)) {
+        var used = productLines.filter(function (line) { return lineMatchesVariant(p, line, key); })
+          .reduce(function (total, line) { return total + line.quantity; }, 0);
+        limits.push(Number(map[key]) - used);
+      }
+    });
+    return limits.length ? Math.max(0, Math.min.apply(null, limits)) : null;
+  }
+
+  function variantStatus(p, s) {
+    var status = p.stock || 'in-stock', map = p.variant_stock || {};
+    variantKeys(p, s).forEach(function (key) {
+      if (map[key] === 'out-of-stock') status = 'out-of-stock';
+      else if (map[key] === 'low-stock' && status !== 'out-of-stock') status = 'low-stock';
+    });
+    var remaining = remainingQuantity(p, s);
+    if (remaining === 0) status = 'out-of-stock';
+    else if (remaining !== null && remaining <= 5 && status !== 'out-of-stock') status = 'low-stock';
+    return status;
+  }
+
+  function choice(p) {
+    var key = String(p.id), o = options(p), c = colors(p), f = flavors(p), s = selections[key] || {};
+    return {
+      option: Math.min(Number(s.option || 0), Math.max(0, o.length - 1)),
+      color: s.color && c.indexOf(s.color) >= 0 ? s.color : c[0],
+      flavor: s.flavor && f.indexOf(s.flavor) >= 0 ? s.flavor : (f[0] || '')
+    };
+  }
+
+  function lineKey(id, o, c, f) { return [id, o, c, f].join('|'); }
+  function findLine(key) { return cart.find(function (i) { return i.key === key; }); }
+  function lineFor(p) {
+    var s = choice(p);
+    return findLine(lineKey(p.id, s.option, s.color, s.flavor));
+  }
+
+  /* The highest absolute quantity this line may hold. remainingQuantity()
+     already excludes what the cart holds, so the ceiling is current + headroom. */
+  function ceilingFor(p, s, current) {
+    var remaining = remainingQuantity(p, s);
+    return remaining === null ? MAX_QTY : Math.min(MAX_QTY, current + remaining);
+  }
+
+  /* ------------------------------------------------------------ cart state */
+
+  /* Only positive lines are persisted. A zero-quantity line may exist in memory
+     while its field is being edited (typing "0" before "60" must not delete it). */
+  function saveCart() {
+    try {
+      sessionStorage.setItem(CART_KEY, JSON.stringify(cart.filter(function (l) { return l.quantity > 0; })));
+    } catch (e) { /* private mode */ }
+    updateCartCount();
+  }
+
+  function updateCartCount() {
+    var el = document.getElementById('cart-count');
+    if (!el) return;
+    var count = cart.reduce(function (t, i) { return t + i.quantity; }, 0),
+        previous = Number(el.textContent) || 0;
+    el.textContent = count;
+    if (count !== previous && motion() !== 'off') {
+      el.classList.remove('is-bumped');
+      void el.offsetWidth;
+      el.classList.add('is-bumped');
+    }
+  }
+
+  /* Set an absolute quantity. Returns the value actually stored, so a caller
+     can write a clamped number back into the field. */
+  function setVariantQuantity(p, s, value, opts) {
+    opts = opts || {};
+    var key = lineKey(p.id, s.option, s.color, s.flavor),
+        line = findLine(key),
+        current = line ? line.quantity : 0,
+        requested = Math.floor(Number(value));
+    if (!isFinite(requested) || requested < 0) requested = 0;
+
+    var ceiling = ceilingFor(p, s, current),
+        next = Math.max(0, Math.min(requested, ceiling));
+    if (next > current && variantStatus(p, s) === 'out-of-stock') next = current;
+
+    if (!line && next > 0) {
+      line = { key: key, productId: p.id, option: s.option, color: s.color, flavor: s.flavor, quantity: 0 };
+      cart.push(line);
+    }
+    if (line) line.quantity = next;
+    if (!opts.defer) purgeEmptyLines();
+    saveCart();
+    return { value: next, clamped: next !== requested, added: current === 0 && next > 0 };
+  }
+
+  function purgeEmptyLines() {
+    var before = cart.length;
+    cart = cart.filter(function (l) { return l.quantity > 0; });
+    return cart.length !== before;
+  }
+
+  /* Kept for the public DR_CATALOG_APP surface and for external callers: full
+     re-render semantics, exactly as before. */
+  function changeVariant(p, s, delta) {
+    var key = lineKey(p.id, s.option, s.color, s.flavor),
+        line = findLine(key),
+        current = line ? line.quantity : 0;
+    setVariantQuantity(p, s, current + delta);
+    render();
+    renderCart();
+    if (detailProduct) renderDetail();
+  }
+  function changeCart(p, delta) { changeVariant(p, choice(p), delta); }
+
+  function normalizeCart() {
+    var saved = cart.slice();
+    cart = [];
+    saved.forEach(function (line) {
+      var found = findProduct(line.productId);
+      if (!found) return;
+      var p = found.product, o = options(p), c = colors(p), f = flavors(p),
+          state = {
+            option: Number(line.option) || 0,
+            color: line.color || 'Standard',
+            flavor: line.flavor || ''
+          };
+      if ((o.length && state.option >= o.length) || c.indexOf(state.color) < 0 ||
+          (state.flavor && f.indexOf(state.flavor) < 0) || variantStatus(p, state) === 'out-of-stock') return;
+      var remaining = remainingQuantity(p, state),
+          quantity = Math.max(0, Math.min(MAX_QTY, Number(line.quantity) || 0, remaining === null ? MAX_QTY : remaining));
+      if (quantity) {
+        cart.push({
+          key: lineKey(p.id, state.option, state.color, state.flavor),
+          productId: p.id, option: state.option, color: state.color,
+          flavor: state.flavor, quantity: quantity
+        });
+      }
+    });
+    saveCart();
+  }
+
+  function toggleFavorite(id) {
+    favorites = favorites.indexOf(Number(id)) >= 0
+      ? favorites.filter(function (x) { return x !== Number(id); })
+      : [Number(id)].concat(favorites);
+    try { localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites)); } catch (e) {}
+    render();
+    if (detailProduct) renderDetail();
+  }
+
+  /* ------------------------------------------------- the quantity control */
+
+  /* One markup shape, used by product cards, flavor rows and cart lines, so
+     all three behave identically. */
+  function qtyControl(p, s, opts) {
+    opts = opts || {};
+    var key = lineKey(p.id, s.option, s.color, s.flavor),
+        line = findLine(key),
+        qty = line ? line.quantity : 0,
+        status = variantStatus(p, s),
+        ceiling = ceilingFor(p, s, qty),
+        label = opts.label || (p.name + (s.flavor ? ' — ' + s.flavor : ''));
+
+    return '<div class="qty-wrap">' +
+      '<div class="qty' + (qty ? '' : ' is-empty') + '" data-qty' +
+        ' data-pid="' + esc(p.id) + '"' +
+        ' data-option="' + esc(s.option) + '"' +
+        ' data-color="' + esc(s.color || '') + '"' +
+        ' data-flavor="' + esc(s.flavor || '') + '">' +
+        '<button type="button" class="qty-step" data-qty-step="-1" aria-label="Decrease quantity"' +
+          (qty <= 0 ? ' disabled' : '') + '>&minus;</button>' +
+        '<input class="qty-input" type="text" inputmode="numeric" autocomplete="off"' +
+          ' data-qty-input data-max="' + ceiling + '" value="' + qty + '"' +
+          ' aria-label="Quantity for ' + esc(label) + '">' +
+        '<button type="button" class="qty-step" data-qty-step="1" aria-label="Increase quantity"' +
+          (qty >= ceiling || status === 'out-of-stock' ? ' disabled' : '') + '>+</button>' +
+      '</div>' +
+      (opts.hint === false ? '' : '<small class="qty-hint">' + esc(qtyHintText(p, s, qty, ceiling, status)) + '</small>') +
+    '</div>';
+  }
+
+  function qtyHintText(p, s, qty, ceiling, status) {
+    if (status === 'out-of-stock') return 'Out of stock';
+    if (remainingQuantity(p, s) === null) return qty ? qty + (qty === 1 ? ' piece' : ' pieces') : 'Type a quantity';
+    return qty >= ceiling ? 'Maximum ' + ceiling : ceiling - qty + ' more available';
+  }
+
+  /* Resolve a .qty element back to its product and variant. */
+  function controlState(node) {
+    var found = findProduct(node.dataset.pid);
+    if (!found) return null;
+    return {
+      product: found.product,
+      state: {
+        option: Number(node.dataset.option) || 0,
+        color: node.dataset.color || 'Standard',
+        flavor: node.dataset.flavor || ''
+      }
+    };
+  }
+
+  /* Surgical refresh of one control plus the labels around it. */
+  function refreshQtyControl(node, skipInput) {
+    var resolved = controlState(node);
+    if (!resolved) return;
+    var p = resolved.product, s = resolved.state,
+        line = findLine(lineKey(p.id, s.option, s.color, s.flavor)),
+        qty = line ? line.quantity : 0,
+        status = variantStatus(p, s),
+        ceiling = ceilingFor(p, s, qty);
+
+    var input = node.querySelector('[data-qty-input]');
+    if (input) {
+      input.dataset.max = String(ceiling);
+      if (input !== skipInput) input.value = String(qty);
+    }
+    node.classList.toggle('is-empty', qty === 0);
+
+    var minus = node.querySelector('[data-qty-step="-1"]'),
+        plus = node.querySelector('[data-qty-step="1"]');
+    if (minus) minus.disabled = qty <= 0;
+    if (plus) plus.disabled = qty >= ceiling || status === 'out-of-stock';
+
+    var wrap = node.parentNode, hint = wrap && wrap.querySelector('.qty-hint');
+    if (hint) {
+      hint.textContent = qtyHintText(p, s, qty, ceiling, status);
+      hint.classList.toggle('is-max', qty > 0 && qty >= ceiling);
+    }
+
+    var row = node.closest ? node.closest('.flavor-row') : null;
+    if (row) {
+      row.classList.toggle('out-of-stock', status === 'out-of-stock');
+      var avail = row.querySelector('.flavor-avail');
+      if (avail) avail.textContent = availabilityText(p, s, status);
+    }
+
+    var card = node.closest ? node.closest('.product-card') : null;
+    var chip = card && card.querySelector('.stock');
+    if (chip) {
+      chip.className = 'stock ' + status;
+      chip.textContent = stockLabel(p, s, status);
+    }
+  }
+
+  function availabilityText(p, s, status) {
+    var remaining = remainingQuantity(p, s);
+    if (status === 'out-of-stock') return 'Out of stock';
+    if (remaining !== null) return remaining + ' available';
+    return status === 'low-stock' ? 'Low stock' : 'In stock';
+  }
+
+  function stockLabel(p, s, status) {
+    var remaining = remainingQuantity(p, s);
+    if (status === 'out-of-stock') return 'Out of stock';
+    return (status === 'low-stock' ? 'Low stock' : 'In stock') +
+      (remaining !== null ? ' · ' + remaining + ' left' : '');
+  }
+
+  /* Update every number that moved, without rebuilding any container. */
+  function syncQuantityUI(productId, skipInput) {
+    updateCartCount();
+    var nodes = document.querySelectorAll('[data-qty]');
+    Array.prototype.forEach.call(nodes, function (node) {
+      if (productId != null && Number(node.dataset.pid) !== Number(productId)) return;
+      refreshQtyControl(node, skipInput);
+    });
+    refreshCartFigures();
+  }
+
+  function refreshCartFigures() {
+    var box = document.getElementById('cart-content');
+    if (!box) return;
+    var total = 0;
+    cart.forEach(function (line) {
+      var f = findProduct(line.productId);
+      if (f) total += unitPrice(f.product, line) * line.quantity;
+    });
+
+    Array.prototype.forEach.call(box.querySelectorAll('.cart-line[data-line-key]'), function (row) {
+      var line = findLine(row.dataset.lineKey);
+      var found = line && findProduct(line.productId);
+      var totalEl = row.querySelector('[data-line-total]');
+      if (totalEl) totalEl.textContent = found ? money(unitPrice(found.product, line) * line.quantity) : money(0);
+    });
+
+    Array.prototype.forEach.call(box.querySelectorAll('[data-group-count]'), function (el) {
+      var pid = Number(el.dataset.groupCount);
+      var n = cart.filter(function (l) { return Number(l.productId) === pid; })
+        .reduce(function (t, l) { return t + l.quantity; }, 0);
+      el.textContent = n + (n === 1 ? ' piece' : ' pieces');
+    });
+
+    var totalEl = box.querySelector('[data-cart-total]');
+    if (totalEl) totalEl.textContent = money(total);
+
+    var warning = box.querySelector('[data-min-warning]'),
+        minimum = Number((window.DR_PHONE.store || {}).minimum_order || 0);
+    if (warning) {
+      if (minimum && total < minimum && cart.length) {
+        warning.textContent = 'Add ' + money(minimum - total) + ' to reach the ' + money(minimum) + ' minimum order.';
+        warning.hidden = false;
+      } else {
+        warning.hidden = true;
+      }
+    }
+  }
+
+  /* Called when a field is left: zeroed lines finally disappear. Deferred to
+     this point so that typing "0" as the first digit of "60" is harmless. */
+  function commitQuantities() {
+    if (!purgeEmptyLines()) return;
+    saveCart();
+    var box = document.getElementById('cart-content');
+    if (!box) return;
+    Array.prototype.forEach.call(box.querySelectorAll('.cart-line[data-line-key]'), function (row) {
+      if (!findLine(row.dataset.lineKey)) row.remove();
+    });
+    Array.prototype.forEach.call(box.querySelectorAll('.cart-group'), function (group) {
+      if (!group.querySelector('.cart-line')) group.remove();
+    });
+    if (!cart.length) renderCart();
+    else refreshCartFigures();
+  }
+
+  /* Delegated handlers — one set for every quantity control on the page. */
+  function bindQuantityEvents() {
+    document.addEventListener('input', function (e) {
+      var input = e.target.closest && e.target.closest('[data-qty-input]');
+      if (!input) return;
+      var node = input.closest('[data-qty]'), resolved = node && controlState(node);
+      if (!resolved) return;
+
+      // Digits only, preserving the caret.
+      var raw = input.value, clean = raw.replace(/[^0-9]/g, '');
+      if (clean !== raw) {
+        var pos = input.selectionStart == null ? clean.length : input.selectionStart - (raw.length - clean.length);
+        input.value = clean;
+        try { input.setSelectionRange(Math.max(0, pos), Math.max(0, pos)); } catch (err) {}
+      }
+      if (clean === '') { return; }  // mid-edit; nothing committed yet
+
+      var result = setVariantQuantity(resolved.product, resolved.state, clean, { defer: true });
+      if (result.clamped) {
+        input.value = String(result.value);
+        flashClamped(node);
+      }
+      if (result.added) flyToCart(node);
+      syncQuantityUI(resolved.product.id, input);
+    });
+
+    document.addEventListener('change', function (e) {
+      if (e.target.closest && e.target.closest('[data-qty-input]')) commitField(e.target);
+    });
+    document.addEventListener('focusout', function (e) {
+      if (e.target.closest && e.target.closest('[data-qty-input]')) commitField(e.target);
+    });
+    document.addEventListener('focusin', function (e) {
+      var input = e.target.closest && e.target.closest('[data-qty-input]');
+      if (input) { try { input.select(); } catch (err) {} }
+    });
+    document.addEventListener('keydown', function (e) {
+      var input = e.target.closest && e.target.closest('[data-qty-input]');
+      if (!input) return;
+      if (e.key === 'Enter') { e.preventDefault(); input.blur(); return; }
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        stepQuantity(input.closest('[data-qty]'), e.key === 'ArrowUp' ? 1 : -1);
+      }
+    });
+
+    // Press-and-hold on - / +. Bound to pointerdown so the change lands before
+    // any focused field's blur can reflow the list under the pointer.
+    var hold = null;
+    function stopHold() {
+      if (!hold) return;
+      clearTimeout(hold.delay);
+      clearInterval(hold.timer);
+      try { hold.button.releasePointerCapture(hold.pointerId); } catch (e) {}
+      hold = null;
+    }
+    document.addEventListener('pointerdown', function (e) {
+      var button = e.target.closest && e.target.closest('[data-qty-step]');
+      if (!button || button.disabled) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      e.preventDefault();
+      stopHold();
+      var node = button.closest('[data-qty]'), delta = Number(button.dataset.qtyStep);
+      stepQuantity(node, delta);
+      // Capture the pointer so the matching pointerup always reaches us even if
+      // the list reflows out from under the finger.
+      try { button.setPointerCapture(e.pointerId); } catch (err) {}
+      hold = { button: button, pointerId: e.pointerId, delay: null, timer: null };
+      hold.delay = setTimeout(function () {
+        var ticks = 0;
+        hold.timer = setInterval(function () {
+          if (button.disabled || !button.isConnected) { stopHold(); return; }
+          stepQuantity(node, delta * (++ticks > 14 ? 5 : 1));   // accelerates after ~1.5s
+        }, 110);
+      }, 450);
+    });
+    // Deliberately not pointerleave: registered on document in the capture
+    // phase it fires for every element the pointer crosses, which cancelled the
+    // hold on the very first move.
+    ['pointerup', 'pointercancel'].forEach(function (type) {
+      window.addEventListener(type, stopHold);
+    });
+    window.addEventListener('blur', stopHold);
+    // Keyboard activation of the buttons produces a click with detail 0.
+    document.addEventListener('click', function (e) {
+      var button = e.target.closest && e.target.closest('[data-qty-step]');
+      if (!button || button.disabled || e.detail !== 0) return;
+      stepQuantity(button.closest('[data-qty]'), Number(button.dataset.qtyStep));
+    });
+  }
+
+  function stepQuantity(node, delta) {
+    var resolved = node && controlState(node);
+    if (!resolved) return;
+    var p = resolved.product, s = resolved.state,
+        line = findLine(lineKey(p.id, s.option, s.color, s.flavor)),
+        current = line ? line.quantity : 0;
+    var result = setVariantQuantity(p, s, current + delta);
+    if (result.added) flyToCart(node);
+    syncQuantityUI(p.id);
+    if (result.value === 0) commitQuantities();
+  }
+
+  function commitField(input) {
+    var node = input.closest('[data-qty]'), resolved = node && controlState(node);
+    if (!resolved) return;
+    var value = input.value.replace(/[^0-9]/g, '');
+    var result = setVariantQuantity(resolved.product, resolved.state, value === '' ? 0 : value, { defer: true });
+    input.value = String(result.value);
+    if (result.clamped) flashClamped(node);
+    syncQuantityUI(resolved.product.id);
+    commitQuantities();
+  }
+
+  function flashClamped(node) {
+    if (!node || motion() === 'off') return;
+    node.classList.remove('is-clamped');
+    void node.offsetWidth;
+    node.classList.add('is-clamped');
+    setTimeout(function () { node.classList.remove('is-clamped'); }, 700);
+  }
+
+  /* ------------------------------------------------------------- motion */
+
+  var revealObserver = null;
+
+  function observeReveals(root) {
+    var nodes = (root || document).querySelectorAll('[data-reveal]:not(.is-revealed)');
+    if (motion() === 'off' || !('IntersectionObserver' in window)) {
+      Array.prototype.forEach.call(nodes, function (n) { n.classList.add('is-revealed'); });
+      return;
+    }
+    if (!revealObserver) {
+      revealObserver = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add('is-revealed');
+          revealObserver.unobserve(entry.target);   // one shot; cheap at 98 cards
+        });
+      }, { rootMargin: '0px 0px -8% 0px', threshold: 0.05 });
+    }
+    Array.prototype.forEach.call(nodes, function (n) { revealObserver.observe(n); });
+  }
+
+  function runCounters(root) {
+    var nodes = (root || document).querySelectorAll('[data-count-to]');
+    Array.prototype.forEach.call(nodes, function (el) {
+      var target = Number(el.dataset.countTo) || 0;
+      if (motion() === 'off') { el.textContent = target; return; }
+      var start = null, duration = 1100;
+      function tick(now) {
+        if (start === null) start = now;
+        var t = Math.min(1, (now - start) / duration);
+        el.textContent = Math.round(target * (1 - Math.pow(1 - t, 3)));
+        if (t < 1) requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    });
+  }
+
+  function flyToCart(sourceNode) {
+    if (motion() === 'off') return;
+    var card = sourceNode.closest && sourceNode.closest('.product-card, .product-content, .flavor-row');
+    var img = card && card.querySelector('img');
+    var target = document.getElementById('cart-count');
+    var layer = document.getElementById('fly-layer');
+    if (!img || !target || !layer || !img.animate) return;
+
+    var from = img.getBoundingClientRect(), to = target.getBoundingClientRect();
+    if (!from.width || !to.width) return;
+
+    var clone = img.cloneNode(false);
+    clone.className = 'fly-clone';
+    clone.style.left = from.left + 'px';
+    clone.style.top = from.top + 'px';
+    clone.style.width = from.width + 'px';
+    clone.style.height = from.height + 'px';
+    layer.appendChild(clone);
+
+    var dx = (to.left + to.width / 2) - (from.left + from.width / 2),
+        dy = (to.top + to.height / 2) - (from.top + from.height / 2);
+    var animation = clone.animate([
+      { transform: 'translate3d(0,0,0) scale(1)', opacity: 1 },
+      { transform: 'translate3d(' + dx * 0.5 + 'px,' + (dy * 0.3 - 80) + 'px,0) scale(.55)', opacity: .95, offset: .55 },
+      { transform: 'translate3d(' + dx + 'px,' + dy + 'px,0) scale(.12)', opacity: 0 }
+    ], { duration: 700, easing: 'cubic-bezier(.5,0,.75,1)' });
+    animation.onfinish = function () { clone.remove(); };
+    animation.oncancel = function () { clone.remove(); };
+  }
+
+  /* ------------------------------------------------------------ selection */
+
+  function activeCategory() {
+    return catalog.find(function (c) { return c.slug === selected; });
+  }
+  function minPrice(p) {
+    var o = options(p);
+    return o.length ? Math.min.apply(null, o.map(function (x) { return Number(x.price); })) : Infinity;
+  }
+
+  /* A query searches the whole catalog, matching the "Search all products"
+     placeholder; without one, the open category is the pool. */
+  function searchScope() { return search.value.trim() ? null : activeCategory(); }
+
+  function getProducts() {
+    var q = search.value.trim().toLowerCase(),
+        category = searchScope(),
+        pool = category ? category.products : allProducts().map(function (x) { return x.product; });
+    if (q) {
+      pool = pool.filter(function (p) {
+        return [p.sku, p.name, p.brand, p.color, p.type, (p.colors || []).join(' '), (p.flavors || []).join(' ')]
+          .join(' ').toLowerCase().indexOf(q) >= 0;
+      });
+    } else if (!category) return [];
+    var result = pool.slice();
+    if (sortMode === 'name') result.sort(function (a, b) { return a.name.localeCompare(b.name); });
+    if (sortMode === 'brand') result.sort(function (a, b) { return (a.brand || '').localeCompare(b.brand || '') || a.name.localeCompare(b.name); });
+    if (sortMode === 'price-low') result.sort(function (a, b) { return minPrice(a) - minPrice(b); });
+    if (sortMode === 'price-high') result.sort(function (a, b) { return minPrice(b) - minPrice(a); });
+    return result;
+  }
+
+  function categoryGroups() {
+    var groups = [];
+    catalog.forEach(function (c) {
+      var name = c.group || 'Other',
+          group = groups.find(function (g) { return g.name === name; });
+      if (!group) { group = { name: name, categories: [] }; groups.push(group); }
+      group.categories.push(c);
+    });
+    return groups;
+  }
+
+  /* --------------------------------------------------------- menu / strips */
+
+  function renderMenu() {
+    var nav = document.getElementById('menu-categories');
+    if (!nav) return;
+    nav.innerHTML = '<button data-category="">All categories</button>' + categoryGroups().map(function (group) {
+      var active = group.categories.some(function (c) { return c.slug === selected; });
+      return '<details class="menu-category-group"' + (active ? ' open' : '') + '>' +
+        '<summary><span>' + esc(group.name) + '</span></summary>' +
+        group.categories.map(function (c) {
+          return '<button data-category="' + esc(c.slug) + '" class="' + (c.slug === selected ? 'active' : '') + '">' +
+            '<span>' + esc(c.name) + '</span><small>' + c.products.length + '</small></button>';
+        }).join('') + '</details>';
+    }).join('');
+    nav.onclick = function (e) {
+      var b = e.target.closest('[data-category]');
+      if (!b) return;
+      selected = b.dataset.category || null;
+      search.value = '';
+      syncSearchClear();
+      sortMode = 'original';
+      history.replaceState(null, '', selected ? '#' + selected : location.pathname);
+      closePanels();
+      render();
+      scrollTo({ top: 0, behavior: 'smooth' });
+    };
+  }
+
+  function productStrip(title, ids) {
+    var products = ids.map(function (id) { var f = findProduct(id); return f && f.product; }).filter(Boolean);
+    if (!products.length) return '';
+    return '<section class="saved-products" data-reveal><div class="saved-products-head"><h3>' + esc(title) + '</h3></div><div>' +
+      products.map(function (p) {
+        return '<button class="saved-card" data-open-product="' + p.id + '">' +
+          '<img src="' + esc(p.image || '') + '" alt="" loading="lazy"><span>' + esc(p.name) + '</span></button>';
+      }).join('') + '</div></section>';
+  }
+
+  function recentStrip() {
+    var products = recent.map(function (id) { var f = findProduct(id); return f && f.product; }).filter(Boolean);
+    if (!products.length) return '';
+    return '<section class="saved-products recent-products ' + (recentCollapsed ? 'collapsed' : '') + '" data-reveal>' +
+      '<div class="saved-products-head"><h3>Recently viewed</h3><div class="saved-products-actions">' +
+        '<button data-recent-toggle aria-label="' + (recentCollapsed ? 'Expand' : 'Minimize') + ' recently viewed">' + chevron() + '</button>' +
+        '<button data-recent-clear aria-label="Clear recently viewed">' + cross() + '</button>' +
+      '</div></div>' +
+      (recentCollapsed ? '' : '<div class="saved-product-strip">' + products.map(function (p) {
+        return '<div class="saved-product-item"><button data-open-product="' + p.id + '">' +
+          '<img src="' + esc(p.image || '') + '" alt="" loading="lazy"><span>' + esc(p.name) + '</span></button>' +
+          '<button class="remove-recent" data-recent-remove="' + p.id + '" aria-label="Remove ' + esc(p.name) + '">' + cross() + '</button></div>';
+      }).join('') + '</div>') + '</section>';
+  }
+
+  function chevron() { return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>'; }
+  function cross() { return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>'; }
+  function heart() { return '<svg viewBox="0 0 24 24" aria-hidden="true" style="fill:currentColor;stroke:none"><path d="M12 21s-8-4.9-8-10.4A4.6 4.6 0 0 1 12 7.6a4.6 4.6 0 0 1 8 3C20 16.1 12 21 12 21Z"/></svg>'; }
+
+  /* ------------------------------------------------------------- the hero */
+
+  function heroMarkup() {
+    var groups = categoryGroups(),
+        productCount = catalog.reduce(function (t, c) { return t + c.products.length; }, 0),
+        items = groups.map(function (g) { return '<span class="marquee-item">' + esc(g.name) + '</span>'; }).join('');
+    return '<section class="hero">' +
+      '<div class="hero-eyebrow"><p class="eyebrow">DR PHONE wholesale</p></div>' +
+      '<h1 class="hero-headline">' +
+        '<span class="reveal-line"><i style="--d:.05s">Phones,</i></span>' +
+        '<span class="reveal-line"><i style="--d:.15s">tech &amp;</i></span>' +
+        '<span class="reveal-line"><i style="--d:.25s">lots <em>more.</em></i></span>' +
+      '</h1>' +
+      '<div class="hero-rule"></div>' +
+      '<div class="hero-meta">' +
+        '<div class="hero-stat"><b data-count-to="' + productCount + '">0</b><span>Products</span></div>' +
+        '<div class="hero-stat"><b data-count-to="' + catalog.length + '">0</b><span>Categories</span></div>' +
+        '<div class="hero-stat"><b data-count-to="' + groups.length + '">0</b><span>Departments</span></div>' +
+      '</div>' +
+      // The track is printed twice so the -50% loop is seamless.
+      '<div class="marquee"><div class="marquee-track">' + items + items + '</div></div>' +
+    '</section>';
+  }
+
+  /* ------------------------------------------------------ category screen */
+
+  function categoryRows() {
+    var number = 0;
+    return categoryGroups().map(function (group) {
+      return '<section class="catalog-group" data-reveal><h3>' + esc(group.name) + '</h3><div class="category-rows">' +
+        group.categories.map(function (c) {
+          number++;
+          return '<button class="category-row" data-slug="' + esc(c.slug) + '">' +
+            '<span class="category-index">' + String(number).padStart(2, '0') + '</span>' +
+            '<span class="category-name">' + esc(c.name) + '</span>' +
+            '<span class="category-count">' + c.products.length + ' items</span>' +
+            '<span class="category-arrow"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg></span>' +
+          '</button>';
+        }).join('') + '</div></section>';
+    }).join('');
+  }
+
+  function renderCategories() {
+    content.innerHTML = heroMarkup() +
+      productStrip('♥ Favorites', favorites) +
+      recentStrip() +
+      '<div class="section-heading" data-reveal><div><p class="eyebrow">Browse the collection</p><h2>Choose a category</h2></div>' +
+        '<span class="result-count">' + catalog.length + ' categories</span></div>' +
+      categoryRows();
+
+    content.onchange = null;
+    content.onclick = function (e) {
+      if (e.target.closest('[data-recent-toggle]')) {
+        recentCollapsed = !recentCollapsed;
+        try { localStorage.setItem(RECENT_COLLAPSED_KEY, recentCollapsed ? '1' : '0'); } catch (err) {}
+        renderCategories();
+        return;
+      }
+      if (e.target.closest('[data-recent-clear]')) {
+        recent = [];
+        try { localStorage.setItem(RECENT_KEY, '[]'); } catch (err) {}
+        renderCategories();
+        return;
+      }
+      var remove = e.target.closest('[data-recent-remove]');
+      if (remove) {
+        recent = recent.filter(function (id) { return Number(id) !== Number(remove.dataset.recentRemove); });
+        try { localStorage.setItem(RECENT_KEY, JSON.stringify(recent)); } catch (err) {}
+        renderCategories();
+        return;
+      }
+      var open = e.target.closest('[data-open-product]');
+      if (open) {
+        var found = findProduct(open.dataset.openProduct);
+        if (found) openProduct(found.product);
+        return;
+      }
+      var b = e.target.closest('[data-slug]');
+      if (!b) return;
+      selected = b.dataset.slug;
+      search.value = '';
+      syncSearchClear();
+      location.hash = selected;
+      render();
+      scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    observeReveals(content);
+    runCounters(content);
+  }
+
+  /* -------------------------------------------------------- product cards */
+
+  function selectMarkup(label, kind, values, current, p) {
+    if (!values.length) return '';
+    return '<label class="product-select"><span>' + esc(label) + '</span>' +
+      '<select data-choice="' + kind + '" data-id="' + p.id + '">' +
+      values.map(function (v, i) {
+        var value = kind === 'option' ? String(i) : v;
+        var title = kind === 'option' ? v.name + ' — ' + money(v.price) : v;
+        return '<option value="' + esc(value) + '"' + (String(value) === String(current) ? ' selected' : '') + '>' + esc(title) + '</option>';
+      }).join('') + '</select></label>';
+  }
+
+  function productCard(p, index) {
+    var o = options(p), c = colors(p), f = flavors(p), s = choice(p),
+        status = variantStatus(p, s),
+        meta = [p.sku, p.type].filter(Boolean).join(' · ');
+
+    var price = o.length > 1
+      ? '<div class="option-table"><div><b>Option</b><b>Price</b></div>' + o.map(function (x) {
+          return '<div><span>' + esc(x.name) + '</span><strong>' + money(x.price) + '</strong></div>';
+        }).join('') + '</div>'
+      : '<p class="price">' + (o[0] ? money(o[0].price) : 'Price on request') + '</p>';
+
+    var colorPicker = c.length > 1
+      ? '<div class="color-picker"><span>Choose color</span><div>' + c.map(function (color) {
+          return '<button data-color="' + esc(color) + '" data-id="' + p.id + '" class="' + (color === s.color ? 'active' : '') + '">' + esc(color) + '</button>';
+        }).join('') + '</div></div>'
+      : '';
+
+    var buy;
+    if (f.length) {
+      buy = '<button class="choose-flavors" data-open-product="' + p.id + '">Choose flavors <b>' + f.length + '</b></button>';
+    } else if (status === 'out-of-stock') {
+      buy = '<button class="add-cart" disabled>Out of stock</button>';
+    } else {
+      buy = qtyControl(p, s);
+    }
+
+    return '<article class="product-card" data-reveal style="--reveal-delay:' + (index % 8) * 45 + 'ms">' +
+      '<button class="favorite-button ' + (favorites.indexOf(Number(p.id)) >= 0 ? 'active' : '') + '"' +
+        ' data-favorite="' + p.id + '" aria-label="Save ' + esc(p.name) + '">' + heart() + '</button>' +
+      '<button class="image-frame" data-open-product="' + p.id + '" aria-label="Open ' + esc(p.name) + '">' +
+        (p.image ? '<img src="' + esc(p.image) + '" alt="' + esc(p.name) + '" loading="lazy">' : '<div class="image-missing">Image unavailable</div>') +
+      '</button>' +
+      '<div class="product-info">' +
+        '<div class="product-label-row"><p class="product-brand">' + esc(p.brand || 'DR PHONE') + '</p>' +
+          '<span class="stock ' + esc(status) + '">' + esc(stockLabel(p, s, status)) + '</span></div>' +
+        '<h3>' + esc(p.name) + '</h3>' +
+        (meta ? '<p class="product-meta">' + esc(meta) + '</p>' : '') +
+        price +
+        (o.length > 1 ? selectMarkup('Choose option', 'option', o, s.option, p) : '') +
+        colorPicker +
+        '<div class="buy-row">' + buy + '</div>' +
+      '</div></article>';
+  }
+
+  function renderResults() {
+    var category = searchScope(), products = getProducts(), q = search.value.trim();
+    content.innerHTML =
+      '<div class="section-heading product-heading">' +
+        '<button class="back-button" id="back" aria-label="Back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H6M11 18l-6-6 6-6"/></svg></button>' +
+        '<div class="result-title"><h2>' + esc(category ? category.name : 'Results for “' + q + '”') + '</h2></div>' +
+        '<div class="result-tools"><span class="result-count">' + products.length + ' items</span>' +
+          '<label class="sort-control"><span>Sort</span><select id="sort">' +
+            '<option value="original">Original order</option>' +
+            '<option value="name">Name A–Z</option>' +
+            '<option value="brand">Brand A–Z</option>' +
+            '<option value="price-low">Price: low to high</option>' +
+            '<option value="price-high">Price: high to low</option>' +
+          '</select></label></div>' +
+      '</div>' +
+      (products.length
+        ? '<div class="product-grid">' + products.map(productCard).join('') + '</div>'
+        : '<div class="empty-state"><h3>No products found</h3><p>Try a different search term or category.</p></div>');
+
+    var sortSelect = document.getElementById('sort');
+    sortSelect.value = sortMode;
+    sortSelect.onchange = function (e) { sortMode = e.target.value; renderResults(); };
+    document.getElementById('back').onclick = function () {
+      selected = null;
+      search.value = '';
+      syncSearchClear();
+      sortMode = 'original';
+      history.replaceState(null, '', location.pathname);
+      render();
+    };
+
+    content.onchange = function (e) {
+      var el = e.target.closest('[data-choice]');
+      if (!el) return;
+      var found = findProduct(el.dataset.id);
+      if (!found) return;
+      var p = found.product, key = String(p.id), s = choice(p);
+      s[el.dataset.choice] = el.dataset.choice === 'option' ? Number(el.value) : el.value;
+      selections[key] = s;
+      renderResults();
+    };
+    content.onclick = function (e) {
+      var favorite = e.target.closest('[data-favorite]');
+      if (favorite) { toggleFavorite(favorite.dataset.favorite); return; }
+      var open = e.target.closest('[data-open-product]');
+      if (open) {
+        var opened = findProduct(open.dataset.openProduct);
+        if (opened) openProduct(opened.product);
+        return;
+      }
+      var color = e.target.closest('[data-color]');
+      if (color) {
+        var colored = findProduct(color.dataset.id);
+        if (colored) {
+          var key = String(colored.product.id), s = choice(colored.product);
+          s.color = color.dataset.color;
+          selections[key] = s;
+          renderResults();
+        }
+      }
+    };
+
+    observeReveals(content);
+  }
+
+  function render() {
+    purgeEmptyLines();
+    (activeCategory() || search.value.trim()) ? renderResults() : renderCategories();
+  }
+
+  /* ------------------------------------------------------- product detail */
+
+  function openProduct(p) {
+    detailProduct = p;
+    flavorQuery = '';
+    recent = [Number(p.id)].concat(recent.filter(function (x) { return x !== Number(p.id); })).slice(0, 12);
+    try { localStorage.setItem(RECENT_KEY, JSON.stringify(recent)); } catch (e) {}
+    renderDetail();
+    openPanel('product-panel');
+  }
+
+  function renderDetail() {
+    var box = document.getElementById('product-content'), p = detailProduct;
+    if (!box || !p) return;
+    var o = options(p), c = colors(p), f = flavors(p), s = choice(p),
+        filtered = f.filter(function (name) { return name.toLowerCase().indexOf(flavorQuery.toLowerCase()) >= 0; }),
+        images = Array.isArray(p.images) && p.images.length ? p.images : (p.image ? [p.image] : []),
+        standardStatus = variantStatus(p, s);
+
+    var flavorRows = filtered.map(function (flavor) {
+      var state = { option: s.option, color: s.color, flavor: flavor },
+          status = variantStatus(p, state);
+      return '<div class="flavor-row ' + esc(status) + '">' +
+        '<span><b>' + esc(flavor) + '</b><small class="flavor-avail">' + esc(availabilityText(p, state, status)) + '</small></span>' +
+        qtyControl(p, state, { hint: false, label: p.name + ' — ' + flavor }) +
+      '</div>';
+    }).join('');
+
+    box.innerHTML =
+      '<div class="detail-gallery">' +
+        '<div class="detail-image">' + (images[0] ? '<img src="' + esc(images[0]) + '" alt="' + esc(p.name) + '">' : 'Image unavailable') + '</div>' +
+        (images.length > 1 ? '<div class="detail-thumbnails">' + images.map(function (src) {
+          return '<img src="' + esc(src) + '" alt="" data-detail-thumb="' + esc(src) + '">';
+        }).join('') + '</div>' : '') +
+      '</div>' +
+      '<div class="detail-controls">' +
+        '<div class="detail-title"><div><p class="eyebrow">' + esc(p.brand || 'DR PHONE') + '</p><h2>' + esc(p.name) + '</h2></div>' +
+          '<button data-detail-favorite class="favorite-button ' + (favorites.indexOf(Number(p.id)) >= 0 ? 'active' : '') + '" aria-label="Save product">' + heart() + '</button></div>' +
+        (p.type ? '<p class="product-meta">' + esc(p.type) + '</p>' : '') +
+        (o.length > 1 ? selectMarkup('Choose option', 'option', o, s.option, p) : '<p class="price">' + (o[0] ? money(o[0].price) : 'Price on request') + '</p>') +
+        (c.length > 1 ? '<div class="color-picker"><span>Choose color</span><div>' + c.map(function (color) {
+          return '<button data-detail-color="' + esc(color) + '" class="' + (color === s.color ? 'active' : '') + '">' + esc(color) + '</button>';
+        }).join('') + '</div></div>' : '') +
+        (f.length
+          ? '<div class="flavor-panel"><label class="flavor-search">' +
+              '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>' +
+              '<input id="flavor-search" type="search" placeholder="Search flavors" value="' + esc(flavorQuery) + '">' +
+            '</label><div class="flavor-list">' + (flavorRows || '<div class="empty-state"><h3>No matches</h3></div>') + '</div></div>'
+          : '<div class="detail-add">' + (standardStatus === 'out-of-stock'
+              ? '<button class="add-cart" disabled>Out of stock</button>'
+              : qtyControl(p, s)) + '</div>') +
+      '</div>';
+
+    box.oninput = function (e) {
+      if (e.target.id !== 'flavor-search') return;
+      flavorQuery = e.target.value;
+      renderDetail();
+      var input = document.getElementById('flavor-search');
+      if (input) { input.focus(); try { input.setSelectionRange(input.value.length, input.value.length); } catch (err) {} }
+    };
+    box.onchange = function (e) {
+      var el = e.target.closest('[data-choice]');
+      if (!el) return;
+      var state = choice(p);
+      state.option = Number(el.value);
+      selections[String(p.id)] = state;
+      renderDetail();
+    };
+    box.onclick = function (e) {
+      if (e.target.closest('[data-detail-favorite]')) { toggleFavorite(p.id); return; }
+      var thumb = e.target.closest('[data-detail-thumb]');
+      if (thumb) {
+        var main = box.querySelector('.detail-image img');
+        if (main) main.src = thumb.dataset.detailThumb;
+        return;
+      }
+      var color = e.target.closest('[data-detail-color]');
+      if (color) {
+        var state = choice(p);
+        state.color = color.dataset.detailColor;
+        selections[String(p.id)] = state;
+        renderDetail();
+      }
+    };
+  }
+
+  /* ------------------------------------------------------------ the cart */
+
+  function cartGroups() {
+    var groups = [];
+    cart.forEach(function (line) {
+      if (line.quantity <= 0) return;
+      var group = groups.find(function (g) { return Number(g.productId) === Number(line.productId); });
+      if (!group) { group = { productId: line.productId, lines: [] }; groups.push(group); }
+      group.lines.push(line);
+    });
+    return groups;
+  }
+
+  function variantLabel(p, line) {
+    var o = options(p)[line.option], parts = [];
+    if (o && o.name && o.name !== 'Standard') parts.push(o.name);
+    if (line.color && line.color !== 'Standard') parts.push('Color: ' + line.color);
+    if (line.flavor) parts.push('Flavor: ' + line.flavor);
+    return parts.join(' · ') || 'Standard';
+  }
+  function displayName(p) { return p.name + (p.sku ? ' [' + p.sku + ']' : ''); }
+
+  function cartLine(p, line) {
+    var unit = unitPrice(p, line),
+        state = { option: line.option, color: line.color, flavor: line.flavor },
+        remaining = remainingQuantity(p, state);
+    return '<div class="cart-line cart-variant" data-line-key="' + esc(line.key) + '">' +
+      '<div><p>' + esc(variantLabel(p, line)) + '</p>' +
+        '<small>' + money(unit) + ' each' + ((p.tiers || []).length ? ' · tier price applied automatically' : '') +
+          (remaining !== null ? ' · ' + remaining + ' more available' : '') + '</small>' +
+        '<input class="line-note" data-line-note="' + esc(line.key) + '" placeholder="Note for this item" value="' + esc(lineNotes[line.key] || '') + '"></div>' +
+      qtyControl(p, state, { hint: false, label: displayName(p) + ' — ' + variantLabel(p, line) }) +
+      '<strong data-line-total>' + money(unit * line.quantity) + '</strong>' +
+      '<button class="remove-line" data-line="remove" data-key="' + esc(line.key) + '" aria-label="Remove item">' + cross() + '</button>' +
+    '</div>';
+  }
+
+  function cartGroup(group) {
+    var found = findProduct(group.productId);
+    if (!found) return '';
+    var p = found.product,
+        totalQty = group.lines.reduce(function (t, l) { return t + l.quantity; }, 0);
+    return '<article class="cart-group"><header>' +
+      '<img src="' + esc(p.image || '') + '" alt="" loading="lazy">' +
+      '<div><h4>' + esc(displayName(p)) + '</h4>' +
+        '<small data-group-count="' + esc(p.id) + '">' + totalQty + (totalQty === 1 ? ' piece' : ' pieces') + '</small></div>' +
+    '</header><div class="cart-variants">' + group.lines.map(function (line) { return cartLine(p, line); }).join('') + '</div></article>';
+  }
+
+  function renderCart() {
+    var box = document.getElementById('cart-content');
+    if (!box) return;
+    purgeEmptyLines();
+
+    var total = 0;
+    cart.forEach(function (line) {
+      var f = findProduct(line.productId);
+      if (f) total += unitPrice(f.product, line) * line.quantity;
+    });
+    var minimum = Number((window.DR_PHONE.store || {}).minimum_order || 0);
+
+    var customerForm = '<section class="order-customer">' +
+      '<div><span>Order reference</span><strong>' + esc(orderReference) + '</strong></div>' +
+      '<div class="order-fields">' +
+        '<input data-customer="name" placeholder="Customer name" value="' + esc(customer.name) + '">' +
+        '<input data-customer="phone" placeholder="Phone number" value="' + esc(customer.phone) + '">' +
+        '<input data-customer="business" placeholder="Business name (optional)" value="' + esc(customer.business) + '">' +
+        '<textarea data-customer="notes" placeholder="Order notes (optional)">' + esc(customer.notes) + '</textarea>' +
+      '</div></section>';
+
+    box.innerHTML = customerForm + (cart.length
+      ? cartGroups().map(cartGroup).join('') +
+        '<p class="minimum-warning" data-min-warning' + (minimum && total < minimum ? '' : ' hidden') + '>' +
+          (minimum && total < minimum ? 'Add ' + money(minimum - total) + ' to reach the ' + money(minimum) + ' minimum order.' : '') + '</p>' +
+        '<div class="cart-total"><span>Total</span><strong data-cart-total>' + money(total) + '</strong></div>'
+      : '<div class="empty-state"><h3>Your cart is empty</h3><p>Choose a product option, color or flavor and add it here.</p></div>');
+
+    box.oninput = function (e) {
+      var field = e.target.dataset.customer;
+      if (field) {
+        customer[field] = e.target.value;
+        try { sessionStorage.setItem(CUSTOMER_KEY, JSON.stringify(customer)); } catch (err) {}
+      }
+      if (e.target.dataset.lineNote) {
+        lineNotes[e.target.dataset.lineNote] = e.target.value;
+        try { localStorage.setItem(NOTES_KEY, JSON.stringify(lineNotes)); } catch (err) {}
+      }
+    };
+    box.onclick = function (e) {
+      var b = e.target.closest('[data-line="remove"]');
+      if (!b) return;
+      cart = cart.filter(function (i) { return i.key !== b.dataset.key; });
+      saveCart();
+      renderCart();
+      render();
+    };
+  }
+
+  function shareWhatsApp() {
+    if (!cart.length) return;
+    var lines = ['Hello DR PHONE, I would like to order:', 'Reference: ' + orderReference], total = 0;
+    if (customer.name) lines.push('Customer: ' + customer.name);
+    if (customer.business) lines.push('Business: ' + customer.business);
+    if (customer.phone) lines.push('Phone: ' + customer.phone);
+    if (customer.notes) lines.push('Notes: ' + customer.notes);
+    lines.push('');
+    cartGroups().forEach(function (group) {
+      var f = findProduct(group.productId);
+      if (!f) return;
+      var p = f.product;
+      lines.push(displayName(p) + ':');
+      group.lines.forEach(function (line) {
+        var unit = unitPrice(p, line);
+        total += unit * line.quantity;
+        lines.push('  • ' + variantLabel(p, line) + ' × ' + line.quantity + ' — ' + money(unit * line.quantity) +
+          (lineNotes[line.key] ? ' · ' + lineNotes[line.key] : ''));
+      });
+      lines.push('');
+    });
+    lines.push('Total: ' + money(total));
+    window.open('https://wa.me/' + String(window.DR_PHONE.phone || '').replace(/\D/g, '').replace(/^00/, '') +
+      '?text=' + encodeURIComponent(lines.join('\n')), '_blank', 'noopener');
+  }
+
+  /* ----------------------------------------------------------- the panels */
+
+  var lastFocused = null;
+
+  function openPanel(id) {
+    var panel = document.getElementById(id);
+    if (!panel) return;
+    lastFocused = document.activeElement;
+    panel.classList.add('open');
+    panel.setAttribute('aria-hidden', 'false');
+    document.getElementById('panel-overlay').classList.add('open');
+    document.body.classList.add('panel-open');
+    if (id === 'cart-panel') renderCart();
+    var close = panel.querySelector('.panel-close');
+    if (close) close.focus();
+  }
+
+  function closePanels() {
+    var open = document.querySelectorAll('.side-panel.open');
+    if (!open.length) return;
+    Array.prototype.forEach.call(open, function (p) {
+      p.classList.remove('open');
+      p.setAttribute('aria-hidden', 'true');
+    });
+    document.getElementById('panel-overlay').classList.remove('open');
+    document.body.classList.remove('panel-open');
+    if (lastFocused && lastFocused.focus) { try { lastFocused.focus(); } catch (e) {} }
+    lastFocused = null;
+  }
+
+  function syncSearchClear() {
+    var clear = document.getElementById('search-clear');
+    if (clear) clear.hidden = !search.value;
+  }
+
+  /* --------------------------------------------------------------- boot */
+
+  try { cart = JSON.parse(sessionStorage.getItem(CART_KEY) || '[]'); if (!Array.isArray(cart)) cart = []; } catch (e) { cart = []; }
+  try { favorites = JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]'); if (!Array.isArray(favorites)) favorites = []; } catch (e) { favorites = []; }
+  try { recent = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); if (!Array.isArray(recent)) recent = []; } catch (e) { recent = []; }
+  try { lineNotes = JSON.parse(localStorage.getItem(NOTES_KEY) || '{}'); } catch (e) { lineNotes = {}; }
+  try { recentCollapsed = localStorage.getItem(RECENT_COLLAPSED_KEY) === '1'; } catch (e) { recentCollapsed = false; }
+  try {
+    customer = JSON.parse(sessionStorage.getItem(CUSTOMER_KEY) || '{"name":"","phone":"","business":"","notes":""}');
+  } catch (e) { customer = { name: '', phone: '', business: '', notes: '' }; }
+  try {
+    orderReference = sessionStorage.getItem(REFERENCE_KEY) ||
+      ('DR-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' + Math.floor(1000 + Math.random() * 9000));
+    sessionStorage.setItem(REFERENCE_KEY, orderReference);
+  } catch (e) {
+    orderReference = 'DR-' + new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  }
+
+  search.addEventListener('input', function () { syncSearchClear(); render(); });
+  var searchClear = document.getElementById('search-clear');
+  if (searchClear) {
+    searchClear.onclick = function () { search.value = ''; syncSearchClear(); search.focus(); render(); };
+  }
+
+  document.getElementById('menu-open').onclick = function () { openPanel('category-menu'); };
+  document.getElementById('cart-open').onclick = function () { openPanel('cart-panel'); };
+  Array.prototype.forEach.call(document.querySelectorAll('[data-close-panel]'), function (b) { b.onclick = closePanels; });
+  document.getElementById('panel-overlay').onclick = closePanels;
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closePanels(); });
+
+  document.getElementById('cart-clear').onclick = function () {
+    cart = [];
+    saveCart();
+    renderCart();
+    render();
+  };
+  document.getElementById('cart-whatsapp').onclick = shareWhatsApp;
+  document.getElementById('cart-print').onclick = function () {
+    document.body.classList.add('printing');
+    window.print();
+    setTimeout(function () { document.body.classList.remove('printing'); }, 1000);
+  };
+
+  var topButton = document.getElementById('scroll-top');
+  window.addEventListener('scroll', function () {
+    topButton.classList.toggle('visible', scrollY > 450);
+  }, { passive: true });
+  topButton.onclick = function () { scrollTo({ top: 0, behavior: 'smooth' }); };
+
+  // Header condenses once the page has scrolled past the sentinel.
+  var sentinel = document.getElementById('header-sentinel'), header = document.getElementById('site-header');
+  if (sentinel && header && 'IntersectionObserver' in window) {
+    new IntersectionObserver(function (entries) {
+      header.classList.toggle('is-stuck', !entries[0].isIntersecting);
+    }, { threshold: 0 }).observe(sentinel);
+  }
+
+  bindQuantityEvents();
+  updateCartCount();
+  syncSearchClear();
+
+  fetch('api/catalog.php', { credentials: 'same-origin' })
+    .then(function (r) {
+      if (r.status === 401) { location.reload(); throw Error('Locked'); }
+      return r.json();
+    })
+    .then(function (data) {
+      catalog = data.catalog || [];
+      window.DR_PHONE.store = data.store || {};
+      normalizeCart();
+      var hash = location.hash.slice(1);
+      if (catalog.some(function (c) { return c.slug === hash; })) selected = hash;
+      renderMenu();
+      render();
+      renderCart();
+
+      window.DR_CATALOG_APP = {
+        catalog: function () { return catalog; },
+        cart: function () { return cart; },
+        setCart: function (next) {
+          cart = Array.isArray(next) ? next : [];
+          normalizeCart();
+          renderCart();
+          render();
+        },
+        favorites: function () { return favorites; },
+        openProduct: openProduct,
+        openPanel: openPanel,
+        renderCart: renderCart,
+        findProduct: findProduct,
+        options: options,
+        colors: colors,
+        flavors: flavors,
+        changeVariant: changeVariant,
+        setVariantQuantity: setVariantQuantity,
+        unitPrice: unitPrice,
+        customer: function () { return customer; },
+        reference: function () { return orderReference; },
+        notes: function () { return lineNotes; }
+      };
+      window.dispatchEvent(new Event('dr-catalog-ready'));
+    })
+    .catch(function (e) {
+      if (e.message !== 'Locked') {
+        content.innerHTML = '<div class="empty-state"><h3>Catalog unavailable</h3><p>Please refresh or contact DR PHONE.</p></div>';
+      }
+    });
+})();
