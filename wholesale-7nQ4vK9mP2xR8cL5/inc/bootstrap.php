@@ -11,6 +11,8 @@ define('BACKUP_DIR', STORAGE_DIR . '/backups');
 define('AUTH_ATTEMPTS_FILE', STORAGE_DIR . '/auth-attempts.json');
 define('ACTIVITY_FILE', STORAGE_DIR . '/activity.json');
 define('OPENCV_AUDIT_FILE', STORAGE_DIR . '/opencv-image-audit.json');
+define('IMAGE_AUDIT_CACHE_FILE', STORAGE_DIR . '/image-audit-cache.json');
+define('ORDERS_FILE', STORAGE_DIR . '/orders.json');
 define('INSTALL_LOCK_FILE', STORAGE_DIR . '/installation.lock');
 const UPLOAD_DIR = ROOT_DIR . '/uploads/products';
 
@@ -78,7 +80,7 @@ function backup_catalog(): void {
 function save_catalog(array $data): void { backup_catalog(); save_json(CATALOG_FILE, $data); }
 function log_activity(string $action, string $detail=''): void {
     $items=load_json(ACTIVITY_FILE,[]);
-    array_unshift($items,['time'=>gmdate('c'),'admin'=>(string)(settings()['admin_username']??'admin'),'ip'=>clean_text($_SERVER['REMOTE_ADDR']??'unknown',64),'action'=>$action,'detail'=>clean_text($detail,300)]);
+    array_unshift($items,['time'=>gmdate('c'),'admin'=>(string)(settings()['admin_username']??'admin'),'ip'=>clean_text(client_ip(),64),'action'=>$action,'detail'=>clean_text($detail,300)]);
     save_json(ACTIVITY_FILE,array_slice($items,0,250));
 }
 function catalog_backups(): array {
@@ -91,18 +93,57 @@ function restore_catalog_backup(string $name): array {
     $data=load_json($path,[]); if(!$data)throw new RuntimeException('Backup is empty or invalid.');
     save_catalog($data); log_activity('Catalog restored',$name); return $data;
 }
+/* Measuring 1157 images with getimagesize() costs ~1.4s of blocking disk I/O, and
+   this used to run on every admin GET — including the reload after every save.
+   Results are cached per file and only recomputed when the file's mtime changes. */
 function image_audit(array $data): array {
-    $issues=[];
+    $cache=load_json(IMAGE_AUDIT_CACHE_FILE,[]); $dirty=false; $seen=[]; $issues=[];
     foreach($data as $category)foreach(($category['products']??[]) as $product){
         $image=(string)($product['image']??''); $reason='';
-        if($image==='')$reason='Missing image';
-        elseif(str_starts_with($image,'uploads/')&&!is_file(ROOT_DIR.'/'.$image))$reason='Image file not found';
-        elseif(str_starts_with($image,'uploads/')&&is_file(ROOT_DIR.'/'.$image)){
-            $size=@getimagesize(ROOT_DIR.'/'.$image); if(!$size)$reason='Unreadable image'; elseif($size[0]<500||$size[1]<500)$reason='Low resolution ('.$size[0].'×'.$size[1].')';
+        if($image===''){
+            $reason='Missing image';
+        }elseif(str_starts_with($image,'uploads/')){
+            $full=ROOT_DIR.'/'.$image;
+            if(!is_file($full)){
+                $reason='Image file not found';
+            }else{
+                $seen[$image]=true;
+                $mtime=(int)@filemtime($full);
+                $entry=$cache[$image]??null;
+                if(!is_array($entry)||(int)($entry['mtime']??-1)!==$mtime){
+                    $size=@getimagesize($full);
+                    $entry=['mtime'=>$mtime,'width'=>$size?(int)$size[0]:0,'height'=>$size?(int)$size[1]:0];
+                    $cache[$image]=$entry; $dirty=true;
+                }
+                if(!$entry['width']||!$entry['height'])$reason='Unreadable image';
+                elseif($entry['width']<500||$entry['height']<500)$reason='Low resolution ('.$entry['width'].'×'.$entry['height'].')';
+            }
         }
         if($reason!=='')$issues[]=['id'=>(int)$product['id'],'name'=>(string)$product['name'],'category'=>(string)($category['name']??''),'reason'=>$reason];
     }
+    // Drop entries for images the catalog no longer references.
+    foreach(array_keys($cache) as $path)if(!isset($seen[$path])){unset($cache[$path]);$dirty=true;}
+    if($dirty){try{save_json(IMAGE_AUDIT_CACHE_FILE,$cache);}catch(Throwable $e){/* cache is an optimisation, never fatal */}}
     return $issues;
+}
+
+/* Counts for the dashboard Overview. Cheap: no disk access beyond the audit cache. */
+function catalog_stats(array $data): array {
+    $products=0;$low=0;$out=0;$unreviewed=0;$noImage=0;$draft=0;$published=0;$hidden=0;$perCategory=[];
+    foreach($data as $category){
+        $items=$category['products']??[]; $perCategory[]=['name'=>(string)($category['name']??''),'slug'=>(string)($category['slug']??''),'group'=>(string)($category['group']??'Other'),'count'=>count($items)];
+        foreach($items as $product){
+            $products++;
+            $stock=(string)($product['stock']??'in-stock'); $quantity=(int)($product['stock_quantity']??0);
+            if($stock==='out-of-stock')$out++; elseif($stock==='low-stock'||($quantity>0&&$quantity<=5))$low++;
+            if(empty($product['stock_updated_at']))$unreviewed++;
+            if(empty($product['image']))$noImage++;
+            $visibility=(string)($product['visibility']??'published');
+            if($visibility==='draft')$draft++; elseif($visibility==='hidden')$hidden++; else $published++;
+        }
+    }
+    return ['products'=>$products,'categories'=>count($data),'low'=>$low,'out'=>$out,'in_stock'=>max(0,$products-$low-$out),
+        'unreviewed'=>$unreviewed,'no_image'=>$noImage,'published'=>$published,'draft'=>$draft,'hidden'=>$hidden,'per_category'=>$perCategory];
 }
 function backup_settings(): void {
     if(!is_file(SETTINGS_FILE))return;
@@ -118,14 +159,58 @@ function is_admin(): bool {
 }
 function is_customer(): bool { return is_admin() || !empty($_SESSION['customer_authenticated']); }
 
-function auth_attempt_key(string $scope): string { return $scope.':'.hash('sha256',(string)($_SERVER['REMOTE_ADDR']??'unknown')); }
+/* A forwarded-for header is attacker-controlled unless the request demonstrably
+   came through a proxy we trust, so it is only honoured when REMOTE_ADDR is in
+   TRUSTED_PROXIES (empty by default — see inc/config.php). Without this, anyone
+   could spoof an address and sidestep the throttle entirely. */
+function client_ip(): string {
+    $remote=(string)($_SERVER['REMOTE_ADDR']??'unknown');
+    $trusted=defined('TRUSTED_PROXIES')?(array)TRUSTED_PROXIES:[];
+    if(!$trusted||!in_array($remote,$trusted,true))return $remote;
+    foreach(['HTTP_CF_CONNECTING_IP','HTTP_X_FORWARDED_FOR','HTTP_X_REAL_IP'] as $header){
+        $value=trim((string)($_SERVER[$header]??''));
+        if($value==='')continue;
+        $first=trim(explode(',',$value)[0]);
+        if(filter_var($first,FILTER_VALIDATE_IP))return $first;
+    }
+    return $remote;
+}
+
+/* Two counters per scope. The IP counter is the outer bound; the session counter
+   stops one browser after a handful of tries. Behind a CDN every customer shares
+   one address, so an IP-only limit of 5 let a single bad actor lock out the whole
+   customer base — the session counter is what keeps the per-browser limit tight
+   while the IP limit can be loosened. A fresh session resets its own counter,
+   which is exactly why the IP bound has to stay. */
+function auth_limits(string $scope): array {
+    return $scope==='admin'?['ip'=>5,'session'=>5]:['ip'=>20,'session'=>5];
+}
+function auth_attempt_key(string $scope): string { return $scope.':'.hash('sha256',client_ip()); }
 function auth_attempts(string $scope): array {
     $all=load_json(AUTH_ATTEMPTS_FILE,[]); $key=auth_attempt_key($scope); $cutoff=time()-900;
     return array_values(array_filter($all[$key]??[],fn($time)=>(int)$time>$cutoff));
 }
-function auth_allowed(string $scope): bool { return count(auth_attempts($scope))<5; }
-function auth_record_failure(string $scope): void { $all=load_json(AUTH_ATTEMPTS_FILE,[]); $key=auth_attempt_key($scope); $all[$key]=array_slice(array_merge(auth_attempts($scope),[time()]),-10); save_json(AUTH_ATTEMPTS_FILE,$all); }
-function auth_clear_failures(string $scope): void { $all=load_json(AUTH_ATTEMPTS_FILE,[]); unset($all[auth_attempt_key($scope)]); save_json(AUTH_ATTEMPTS_FILE,$all); }
+function auth_session_attempts(string $scope): array {
+    $cutoff=time()-900;
+    return array_values(array_filter((array)($_SESSION['auth_failures'][$scope]??[]),fn($time)=>(int)$time>$cutoff));
+}
+function auth_allowed(string $scope): bool {
+    $limits=auth_limits($scope);
+    return count(auth_attempts($scope))<$limits['ip'] && count(auth_session_attempts($scope))<$limits['session'];
+}
+function auth_record_failure(string $scope): void {
+    $all=load_json(AUTH_ATTEMPTS_FILE,[]); $key=auth_attempt_key($scope);
+    $all[$key]=array_slice(array_merge(auth_attempts($scope),[time()]),-30);
+    // Old buckets would otherwise accumulate one entry per attacking address forever.
+    $cutoff=time()-900;
+    foreach($all as $bucket=>$times){ $kept=array_filter((array)$times,fn($t)=>(int)$t>$cutoff); if(!$kept)unset($all[$bucket]); else $all[$bucket]=array_values($kept); }
+    save_json(AUTH_ATTEMPTS_FILE,$all);
+    $_SESSION['auth_failures'][$scope]=array_slice(array_merge(auth_session_attempts($scope),[time()]),-10);
+}
+function auth_clear_failures(string $scope): void {
+    $all=load_json(AUTH_ATTEMPTS_FILE,[]); unset($all[auth_attempt_key($scope)]); save_json(AUTH_ATTEMPTS_FILE,$all);
+    unset($_SESSION['auth_failures'][$scope]);
+}
 
 function csrf_token(): string {
     if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(24));

@@ -1877,3 +1877,30 @@ html[data-motion='off'] .skeleton { animation: none; }
   }
   body.printing .cart-line { grid-template-columns: minmax(0, 1fr) auto auto; }
 }
+
+/* Cart carried over from a previous visit (it now lives in localStorage). */
+.cart-stale {
+  position: relative;
+  margin: 0 0 14px;
+  padding: 12px 40px 12px 14px;
+  border-left: 4px solid var(--warn);
+  border-radius: 0 10px 10px 0;
+  background: var(--warn-wash);
+  color: var(--warn);
+  font-size: var(--step--2);
+  font-weight: 700;
+}
+.cart-stale button {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font-size: 17px;
+  line-height: 1;
+}
+.cart-stale button:hover { background: rgba(0, 0, 0, .08); }

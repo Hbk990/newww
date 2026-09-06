@@ -1,0 +1,13 @@
+# The app-wide rule sets Cache-Control: no-store on every .php response. That
+# stops the browser storing anything, so it can never send a conditional request
+# and every visit re-downloads the whole catalog.
+#
+# catalog.php sends its own ETag and answers If-None-Match with 304, so it needs
+# "no-cache" (revalidate every time) rather than "no-store" (never keep a copy).
+# It stays "private", so no shared proxy may cache it, and it is still never
+# served without revalidating against the server. Everything else keeps no-store.
+<Files "catalog.php">
+  <IfModule mod_headers.c>
+    Header always set Cache-Control "private, no-cache, must-revalidate"
+  </IfModule>
+</Files>

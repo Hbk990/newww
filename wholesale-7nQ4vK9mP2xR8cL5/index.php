@@ -29,7 +29,7 @@ $unlocked=is_customer(); $admin=is_admin(); $adminEntry=$admin||!empty($_SESSION
 <meta name="description" content="DR PHONE wholesale product catalog">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23ff0000'/%3E%3Crect x='23' y='14' width='18' height='36' rx='4' fill='%23fff'/%3E%3C/svg%3E">
 <link rel="preload" href="assets/fonts/outfit-latin.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="assets/styles.css?v=7">
+<link rel="stylesheet" href="assets/styles.css?v=8">
 <script nonce="<?=htmlspecialchars(CSP_NONCE)?>">
 /* Motion tiering runs before first paint, so the page never flashes the full
    treatment before downgrading. "lite" drops only the animations that run
@@ -154,7 +154,7 @@ document.querySelector('.show-password').onclick=function(){var input=document.g
 <button id="scroll-top" class="scroll-top" aria-label="Back to top"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V6M6 12l6-6 6 6"/></svg></button>
 
 <script nonce="<?=htmlspecialchars(CSP_NONCE)?>">window.DR_PHONE={admin:<?=json_encode($admin)?>,phone:<?=json_encode((string)$siteSettings['phone'])?>};</script>
-<script src="assets/catalog.js?v=7"></script>
+<script src="assets/catalog.js?v=8"></script>
 <?php endif;?>
 </body>
 </html>

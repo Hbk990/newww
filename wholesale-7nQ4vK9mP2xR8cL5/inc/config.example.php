@@ -19,3 +19,10 @@ const INSTALL_TOKEN = 'replace-with-a-random-token';
 const CUSTOMER_PASSWORD_HASH = 'replace-with-a-password_hash-string';
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const BACKUP_LIMIT = 10;
+
+/* Addresses of proxies allowed to set the client IP via CF-Connecting-IP or
+ * X-Forwarded-For. Leave EMPTY unless the site really sits behind one: an
+ * untrusted forwarded header is attacker-controlled and would defeat the login
+ * throttle. Example for Cloudflare: const TRUSTED_PROXIES = ['173.245.48.1'];
+ */
+const TRUSTED_PROXIES = [];

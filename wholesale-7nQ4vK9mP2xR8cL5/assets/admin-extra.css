@@ -1,26 +1,203 @@
-.header-button{padding:9px 11px;border:1px solid #ffffff33;border-radius:9px;color:#fff;background:#ffffff12;font-size:12px}
-.form-grid textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:9px;background:#fff;font:inherit;resize:vertical}
-.stock-pill{display:inline-block;margin-left:5px;padding:3px 6px;border-radius:999px;color:#111827;background:#e5e7eb;font-size:9px;font-weight:800}
-.bulk-bar{position:sticky;top:8px;z-index:5;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;padding:12px;border:1px solid #ffc4c4;border-radius:13px;background:#fff;box-shadow:0 8px 24px #0002}.bulk-bar[hidden]{display:none}.bulk-bar select,.bulk-bar button{min-height:38px;padding:8px 10px;border:1px solid #ddd;border-radius:9px;background:#fff;color:#222;line-height:1.25}.bulk-bar button:not(.secondary){border-color:#e00000;background:#e00000;color:#fff}.row-check{width:18px;height:18px;accent-color:#e00000}.admin-product{grid-template-columns:22px 58px 1fr auto}.select-category{display:flex;align-items:center;gap:6px}.select-category input{width:17px;height:17px;accent-color:#e00000}.visibility-pill{display:inline-block;margin-left:4px;padding:3px 6px;border-radius:999px;background:#eaf2ff;color:#1d4ed8;font-size:9px;font-weight:800}.visibility-pill.draft{background:#fff4d6;color:#8a5a00}.visibility-pill.hidden{background:#eee;color:#555}.operations-panel{padding:22px}.operations-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.operations-grid section{min-width:0;padding:14px;border:1px solid #ddd;border-radius:13px;background:#fafafa}.operations-grid h3{margin:0 0 5px;font-size:15px}.operations-grid p{margin:0 0 10px;color:#666;font-size:11px}.operations-grid form{display:grid;gap:8px}.operations-grid input{max-width:100%}.tool-list{display:grid;gap:6px;max-height:240px;overflow:auto}.tool-list button,.tool-list>div{display:flex;flex-direction:column;align-items:flex-start;gap:3px;width:100%;padding:9px;border:1px solid #ddd;border-radius:9px;background:#fff;color:#222;text-align:left}.tool-list span{color:#666;font-size:10px}#operations-dialog{width:min(94vw,900px)}
-@media(max-width:700px){.admin-product{grid-template-columns:22px 48px 1fr}.operations-grid{grid-template-columns:1fr}.bulk-bar>*{flex:1 1 140px}.row-check{grid-row:1}.admin-actions{grid-column:1/-1}}
-.two-factor-setting{padding:12px;border:1px solid #ffd0d0;border-radius:10px;background:#fff7f7}.two-factor-setting>span{display:flex;align-items:center;gap:8px;color:#222}.two-factor-setting input{width:18px!important;height:18px!important;accent-color:#e00000}.two-factor-setting code{display:block;overflow-wrap:anywhere;color:#a40000;font-size:12px}
-.two-factor-setting{display:grid!important;gap:10px}.two-factor-setting input{width:100%!important;height:40px!important}.two-factor-setting button{width:max-content;padding:9px 12px;border-radius:9px}.two-factor-setting code{padding:9px;border-radius:8px;background:#fff;border:1px solid #efb7b7}
-.category-tools{display:flex;gap:5px;margin-left:auto}.category-tools button{padding:6px 8px;border:1px solid #d5d5d5;border-radius:7px;background:#fff;color:#222;font-size:10px}.category-tools button.danger{color:#b42318;background:#fff0f0}.category-tools button:disabled{opacity:.35;cursor:default}
-.review-state{font-weight:700;color:#a15c00}.review-state.verified{color:#08783e}#inventory-filter.active{border-color:#e00000;background:#fff0f0;color:#b00000}
-#category-form select{height:42px;padding:0 10px;border:1px solid var(--line);border-radius:9px;background:#fff;color:#222}
-.download-backup{display:inline-block;margin-top:10px;padding:9px 11px;border-radius:9px;color:#fff;background:#111;text-decoration:none;font-size:11px;font-weight:800}
-@media(max-width:700px){.category-section h2{flex-wrap:wrap}.category-tools{width:100%;margin-left:0}.category-tools button{flex:1}}
-.admin-brand-logo{width:150px;height:auto;display:block;border-radius:12px}.auth-card .admin-brand-logo{margin:0 auto 18px}.admin-brand{display:flex;align-items:center;gap:14px}.admin-brand h1{margin:0}
-.variant-editor{padding:14px;border:1px solid #ddd;border-radius:13px;background:#fafafa}.variant-editor-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}.variant-editor-head h3{margin:0 0 3px;color:#222;font-size:14px}.variant-editor-head small{color:#666;font-size:10px}.variant-editor-head button{height:36px;padding:0 11px;border-radius:9px;white-space:nowrap}.variant-rows{display:grid;gap:8px}.variant-rows:empty::after{content:'No entries yet. Use the Add button.';padding:13px;border:1px dashed #ccc;border-radius:9px;color:#777;text-align:center;font-size:11px}.variant-row{display:grid;grid-template-columns:minmax(140px,1.7fr) minmax(115px,1fr) minmax(100px,.8fr) 34px;align-items:end;gap:8px;padding:10px;border:1px solid #ddd;border-radius:10px;background:#fff}.variant-row.option-row{grid-template-columns:minmax(130px,1.5fr) minmax(85px,.7fr) minmax(115px,1fr) minmax(100px,.8fr) 34px}.variant-row label{display:flex;flex-direction:column;gap:5px;color:#666;font-size:10px;font-weight:700}.variant-row input,.variant-row select{width:100%;height:38px;padding:0 9px;border:1px solid #d5d5d5;border-radius:8px;background:#fff;color:#222}.variant-remove{width:34px;height:38px;border-radius:8px;background:#fff0f0;color:#b42318;font-size:20px}.variant-status option{background:#fff;color:#111}#product-dialog{width:min(96vw,900px)}
-.admin-header a,.admin-header .header-button{display:inline-flex;align-items:center;justify-content:center;font-family:Arial,sans-serif;font-size:12px;font-weight:800;line-height:1.2}.toolbar select{width:220px;height:40px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}.toolbar select option{background:#fff;color:#111}.operations-grid form{padding:0}.operations-grid form input,.operations-grid form button{width:100%;max-width:100%;min-width:0}.operations-grid section{overflow:hidden}
-@media(max-width:700px){.variant-editor-head{align-items:flex-start;flex-direction:column}.variant-editor-head button{width:100%}.variant-row,.variant-row.option-row{grid-template-columns:1fr 1fr}.variant-row label:first-child{grid-column:1/-1}.variant-remove{width:100%;grid-column:1/-1}.toolbar select{width:100%;flex-basis:100%}}
-.picture-import-section b{color:#222}.image-import-result{min-height:18px;margin-top:9px;white-space:pre-wrap;overflow-wrap:anywhere;color:#08783e;font-size:11px;line-height:1.45}.image-import-result.has-warning{padding:9px;border:1px solid #efc46b;border-radius:8px;background:#fff8e6;color:#7a4d00}.picture-import-section button:disabled{opacity:.55;cursor:wait}
-.operations-grid section.full-tool{grid-column:1/-1}.opencv-actions{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.opencv-actions button{min-width:135px;padding:9px 11px}.opencv-actions button:disabled{opacity:.5;cursor:wait}.opencv-progress{min-height:38px;padding:10px;border:1px solid #d8e4f4;border-radius:9px;background:#f3f8ff;color:#244a75;font-size:11px}.opencv-summary{margin:10px 0;color:#555;font-size:11px}.cv-pass{color:#08783e;font-weight:800}.cv-warning{color:#9a6000;font-weight:800}.cv-fail{color:#b42318;font-weight:800}.cv-dot{display:inline-block;width:8px;height:8px;margin-right:7px;border-radius:50%}.cv-dot.warning{background:#d28b00}.cv-dot.fail{background:#d92d20}.opencv-list{max-height:300px}.opencv-list button strong{display:flex;align-items:center}.opencv-list button span:last-child{line-height:1.4}
-@media(max-width:700px){.opencv-actions button{flex:1 1 145px}.opencv-progress{line-height:1.45}}
-body{overflow-x:hidden}
-.admin-header a,.admin-header .header-button,.toolbar button,.dialog-actions button,.admin-actions button,.category-tools button,.bulk-bar button{transition:transform .12s ease,box-shadow .12s ease,opacity .12s ease}
-.admin-header a:active,.admin-header .header-button:active,.toolbar button:active,.dialog-actions button:active,.admin-actions button:active,.category-tools button:active,.bulk-bar button:active,#add-product:active{transform:scale(.97)}
-a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid #e00000;outline-offset:2px}
-.admin-header a:focus-visible,.admin-header .header-button:focus-visible{outline-color:#fff}
-@media(hover:hover){.admin-product{transition:box-shadow .15s ease}.admin-product:hover{box-shadow:0 4px 16px #0001}.toolbar button:hover,.dialog-actions button:hover,.admin-actions button:hover,.category-tools button:hover{filter:brightness(.97)}}
-.admin-product h3,.category-section h2 label{overflow-wrap:anywhere}
+/* ==========================================================================
+   DR PHONE — admin dashboard, supplementary styles
+   Loaded after admin.css. Covers the pieces built by admin.js at runtime:
+   the variant editors, the operations panel and the OpenCV audit.
+   Dark glass, same tokens as admin.css.
+   ========================================================================== */
+
+/* ---------- Sticky bulk bar ---------------------------------------------- */
+
+.bulk-bar { position: sticky; top: 10px; z-index: 5; }
+.select-category input { width: 17px; height: 17px; accent-color: var(--red); }
+
+/* ---------- Operations dialog -------------------------------------------- */
+
+#operations-dialog { width: min(94vw, 940px); }
+.operations-panel { padding: 24px; }
+.operations-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.operations-grid section {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--glass-line);
+  border-radius: var(--radius);
+  background: var(--glass);
+}
+.operations-grid h3 { margin: 0 0 6px; font-size: 15px; }
+.operations-grid p { margin: 0 0 12px; color: var(--text-mid); font-size: 11px; }
+.operations-grid form { display: grid; gap: 9px; }
+.operations-grid input { max-width: 100%; }
+.operations-grid input[type=file] {
+  padding: 10px;
+  border: 1px solid var(--glass-line);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, .3);
+  color: var(--text-hi);
+  font-size: 12px;
+}
+.operations-grid button { min-height: 38px; padding: 0 14px; }
+.tool-list { max-height: 260px; overflow: auto; overscroll-behavior: contain; }
+.download-backup {
+  display: block;
+  margin-top: 10px;
+  color: var(--text-mid);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.download-backup:hover { color: var(--red); }
+
+/* ---------- Variant editors ---------------------------------------------- */
+
+.variant-editor {
+  margin-top: 6px;
+  padding: 15px;
+  border: 1px solid var(--glass-line);
+  border-radius: var(--radius);
+  background: rgba(0, 0, 0, .22);
+}
+.variant-editor-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.variant-editor-head h3 { font-size: 14px; }
+.variant-editor-head small { display: block; margin-top: 3px; color: var(--text-mid); font-size: 11px; font-weight: 500; }
+.variant-editor-head button { min-height: 36px; padding: 0 13px; border-radius: 9px; }
+.variant-rows { display: grid; gap: 8px; }
+.variant-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, .8fr) 38px;
+  align-items: end;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--glass-line);
+  border-radius: 10px;
+  background: var(--glass);
+}
+.variant-row.option-row { grid-template-columns: minmax(0, 1.4fr) minmax(0, .7fr) minmax(0, 1fr) minmax(0, .8fr) 38px; }
+.variant-row label { display: grid; gap: 4px; min-width: 0; }
+.variant-row span { color: var(--text-low); font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.variant-row input, .variant-row select {
+  min-height: 36px;
+  padding: 0 9px;
+  border: 1px solid var(--glass-line);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, .34);
+  color: var(--text-hi);
+  font-size: 12px;
+  outline: 0;
+}
+.variant-row input:focus, .variant-row select:focus { border-color: var(--red); }
+.variant-row option { background: var(--surface-2); color: var(--text-hi); }
+.variant-remove {
+  width: 38px;
+  height: 36px;
+  border: 1px solid var(--glass-line);
+  border-radius: 8px;
+  background: var(--glass);
+  color: #ff9a9a;
+  font-size: 17px;
+  line-height: 1;
+}
+.variant-remove:hover { border-color: var(--red); background: var(--red-soft); }
+
+/* ---------- Two-factor + picture import ---------------------------------- */
+
+.two-factor-setting span { display: flex; align-items: center; gap: 9px; color: var(--text-hi); font-size: 12px; }
+.two-factor-setting input[type=checkbox] { width: 17px; height: 17px; min-height: 0; accent-color: var(--red); }
+#two-factor-secret {
+  display: block;
+  margin-top: 8px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, .38);
+  color: var(--warn);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+#two-factor-secret:empty { display: none; }
+.picture-import-section input[type=file] { font-size: 11px; }
+
+/* ---------- OpenCV audit -------------------------------------------------- */
+
+.opencv-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.opencv-actions button { min-height: 36px; padding: 0 12px; border-radius: 9px; font-size: 12px; }
+.opencv-progress { margin: 10px 0 0; color: var(--text-mid); font-size: 11px; line-height: 1.5; }
+#opencv-summary { color: var(--text-mid); font-size: 11px; }
+#opencv-list .cv-pass { border-left: 3px solid var(--ok); }
+#opencv-list .cv-warning { border-left: 3px solid var(--warn); }
+#opencv-list .cv-fail { border-left: 3px solid var(--red); }
+
+/* ---------- Responsive ---------------------------------------------------- */
+
+@media (max-width: 700px) {
+  .operations-grid { grid-template-columns: 1fr; }
+  .operations-panel { padding: 16px; }
+  .bulk-bar > * { flex: 1 1 140px; }
+  .category-section h2 { flex-wrap: wrap; }
+  .category-tools { width: 100%; margin-left: 0; }
+  .category-tools button { flex: 1; }
+  .variant-editor-head { align-items: flex-start; flex-direction: column; }
+  .variant-editor-head button { width: 100%; }
+  .variant-row, .variant-row.option-row { grid-template-columns: 1fr 1fr; }
+  .variant-row label:first-child { grid-column: 1 / -1; }
+  .variant-remove { width: 100%; grid-column: 1 / -1; }
+  .opencv-actions button { flex: 1 1 145px; }
+}
+
+/* ---------- Order log ------------------------------------------------------ */
+
+.orders-toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.orders-toolbar input {
+  flex: 1 1 180px;
+  min-height: 36px;
+  padding: 0 11px;
+  border: 1px solid var(--glass-line);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, .32);
+  color: var(--text-hi);
+  font-size: 12px;
+  outline: 0;
+}
+.orders-toolbar input:focus { border-color: var(--red); }
+.orders-toolbar button { min-height: 36px; padding: 0 12px; border-radius: 9px; font-size: 12px; }
+.order-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto 30px;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 12px;
+  border: 1px solid var(--glass-line);
+  border-radius: 10px;
+  background: var(--glass);
+}
+.order-row strong { display: block; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.order-row span { color: var(--text-mid); font-size: 11px; }
+.order-row > b { font-size: 13px; font-weight: 900; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.order-open, .order-del {
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--glass-line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-hi);
+  font-size: 11px;
+}
+.order-del { width: 30px; padding: 0; color: #ff9a9a; font-size: 15px; }
+.order-open:hover { border-color: var(--glass-line-hi); }
+.order-del:hover { border-color: var(--red); background: var(--red-soft); }
+.order-items {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 3px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--glass-line);
+}
+.order-items span { color: var(--text-mid); font-size: 11px; }
+.orders-note { display: block; margin-top: 10px; color: var(--text-low); font-size: 10px; line-height: 1.5; }
+@media (max-width: 700px) {
+  .order-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .order-open { grid-column: 1; }
+  .order-del { grid-column: 2; }
+}
+
+/* The order log is the tallest tool list; give it more room before scrolling. */
+.orders-section .tool-list { max-height: 360px; }

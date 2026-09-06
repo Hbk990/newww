@@ -18,7 +18,7 @@
   var catalog = [], selected = null, sortMode = 'original', selections = {},
       cart = [], favorites = [], recent = [], recentCollapsed = false,
       lineNotes = {}, detailProduct = null, flavorQuery = '',
-      customer = { name: '', phone: '', business: '', notes: '' }, orderReference = '';
+      customer = { name: '', phone: '', business: '', notes: '' }, orderReference = '', cartSavedAt = 0;
 
   var content = document.getElementById('content'),
       search = document.getElementById('search');
@@ -32,6 +32,7 @@
       NOTES_KEY = 'dr-phone-line-notes';
 
   var MAX_QTY = 999;
+  var staleDismissed = false, hashBeforeProduct = '';
 
   /* ------------------------------------------------------------- helpers */
 
@@ -157,12 +158,40 @@
   /* ------------------------------------------------------------ cart state */
 
   /* Only positive lines are persisted. A zero-quantity line may exist in memory
-     while its field is being edited (typing "0" before "60" must not delete it). */
+     while its field is being edited (typing "0" before "60" must not delete it).
+     Stored in localStorage, not sessionStorage: a wholesale order takes a while to
+     build and used to vanish the moment the tab was closed. */
   function saveCart() {
     try {
-      sessionStorage.setItem(CART_KEY, JSON.stringify(cart.filter(function (l) { return l.quantity > 0; })));
-    } catch (e) { /* private mode */ }
+      localStorage.setItem(CART_KEY, JSON.stringify({
+        saved_at: Date.now(),
+        lines: cart.filter(function (l) { return l.quantity > 0; })
+      }));
+    } catch (e) { /* private mode / quota */ }
     updateCartCount();
+  }
+
+  function loadCart() {
+    // Current format: {saved_at, lines}. Also reads the old sessionStorage array
+    // once, so an order in progress survives the upgrade.
+    try {
+      var stored = JSON.parse(localStorage.getItem(CART_KEY) || 'null');
+      if (stored && Array.isArray(stored.lines)) { cartSavedAt = Number(stored.saved_at) || 0; return stored.lines; }
+      if (Array.isArray(stored)) return stored;
+    } catch (e) {}
+    try {
+      var legacy = JSON.parse(sessionStorage.getItem(CART_KEY) || 'null');
+      if (Array.isArray(legacy) && legacy.length) {
+        sessionStorage.removeItem(CART_KEY);
+        return legacy;
+      }
+    } catch (e) {}
+    return [];
+  }
+
+  function cartAgeDays() {
+    if (!cartSavedAt) return 0;
+    return Math.floor((Date.now() - cartSavedAt) / 86400000);
   }
 
   function updateCartCount() {
@@ -941,9 +970,28 @@
 
   /* ------------------------------------------------------- product detail */
 
+  function findProductBySku(sku) {
+    var needle = String(sku || '').toLowerCase();
+    return allProducts().find(function (x) { return String(x.product.sku || '').toLowerCase() === needle; });
+  }
+
+  /* The hash normally holds the open category. While a product panel is open it
+     holds #p/<sku> instead, so the link can be sent to a customer over WhatsApp
+     and open on that exact product. SKU rather than id: it reads better and
+     survives a CSV re-import. */
+  function productHash(p) { return p && p.sku ? 'p/' + p.sku : ''; }
+
   function openProduct(p) {
     detailProduct = p;
     flavorQuery = '';
+    var hash = productHash(p);
+    if (hash) {
+      // Don't record a product hash as the "return to" hash — on a cold deep-link
+      // the current hash is already #p/<sku>, and closing would restore itself.
+      var current = decodeURIComponent(location.hash.slice(1));
+      hashBeforeProduct = current.indexOf('p/') === 0 ? (selected || '') : current;
+      history.replaceState(null, '', '#' + hash);
+    }
     recent = [Number(p.id)].concat(recent.filter(function (x) { return x !== Number(p.id); })).slice(0, 12);
     try { localStorage.setItem(RECENT_KEY, JSON.stringify(recent)); } catch (e) {}
     renderDetail();
@@ -1095,7 +1143,15 @@
         '<textarea data-customer="notes" placeholder="Order notes (optional)">' + esc(customer.notes) + '</textarea>' +
       '</div></section>';
 
-    box.innerHTML = customerForm + (cart.length
+    // A cart can now be days old (it survives closing the tab), so say so rather
+    // than letting someone send a stale order without noticing.
+    var age = cartAgeDays(),
+        staleNotice = (cart.length && age >= 3 && !staleDismissed)
+          ? '<p class="cart-stale" data-cart-stale>You started this order ' + age + ' days ago. Check the quantities before sending.' +
+            '<button type="button" data-dismiss-stale aria-label="Dismiss">&times;</button></p>'
+          : '';
+
+    box.innerHTML = staleNotice + customerForm + (cart.length
       ? cartGroups().map(cartGroup).join('') +
         '<p class="minimum-warning" data-min-warning' + (minimum && total < minimum ? '' : ' hidden') + '>' +
           (minimum && total < minimum ? 'Add ' + money(minimum - total) + ' to reach the ' + money(minimum) + ' minimum order.' : '') + '</p>' +
@@ -1114,6 +1170,7 @@
       }
     };
     box.onclick = function (e) {
+      if (e.target.closest('[data-dismiss-stale]')) { staleDismissed = true; renderCart(); return; }
       var b = e.target.closest('[data-line="remove"]');
       if (!b) return;
       cart = cart.filter(function (i) { return i.key !== b.dataset.key; });
@@ -1145,8 +1202,30 @@
       lines.push('');
     });
     lines.push('Total: ' + money(total));
+
+    /* Record the order before handing off to WhatsApp. sendBeacon is
+       fire-and-forget and survives the navigation; window.open must stay
+       synchronous inside the click handler or the popup blocker eats it. */
+    logOrder();
+
     window.open('https://wa.me/' + String(window.DR_PHONE.phone || '').replace(/\D/g, '').replace(/^00/, '') +
       '?text=' + encodeURIComponent(lines.join('\n')), '_blank', 'noopener');
+  }
+
+  /* Sends only what was ordered — no name, phone, business or notes. The server
+     re-prices every line from the catalog, so nothing here is authoritative. */
+  function logOrder() {
+    if (!cart.length || !navigator.sendBeacon) return;
+    try {
+      var body = JSON.stringify({
+        csrf: window.DR_PHONE.csrf || '',
+        reference: orderReference,
+        lines: cart.filter(function (l) { return l.quantity > 0; }).map(function (l) {
+          return { productId: l.productId, option: l.option, color: l.color, flavor: l.flavor, quantity: l.quantity };
+        })
+      });
+      navigator.sendBeacon('api/order.php', new Blob([body], { type: 'application/json' }));
+    } catch (e) { /* logging must never block the order */ }
   }
 
   /* ----------------------------------------------------------- the panels */
@@ -1169,6 +1248,10 @@
   function closePanels() {
     var open = document.querySelectorAll('.side-panel.open');
     if (!open.length) return;
+    if (document.getElementById('product-panel').classList.contains('open')) {
+      history.replaceState(null, '', hashBeforeProduct ? '#' + hashBeforeProduct : location.pathname);
+      hashBeforeProduct = '';
+    }
     Array.prototype.forEach.call(open, function (p) {
       p.classList.remove('open');
       p.setAttribute('aria-hidden', 'true');
@@ -1186,7 +1269,7 @@
 
   /* --------------------------------------------------------------- boot */
 
-  try { cart = JSON.parse(sessionStorage.getItem(CART_KEY) || '[]'); if (!Array.isArray(cart)) cart = []; } catch (e) { cart = []; }
+  cart = loadCart();
   try { favorites = JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]'); if (!Array.isArray(favorites)) favorites = []; } catch (e) { favorites = []; }
   try { recent = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); if (!Array.isArray(recent)) recent = []; } catch (e) { recent = []; }
   try { lineNotes = JSON.parse(localStorage.getItem(NOTES_KEY) || '{}'); } catch (e) { lineNotes = {}; }
@@ -1253,11 +1336,16 @@
     .then(function (data) {
       catalog = data.catalog || [];
       window.DR_PHONE.store = data.store || {};
+      window.DR_PHONE.csrf = data.csrf || '';
       normalizeCart();
-      var hash = location.hash.slice(1);
-      if (catalog.some(function (c) { return c.slug === hash; })) selected = hash;
+      var hash = decodeURIComponent(location.hash.slice(1));
+      var deepLink = hash.indexOf('p/') === 0 ? findProductBySku(hash.slice(2)) : null;
+      if (!deepLink && catalog.some(function (c) { return c.slug === hash; })) selected = hash;
       renderMenu();
       render();
+      // A shared link opens straight on the product; an unknown SKU just falls
+      // back to the category screen rather than erroring.
+      if (deepLink) { hashBeforeProduct = ''; openProduct(deepLink.product); }
       renderCart();
 
       window.DR_CATALOG_APP = {

@@ -1,16 +1,53 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/../inc/bootstrap.php';
+
+/* Re-authentication after an idle timeout, so a half-filled product dialog is not
+   lost. Runs BEFORE require_admin() precisely because the session has expired;
+   it re-checks the full credentials (and 2FA) exactly as admin/login.php does. */
+if($_SERVER['REQUEST_METHOD']==='POST'&&($_POST['action']??'')==='reauth'){
+    $siteSettings=settings();
+    if(!auth_allowed('admin'))json_response(['ok'=>false,'error'=>'Too many incorrect attempts. Please wait 15 minutes.'],429);
+    $usernameOk=hash_equals(strtolower((string)($siteSettings['admin_username']??'admin')),strtolower(trim((string)($_POST['username']??''))));
+    $passwordOk=!empty($siteSettings['admin_password_hash'])&&password_verify((string)($_POST['password']??''),(string)$siteSettings['admin_password_hash']);
+    $code=(string)($_POST['otp']??'');
+    $secondFactorOk=empty($siteSettings['two_factor_enabled'])||verify_totp((string)$siteSettings['two_factor_secret'],$code);
+    if(!$secondFactorOk&&$usernameOk&&$passwordOk&&use_recovery_code($siteSettings,$code))$secondFactorOk=true;
+    if($usernameOk&&$passwordOk&&$secondFactorOk){
+        auth_clear_failures('admin'); session_regenerate_id(true);
+        $_SESSION['admin_authenticated']=true; $_SESSION['admin_entry_allowed']=true; $_SESSION['customer_authenticated']=true; $_SESSION['admin_last_seen']=time();
+        log_activity('Administrator re-authenticated');
+        json_response(['ok'=>true,'message'=>'Signed back in.','csrf'=>csrf_token()]);
+    }
+    auth_record_failure('admin'); usleep(700000);
+    json_response(['ok'=>false,'error'=>'Incorrect credentials'.(!empty($siteSettings['two_factor_enabled'])?' or verification code.':'.')],401);
+}
+
 require_admin();
 
 if($_SERVER['REQUEST_METHOD']==='GET'&&($_GET['download']??'')==='data-backup'){
     $payload=['created_at'=>gmdate('c'),'catalog'=>catalog(),'settings'=>settings(),'activity'=>load_json(ACTIVITY_FILE,[])];
     header('Content-Type: application/json; charset=utf-8');header('Content-Disposition: attachment; filename="DR-PHONE-data-backup-'.gmdate('Y-m-d').'.json"');header('Cache-Control: no-store');echo json_encode($payload,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_UNESCAPED_UNICODE);exit;
 }
+/* Keeping the session alive while a tab is actively in use. require_admin() above
+   already refreshed admin_last_seen, so there is nothing else to do. */
+if($_SERVER['REQUEST_METHOD']==='GET'&&isset($_GET['ping'])){
+    json_response(['ok'=>true,'alive'=>true]);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $siteSettings=settings(); $siteSettings['recovery_codes_remaining']=count($siteSettings['two_factor_recovery_hashes']??[]); unset($siteSettings['admin_password_hash'],$siteSettings['customer_password_hash'],$siteSettings['two_factor_secret'],$siteSettings['two_factor_recovery_hashes']);
     $currentCatalog=catalog();
-    json_response(['ok'=>true,'catalog'=>$currentCatalog,'settings'=>$siteSettings,'csrf'=>csrf_token(),'backups'=>catalog_backups(),'activity'=>load_json(ACTIVITY_FILE,[]),'image_audit'=>image_audit($currentCatalog),'opencv_audit'=>load_json(OPENCV_AUDIT_FILE,[])]);
+
+    /* The tools payload (backups, activity log, image audits) is an order of
+       magnitude more expensive than the catalog itself and is only needed when the
+       Operations dialog or the Overview panels are opened. It used to be returned on
+       every GET — including the reload fired after every single save. */
+    if(($_GET['tools']??'')==='1'){
+        json_response(['ok'=>true,'backups'=>catalog_backups(),'activity'=>load_json(ACTIVITY_FILE,[]),'image_audit'=>image_audit($currentCatalog),'opencv_audit'=>load_json(OPENCV_AUDIT_FILE,[]),'orders'=>load_json(ORDERS_FILE,[])]);
+    }
+
+    json_response(['ok'=>true,'catalog'=>$currentCatalog,'settings'=>$siteSettings,'csrf'=>csrf_token(),'stats'=>catalog_stats($currentCatalog)]);
 }
 verify_csrf();
 $action=(string)($_POST['action']??'');
@@ -51,7 +88,14 @@ try {
         if($name===''||$categorySlug==='') throw new RuntimeException('Category and product name are required.');
         $targetIndex=null; foreach($data as $index=>$category)if($category['slug']===$categorySlug){$targetIndex=$index;break;}
         if($targetIndex===null) throw new RuntimeException('Selected category was not found.');
-        $image=save_uploaded_image('image'); $gallery=save_uploaded_images('images'); $existing=null; $existingCategory=null;
+        /* Images land on disk before the SKU/price/category checks below run, so a
+           validation failure used to strand the files. Track them and unlink on the
+           way out — the same shape as import_product_images' $stored rollback. */
+        $freshUploads=[];
+        try{
+        $image=save_uploaded_image('image'); if($image)$freshUploads[]=$image;
+        $gallery=save_uploaded_images('images'); foreach($gallery as $uploaded)$freshUploads[]=$uploaded;
+        $existing=null; $existingCategory=null;
         if($id>0){foreach($data as $ci=>&$category){foreach($category['products'] as $pi=>$product){if((int)$product['id']===$id){$existing=$product;$existingCategory=$ci;unset($category['products'][$pi]);$category['products']=array_values($category['products']);break 2;}}}unset($category);if(!$existing)throw new RuntimeException('Product not found.');}
         else{$max=0;foreach($data as $category)foreach($category['products'] as $product)$max=max($max,(int)$product['id']);$id=$max+1;}
         $oldImageToDelete=null;
@@ -69,7 +113,12 @@ try {
         $restockedAt=$existing['restocked_at']??null; if($existing&&($existing['stock']??'')==='out-of-stock'&&$stock!=='out-of-stock')$restockedAt=gmdate('c');
         $stockUpdatedAt=$existing['stock_updated_at']??null;if(!$existing||($existing['stock']??null)!==$stock||($existing['stock_quantity']??null)!==$stockQuantity||($existing['variant_stock']??[])!==$variantStock||($existing['variant_quantity']??[])!==$variantQuantity)$stockUpdatedAt=gmdate('c');
         $data[$targetIndex]['products'][]=['id'=>$id,'sku'=>$sku,'name'=>$name,'brand'=>clean_text($_POST['brand']??'',100),'price'=>$options?null:$price,'options'=>$options,'tiers'=>clean_tiers($_POST['tiers']??''),'colors'=>$colors,'flavors'=>$flavors,'stock'=>$stock,'stock_quantity'=>$stockQuantity,'stock_updated_at'=>$stockUpdatedAt,'visibility'=>$visibility,'variant_stock'=>$variantStock,'variant_quantity'=>$variantQuantity,'color'=>implode(' ',$colors),'type'=>clean_text($_POST['type']??'',300),'image'=>$image,'images'=>$images,'added_at'=>$existing['added_at']??gmdate('c'),'restocked_at'=>$restockedAt];
-        save_catalog($data); if($oldImageToDelete)delete_unreferenced_product_images($data,['uploads/products/'.basename($oldImageToDelete)]); log_activity($existing?'Product updated':'Product added',$name); json_response(['ok'=>true,'message'=>$existing?'Product updated.':'Product added.','catalog'=>$data]);
+        save_catalog($data); if($oldImageToDelete)delete_unreferenced_product_images($data,['uploads/products/'.basename($oldImageToDelete)]); log_activity($existing?'Product updated':'Product added',$name);
+        json_response(['ok'=>true,'message'=>$existing?'Product updated.':'Product added.','catalog'=>$data,'stats'=>catalog_stats($data)]);
+        }catch(Throwable $saveError){
+            foreach($freshUploads as $path)if(preg_match('#^uploads/products/[A-Za-z0-9._-]+$#',$path))@unlink(ROOT_DIR.'/'.$path);
+            throw $saveError;
+        }
     }
 
     if ($action==='save_settings') {
@@ -97,6 +146,42 @@ try {
         log_activity('Store settings updated'); json_response(['ok'=>true,'message'=>'Account, contact and store settings updated.','settings'=>$safe]);
     }
 
+    /* Inline row editing. Touches price, stock_quantity and stock ONLY.
+       save_product rebuilds a product from the entire POST, so reusing it here
+       would silently wipe options, colors, flavors, tiers and images. */
+    if ($action==='quick_update') {
+        $id=(int)($_POST['id']??0); $target=null;
+        foreach($data as $ci=>$category){foreach(($category['products']??[]) as $pi=>$product){if((int)$product['id']===$id){$target=[$ci,$pi];break 2;}}}
+        if(!$target)throw new RuntimeException('Product not found.');
+        [$ci,$pi]=$target; $product=$data[$ci]['products'][$pi];
+
+        $stock=(string)($_POST['stock']??$product['stock']??'in-stock');
+        if(!in_array($stock,['in-stock','low-stock','out-of-stock'],true))throw new RuntimeException('Invalid stock status.');
+        $stockQuantity=max(0,(int)($_POST['stock_quantity']??0));
+
+        // A product priced through its options keeps price null; the dashboard
+        // does not offer an inline price field for those.
+        $price=$product['price']??null;
+        if(array_key_exists('price',$_POST)&&empty($product['options'])){
+            $raw=trim((string)$_POST['price']);
+            if($raw===''){$price=null;}
+            elseif(!is_numeric($raw))throw new RuntimeException('Price must be a number.');
+            else $price=max(0,(float)$raw);
+        }
+
+        $changed=($product['stock']??null)!==$stock||(int)($product['stock_quantity']??0)!==$stockQuantity||($product['price']??null)!==$price;
+        if($changed){
+            $data[$ci]['products'][$pi]['stock']=$stock;
+            $data[$ci]['products'][$pi]['stock_quantity']=$stockQuantity;
+            $data[$ci]['products'][$pi]['price']=$price;
+            $data[$ci]['products'][$pi]['stock_updated_at']=gmdate('c');
+            if(($product['stock']??'')==='out-of-stock'&&$stock!=='out-of-stock')$data[$ci]['products'][$pi]['restocked_at']=gmdate('c');
+            save_catalog($data);
+            log_activity('Quick edit',(string)($product['name']??$id));
+        }
+        json_response(['ok'=>true,'message'=>$changed?'Saved.':'No change.','product'=>$data[$ci]['products'][$pi],'stats'=>catalog_stats($data)]);
+    }
+
     if ($action==='delete_product') {
         $id=(int)($_POST['id']??0); $deleted=null;
         foreach($data as &$category){foreach($category['products'] as $pi=>$product){if((int)$product['id']===$id){$deleted=$product;unset($category['products'][$pi]);$category['products']=array_values($category['products']);break 2;}}}unset($category);
@@ -114,6 +199,37 @@ try {
     if($action==='verify_inventory'){
         $ids=array_values(array_unique(array_map('intval',explode(',',(string)($_POST['ids']??'')))));if(!$ids)throw new RuntimeException('Select at least one product.');$verified=0;$now=gmdate('c');foreach($data as &$category)foreach($category['products'] as &$product)if(in_array((int)$product['id'],$ids,true)){$product['stock_updated_at']=$now;$verified++;}unset($category,$product);if(!$verified)throw new RuntimeException('No matching products were found.');save_catalog($data);log_activity('Inventory reviewed',$verified.' products');json_response(['ok'=>true,'message'=>$verified.' stock records marked as reviewed.','catalog'=>$data]);
     }
+    /* Reordering products inside a category. The customer's default sort is
+       "Original order", so this is what lets best sellers be put first. */
+    if($action==='set_product_order'){
+        $slug=clean_text($_POST['slug']??'',100); $index=null;
+        foreach($data as $ci=>$category)if($category['slug']===$slug){$index=$ci;break;}
+        if($index===null)throw new RuntimeException('Category not found.');
+        $requested=array_values(array_filter(array_map('intval',explode(',',(string)($_POST['ids']??'')))));
+        $current=array_map(fn($p)=>(int)$p['id'],$data[$index]['products']??[]);
+        // The submitted list must be exactly this category's products, no more and
+        // no fewer — otherwise a stale tab could drop or import products.
+        $a=$requested; $b=$current; sort($a); sort($b);
+        if($a!==$b)throw new RuntimeException('The product list changed. Refresh the dashboard and try again.');
+        $byId=[]; foreach($data[$index]['products'] as $product)$byId[(int)$product['id']]=$product;
+        $data[$index]['products']=array_map(fn($id)=>$byId[$id],$requested);
+        save_catalog($data); log_activity('Products reordered',(string)$data[$index]['name']);
+        json_response(['ok'=>true,'message'=>'Order updated.','catalog'=>$data]);
+    }
+
+    if($action==='delete_order'){
+        $reference=clean_text($_POST['reference']??'',60);
+        $orders=load_json(ORDERS_FILE,[]);
+        $kept=array_values(array_filter($orders,fn($o)=>(string)($o['reference']??'')!==$reference));
+        if(count($kept)===count($orders))throw new RuntimeException('Order not found.');
+        save_json(ORDERS_FILE,$kept); log_activity('Order log entry deleted',$reference);
+        json_response(['ok'=>true,'message'=>'Order removed.','orders'=>$kept]);
+    }
+    if($action==='clear_orders'){
+        save_json(ORDERS_FILE,[]); log_activity('Order log cleared');
+        json_response(['ok'=>true,'message'=>'Order log cleared.','orders'=>[]]);
+    }
+
     if($action==='restore_backup'){$data=restore_catalog_backup(clean_text($_POST['backup']??'',150));json_response(['ok'=>true,'message'=>'Catalog backup restored.','catalog'=>$data,'backups'=>catalog_backups()]);}
     if($action==='import_product_images'){
         $files=$_FILES['product_images']??null;
