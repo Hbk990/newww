@@ -1,0 +1,423 @@
+/* ==========================================================================
+   DR PHONE — "Kinetic Red" film director stylesheet.
+
+   This is NOT part of the shipped site. It styles the standalone film page
+   that render-video.js builds: real screenshots of the live catalog ("plates")
+   composited and moved in genuine CSS 3D, frame by frame.
+
+   Every value that moves is set from JS as a pure function of the frame
+   number, so nothing here animates on its own — CSS transitions and
+   @keyframes are deliberately absent. That is what makes the render
+   deterministic and lets the cuts land exactly on the beat.
+   ========================================================================== */
+
+@font-face {
+  font-family: 'Outfit';
+  font-style: normal;
+  font-weight: 100 900;
+  src: url('outfit-latin.woff2') format('woff2');
+}
+
+:root {
+  --red: #ff0000;
+  --red-deep: #ce0606;
+  --ink: #000;
+  --paper: #fff;
+  --W: 1080px;
+  --H: 1920px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: var(--W);
+  height: var(--H);
+  overflow: hidden;
+  background: #000;
+  font-family: 'Outfit', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#film {
+  position: relative;
+  width: var(--W);
+  height: var(--H);
+  overflow: hidden;
+  perspective: 1400px;
+  perspective-origin: 50% 45%;
+}
+
+.scene {
+  position: absolute;
+  inset: 0;
+  display: none;
+  transform-style: preserve-3d;
+  will-change: transform, opacity;
+}
+.scene.on { display: block; }
+
+.fill { position: absolute; inset: 0; }
+
+/* ---------- shared type ------------------------------------------------- */
+
+.display {
+  font-weight: 900;
+  letter-spacing: -0.055em;
+  line-height: 0.86;
+  text-transform: uppercase;
+}
+
+.label {
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+/* ---------- S1 open ----------------------------------------------------- */
+
+#s1 { background: #000; }
+#s1 .red-panel {
+  position: absolute;
+  inset: 0;
+  background: var(--red);
+  transform-origin: left center;
+}
+#s1 .logo {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 620px;
+  margin-left: -310px;
+  margin-top: -200px;
+  border-radius: 26px;
+  box-shadow: 0 40px 120px rgba(0, 0, 0, .45);
+  transform-style: preserve-3d;
+}
+#s1 .rule {
+  position: absolute;
+  left: 50%;
+  top: 62%;
+  width: 620px;
+  height: 16px;
+  margin-left: -310px;
+  background: #fff;
+  transform-origin: left center;
+}
+#s1 .tag {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 66%;
+  color: #fff;
+  font-size: 34px;
+  text-align: center;
+}
+
+/* ---------- S2 type slams ----------------------------------------------- */
+
+#s2 { background: var(--paper); }
+#s2 .block {
+  position: absolute;
+  left: 70px;
+  right: 70px;
+  top: 50%;
+  transform: translateY(-50%);
+  transform-style: preserve-3d;
+}
+#s2 .line {
+  display: block;
+  overflow: visible;
+  color: var(--ink);
+  font-size: 168px;
+  transform-origin: 50% 100%;
+  will-change: transform, opacity;
+}
+#s2 .line em { font-style: normal; color: var(--red); }
+#s2 .swipe {
+  position: absolute;
+  left: -70px;
+  right: -70px;
+  height: 26px;
+  background: var(--red);
+  transform-origin: left center;
+}
+
+/* ---------- S3 counters ------------------------------------------------- */
+
+#s3 { background: var(--paper); }
+#s3 .plate {
+  position: absolute;
+  inset: 0;
+  object-fit: cover;
+  opacity: .16;
+  filter: grayscale(1);
+}
+#s3 .stats {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 70px;
+  padding: 0 80px;
+}
+#s3 .stat { transform-origin: left center; will-change: transform, opacity; }
+#s3 .stat b {
+  display: block;
+  color: var(--ink);
+  font-size: 232px;
+  font-weight: 900;
+  letter-spacing: -0.06em;
+  line-height: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+#s3 .stat.hot b { color: var(--red); }
+#s3 .stat span {
+  display: block;
+  margin-top: 10px;
+  color: #5f5f5f;
+  font-size: 36px;
+}
+
+/* ---------- S4 grid assembly -------------------------------------------- */
+
+#s4 { background: var(--paper); }
+#s4 .grid {
+  position: absolute;
+  left: 46px;
+  right: 46px;
+  top: 50%;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 26px;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+#s4 .card {
+  width: 100%;
+  border-radius: 22px;
+  box-shadow: 0 26px 70px rgba(0, 0, 0, .16);
+  transform-style: preserve-3d;
+  will-change: transform, opacity;
+}
+#s4 .banner {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 120px;
+  padding: 26px 0;
+  background: var(--red);
+  color: #fff;
+  font-size: 58px;
+  text-align: center;
+  transform-origin: center;
+}
+
+/* ---------- S5 category strobe ------------------------------------------ */
+
+#s5 .bg { position: absolute; inset: 0; }
+#s5 .word {
+  position: absolute;
+  left: 60px;
+  right: 60px;
+  top: 50%;
+  font-size: 132px;
+  text-align: center;
+  transform: translateY(-50%);
+  will-change: transform, opacity;
+}
+#s5 .count {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 62%;
+  font-size: 44px;
+  text-align: center;
+}
+
+/* ---------- S6 the payoff ----------------------------------------------- */
+
+#s6 { background: var(--paper); }
+#s6 .stagewrap {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  transform-style: preserve-3d;
+}
+#s6 .card {
+  width: 620px;
+  border-radius: 26px;
+  box-shadow: 0 40px 110px rgba(0, 0, 0, .25);
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+#s6 .qtybox {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 760px;
+  margin-left: -380px;
+  margin-top: -150px;
+  display: flex;
+  align-items: stretch;
+  height: 300px;
+  border: 10px solid var(--ink);
+  border-radius: 34px;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: 0 40px 120px rgba(0, 0, 0, .3);
+  will-change: transform, opacity;
+}
+#s6 .qtybox .step {
+  width: 190px;
+  display: grid;
+  place-items: center;
+  font-size: 120px;
+  font-weight: 800;
+  color: var(--ink);
+}
+#s6 .qtybox .val {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  border-left: 6px solid #eaeaea;
+  border-right: 6px solid #eaeaea;
+  color: var(--ink);
+  font-size: 172px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+}
+#s6 .cap {
+  position: absolute;
+  left: 60px;
+  right: 60px;
+  top: 70%;
+  color: var(--ink);
+  font-size: 92px;
+  text-align: center;
+  will-change: transform, opacity;
+}
+#s6 .cap em { font-style: normal; color: var(--red); }
+#s6 .cartpill {
+  position: absolute;
+  left: 50%;
+  top: 20%;
+  margin-left: -190px;
+  width: 380px;
+  height: 118px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font-size: 46px;
+  font-weight: 800;
+  letter-spacing: .05em;
+  will-change: transform, opacity;
+}
+#s6 .cartpill b {
+  min-width: 120px;
+  padding: 6px 22px;
+  border-radius: 999px;
+  background: var(--red);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* ---------- S7 dashboard ------------------------------------------------ */
+
+#s7 { background: #0b0b0d; }
+#s7 .plate {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1080px;
+  margin-left: -540px;
+  margin-top: -960px;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+#s7 .glow {
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(45% 40% at 50% 40%, rgba(255, 0, 0, .40), transparent 70%);
+}
+#s7 .cap {
+  position: absolute;
+  left: 60px;
+  right: 60px;
+  bottom: 190px;
+  color: #fff;
+  font-size: 88px;
+  text-align: center;
+  text-shadow: 0 20px 60px rgba(0, 0, 0, .8);
+  will-change: transform, opacity;
+}
+#s7 .cap em { font-style: normal; color: var(--red); }
+
+/* ---------- S8 end card ------------------------------------------------- */
+
+#s8 { background: var(--red); }
+#s8 .logo {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  width: 660px;
+  margin-left: -330px;
+  margin-top: -215px;
+  border-radius: 28px;
+  box-shadow: 0 40px 120px rgba(0, 0, 0, .4);
+  transform-style: preserve-3d;
+}
+#s8 .tag {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 56%;
+  color: #fff;
+  font-size: 76px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+#s8 .phone {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 66%;
+  color: #fff;
+  font-size: 52px;
+  text-align: center;
+}
+#s8 .rule {
+  position: absolute;
+  left: 50%;
+  top: 63%;
+  width: 420px;
+  height: 10px;
+  margin-left: -210px;
+  background: #fff;
+  transform-origin: center;
+}
+
+/* ---------- transition overlay (owns every cut) ------------------------- */
+
+#wipe {
+  position: absolute;
+  inset: 0;
+  background: var(--red);
+  transform-origin: left center;
+  pointer-events: none;
+  z-index: 50;
+}
+#flash {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  pointer-events: none;
+  z-index: 60;
+}

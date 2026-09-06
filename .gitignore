@@ -15,3 +15,9 @@ wholesale-*/assets/opencv.js
 
 # Build output
 *.zip
+
+# Marketing video build output — the scripts are source, the renders are not.
+marketing/out/
+marketing/frames/
+marketing/plates/
+marketing/node_modules
