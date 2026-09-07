@@ -1,8 +1,38 @@
-DR PHONE WHOLESALE — HARDENED INSTALLATION
+DR PHONE WHOLESALE — HARDENED INSTALLATION (v14)
+
+READ THIS FIRST — WHICH ROUTE TO TAKE
+This ZIP is a complete install and it contains a copy of the catalog data as
+it stood when the package was built. Two situations:
+
+  A) You have added, edited or deleted products through the dashboard, or you
+     have customer orders in the order log, since your last install.
+     -> Do NOT do a full replace. Upload only these eight files over the top,
+        keeping everything else on the server exactly as it is:
+          wholesale-.../assets/styles.css
+          wholesale-.../assets/catalog.js
+          wholesale-.../assets/admin.css
+          wholesale-.../assets/admin-extra.css
+          wholesale-.../assets/admin.js
+          wholesale-.../index.php
+          wholesale-.../admin/index.php
+          wholesale-.../api/order.php
+        That upgrades the software and leaves your data alone. Nothing else in
+        this package has changed.
+
+  B) It is a fresh server, or you have made no changes since the last install.
+     -> Follow the full steps below.
+
+A full replace overwrites storage/catalog.json with the copy in this ZIP, and
+removing the old folder first also deletes storage/orders.json, which is where
+your order history lives. Download the whole storage folder before you start,
+whichever route you take.
+
+FULL INSTALL
 
 1. Open Hostinger File Manager and enter public_html.
-2. Back up the old catalog, then remove its old root folders and files from
-   public_html. Do not remove unrelated email or Hostinger system files.
+2. Back up the old catalog — download the entire storage folder, including
+   orders.json — then remove its old root folders and files from public_html.
+   Do not remove unrelated email or Hostinger system files.
 3. Upload this ZIP directly into public_html.
 4. Extract it there. Keep the private folder name unchanged.
 5. Delete the ZIP from the server after extraction.
@@ -45,3 +75,42 @@ FREE OPENCV IMAGE AUDIT
 VISUAL PRODUCT VARIATIONS
 - Product options, colors, flavors, availability and per-variation quantities are managed only through visual Add/Edit/Delete controls.
 - The obsolete manual option/color/flavor/stock-override textareas have been removed from the dashboard.
+
+WHAT IS NEW IN v14
+Customer catalog
+- Quantity price breaks are now shown on the product. The cart has always
+  applied them; nothing used to tell the customer they existed. Each product
+  lists its breaks, the one reached is highlighted, and a line says how many
+  more pieces reach the next price. A break the stock cannot cover is never
+  advertised.
+- "Order pad" view: the same products as compact rows instead of picture
+  cards, about six times as many per screen, for buyers who already know what
+  they want. The choice is remembered per device. Switch with Cards / Order pad
+  next to Sort.
+- Filters for brand, in-stock only and a price range.
+
+Dashboard
+- New "Sales" tab built from the order log: orders, pieces, revenue and average
+  order value; order value per day; most ordered products; categories by
+  revenue; and a 7 / 30 / 90 day / all-time range picker.
+- "What to reorder": stock on hand against how fast each product actually sold,
+  showing what runs out first and roughly when. Products that sold but have no
+  stock quantity recorded are listed separately — they cannot be given a
+  reorder date until a quantity is entered, and the best sellers among them are
+  named so you know which to count first.
+- Selecting a whole category with its checkbox can now be undone by clicking it
+  again, and shows a dash when only some of its products are selected.
+
+Mobile
+- Every input is 16px on touch, so iOS no longer zooms the page when a customer
+  taps a quantity box.
+- Every button and tappable row is at least 44x44.
+- The quantity field scrolls clear of the on-screen keyboard while typing.
+- Below 375px the header is two tidy rows instead of three ragged ones.
+- Below 361px the product grid is one card per row; two-up left too little
+  space for a usable quantity control.
+
+NOTE ON PRICE TIERS
+A single cart line is capped at 999 pieces, so a tier whose minimum quantity is
+1000 or more can never be reached and will never apply. Keep tier minimums
+below 1000.
