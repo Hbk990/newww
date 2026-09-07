@@ -714,7 +714,7 @@
       /* Four columns, not five: the SKU rides under the product name instead of
          taking a column of its own, so the table needs no responsive reshaping
          and the footer always lines up with the body. */
-      '<table class="receipt-table"><thead><tr><th>Product</th><th>Qty</th>'+
+      '<div class="receipt-scroll"><table class="receipt-table"><thead><tr><th>Product</th><th>Qty</th>'+
         '<th>Unit</th><th>Amount</th></tr></thead><tbody>'+
         (o.items||[]).map(function(i){
           var under=[i.sku,i.option,i.color,i.flavor].filter(Boolean).join(' · ');
@@ -723,7 +723,7 @@
             '</td><td>'+esc(amount(i.unit_price))+'</td><td>'+esc(amount(i.line_total))+'</td></tr>';
         }).join('')+
       '</tbody><tfoot><tr><th>Total</th><th>'+Number(o.pieces||0)+' pcs</th>'+
-        '<th></th><th>'+esc(amount(o.total))+'</th></tr></tfoot></table>'+
+        '<th></th><th>'+esc(amount(o.total))+'</th></tr></tfoot></table></div>'+
       (terms.length?'<p class="receipt-terms">'+terms.map(esc).join(' · ')+'</p>':'')+
     '</article>';
   }
