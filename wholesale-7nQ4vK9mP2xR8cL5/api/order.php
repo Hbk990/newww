@@ -84,6 +84,9 @@ foreach ($lines as $line) {
     $total += $lineTotal; $pieces += $quantity;
 
     $items[] = [
+        // The dashboard's restock report joins these lines back to the catalog.
+        // SKU is editable and not guaranteed unique, so record the id as well.
+        'id' => (int)($product['id'] ?? 0),
         'sku' => (string)($product['sku'] ?? ''),
         'name' => (string)($product['name'] ?? ''),
         'option' => $optionName,

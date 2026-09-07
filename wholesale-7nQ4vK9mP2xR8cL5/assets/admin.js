@@ -67,7 +67,12 @@
      Category magnitude is a single sequential hue - bar length already encodes
      the value, so a second colour channel would be redundant. */
   var VIZ={good:'#0ca30c',warn:'#fab219',out:'#ff0000',seq:'#3987e5',
-           ink:'#ffffff',mid:'#c3c2b7',grid:'#2c2c2a'};
+           ink:'#ffffff',mid:'#c3c2b7',grid:'#2c2c2a',
+           /* #ff0000 is 4.35:1 on the glass surface — fine for a mark, short of
+              the 4.5:1 small text needs. This step is 5.31:1. */
+           outText:'#ff4d4d'};
+
+  var DAY=86400000;
 
   function pct(n,total){return total>0?(n/total*100):0}
 
@@ -111,6 +116,18 @@
       bars+='<p class="viz-tail"><span>'+rest.length+' smaller categories</span><b>'+tail+'</b></p>';
     }
     return bars;
+  }
+
+  /* The overview tiles are buttons that deep-link into a product filter and count
+     up from zero. A sales figure has no such filter to jump to, and a formatted
+     money string cannot be counted, so these are plain read-outs. */
+  function salesTile(label,value,tone){
+    return '<div class="stat-tile stat-static'+(tone?' tone-'+tone:'')+'">'+
+      '<span class="stat-sheen" aria-hidden="true"></span>'+
+      '<span class="stat-inner">'+
+        '<b class="stat-value">'+esc(String(value))+'</b>'+
+        '<span class="stat-label">'+esc(label)+'</span>'+
+      '</span></div>';
   }
 
   function statTile(key,label,value,tone){
@@ -249,6 +266,321 @@
 
 
   /* ---- order log + product ordering ------------------------------------- */
+
+  /* ================= Sales: what the order log can actually tell you ========
+   * The log records reference, time, line items, quantities and totals — no
+   * customer data — so everything below is derived from those four things.
+   * Orders whose products have since been deleted still count towards revenue;
+   * they simply cannot be attributed to a category. */
+
+  function ordersInWindow(days){
+    if(!days)return orders.slice();
+    var cut=Date.now()-days*DAY;
+    return orders.filter(function(o){var t=Date.parse(o.time);return isFinite(t)&&t>=cut});
+  }
+
+  /* Product lookup by recorded id first (exact), then SKU, then name. Orders
+     written before the id was recorded only carry the SKU. */
+  function productIndex(){
+    var byId={},bySku={},byName={};
+    allProducts().forEach(function(p){
+      byId[String(p.id)]=p;
+      if(p.sku)bySku[String(p.sku).toLowerCase()]=p;
+      if(p.name)byName[String(p.name).toLowerCase()]=p;
+    });
+    return function(item){
+      return byId[String(item.id||'')]||
+             bySku[String(item.sku||'').toLowerCase()]||
+             byName[String(item.name||'').toLowerCase()]||null;
+    };
+  }
+
+  function salesSummary(rows){
+    var pieces=0,revenue=0,lines=0;
+    rows.forEach(function(o){
+      pieces+=Number(o.pieces)||0;
+      revenue+=Number(o.total)||0;
+      lines+=(o.items||[]).length;
+    });
+    return {orders:rows.length,pieces:pieces,revenue:revenue,lines:lines,
+            average:rows.length?revenue/rows.length:0};
+  }
+
+  /* Daily revenue across the whole window, including days with no orders — a
+     line drawn only through the days that happened would imply a steady trade
+     that the gaps contradict. */
+  function dailySeries(rows,days){
+    if(!rows.length)return [];
+    var stamps=rows.map(function(o){return Date.parse(o.time)}).filter(isFinite);
+    if(!stamps.length)return [];
+    var end=new Date(); end.setHours(0,0,0,0);
+    var earliest=new Date(Math.min.apply(null,stamps)); earliest.setHours(0,0,0,0);
+    var start=days?new Date(Math.max(earliest.getTime(),end.getTime()-(days-1)*DAY)):earliest;
+    var buckets={},cursor=new Date(start),series=[];
+    rows.forEach(function(o){
+      var t=Date.parse(o.time); if(!isFinite(t))return;
+      var d=new Date(t); d.setHours(0,0,0,0);
+      var key=d.getTime();
+      if(!buckets[key])buckets[key]={total:0,orders:0};
+      buckets[key].total+=Number(o.total)||0;
+      buckets[key].orders++;
+    });
+    while(cursor.getTime()<=end.getTime()){
+      var key=cursor.getTime(),b=buckets[key]||{total:0,orders:0};
+      series.push({time:key,total:b.total,orders:b.orders});
+      cursor=new Date(key+DAY);
+      if(series.length>400)break;                 // guard against a bad clock
+    }
+    return series;
+  }
+
+  function topProducts(rows,lookup){
+    var map={};
+    rows.forEach(function(o){
+      (o.items||[]).forEach(function(i){
+        var p=lookup(i),key=p?'id:'+p.id:'name:'+String(i.name||'').toLowerCase();
+        if(!map[key])map[key]={name:(p&&p.name)||i.name||'Unknown',pieces:0,revenue:0,slug:p?p.category:''};
+        map[key].pieces+=Number(i.quantity)||0;
+        map[key].revenue+=Number(i.line_total)||0;
+      });
+    });
+    return Object.keys(map).map(function(k){return map[k]})
+      .sort(function(a,b){return b.pieces-a.pieces});
+  }
+
+  function topCategories(rows,lookup){
+    var map={};
+    rows.forEach(function(o){
+      (o.items||[]).forEach(function(i){
+        var p=lookup(i),name=p?p.categoryName:'No longer in the catalog';
+        if(!map[name])map[name]={name:name,revenue:0,pieces:0};
+        map[name].revenue+=Number(i.line_total)||0;
+        map[name].pieces+=Number(i.quantity)||0;
+      });
+    });
+    return Object.keys(map).map(function(k){return map[k]})
+      .sort(function(a,b){return b.revenue-a.revenue});
+  }
+
+  /* Days of cover = stock on hand / pieces sold per day over the window. Only
+     products that actually sold in the window can be rated; the rest have no
+     rate to divide by and are left out rather than shown as "infinite". */
+  function restockRows(rows,lookup,windowDays){
+    var map={};
+    rows.forEach(function(o){
+      (o.items||[]).forEach(function(i){
+        var p=lookup(i); if(!p)return;
+        var key=String(p.id);
+        if(!map[key])map[key]={product:p,pieces:0,orders:0};
+        map[key].pieces+=Number(i.quantity)||0;
+        map[key].orders++;
+      });
+    });
+    return Object.keys(map).map(function(k){
+      var r=map[k],p=r.product,
+          stock=Number(p.stock_quantity)||0,
+          rate=r.pieces/Math.max(1,windowDays),
+          state,cover;
+      /* A stock_quantity of 0 means one of two very different things: genuinely
+         none left, or never counted. The catalog's own status says which. Calling
+         an uncounted product "out of stock" would flag most of the catalog and
+         make the report worthless, so those are set aside as unrateable — the
+         useful thing to tell the owner is which sellers still need a count. */
+      if((p.stock||'in-stock')==='out-of-stock'){state='out';cover=0}
+      else if(stock<=0){state='untracked';cover=Infinity}
+      else{
+        cover=rate>0?stock/rate:Infinity;
+        state=cover<7?'out':(cover<21?'warn':'good');
+      }
+      return {product:p,name:p.name,category:p.categoryName,stock:stock,tracked:stock>0,
+              pieces:r.pieces,rate:rate,cover:cover,state:state};
+    }).sort(function(a,b){return a.cover-b.cover});
+  }
+
+  /* One column per day, not a line. Two reasons: a day's takings are a discrete
+     magnitude rather than a continuous signal, and with quiet days at zero a line
+     dives to the axis and back, which reads as volatility the trade did not have.
+     Columns also survive preserveAspectRatio="none" — a stretched rectangle is
+     still a rectangle, where a stretched circle becomes an ellipse.
+     Single series, so no legend: the panel title names it. */
+  function revenueChart(series){
+    if(series.length<2)return '<p class="viz-empty">At least two days of orders are needed to draw a trend.</p>';
+    var W=100,H=40,pad=1.5,
+        max=Math.max.apply(null,series.map(function(d){return d.total})),
+        top=max>0?max:1,
+        slot=(W-pad*2)/series.length,
+        gap=Math.min(slot*0.3,0.5),                 // a surface gap between columns
+        width=Math.max(0.2,slot-gap);
+
+    var peak=0; series.forEach(function(d,i){if(d.total>series[peak].total)peak=i});
+
+    var cols=series.map(function(d,i){
+      var h=d.total>0?Math.max(0.4,(H-pad*2)*(d.total/top)):0,
+          x=pad+i*slot,
+          fill=(i===peak||i===series.length-1)?VIZ.ink:VIZ.seq;
+      var title='<title>'+esc(new Date(d.time).toLocaleDateString())+': '+
+        (d.total>0?esc(money(d.total))+' · '+d.orders+(d.orders===1?' order':' orders'):'no orders')+'</title>';
+      if(!h)return '<rect x="'+x.toFixed(3)+'" y="'+(H-pad-0.25)+'" width="'+width.toFixed(3)+'" height="0.25"'+
+        ' fill="'+VIZ.grid+'">'+title+'</rect>';
+      return '<rect x="'+x.toFixed(3)+'" y="'+(H-pad-h).toFixed(3)+'" width="'+width.toFixed(3)+
+        '" height="'+h.toFixed(3)+'" fill="'+fill+'">'+title+'</rect>';
+    }).join('');
+
+    return '<svg class="viz-line" viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" role="img"'+
+        ' aria-label="Order value per day from '+esc(new Date(series[0].time).toLocaleDateString())+
+        ' to '+esc(new Date(series[series.length-1].time).toLocaleDateString())+', peak '+esc(money(series[peak].total))+'">'+
+      '<line x1="0" y1="'+(H-pad)+'" x2="'+W+'" y2="'+(H-pad)+'" stroke="'+VIZ.grid+'" stroke-width="0.5"'+
+        ' vector-effect="non-scaling-stroke"/>'+
+      cols+
+    '</svg>'+
+    '<div class="viz-axis"><span>'+esc(new Date(series[0].time).toLocaleDateString())+'</span>'+
+      '<span>peak '+esc(money(series[peak].total))+'</span>'+
+      '<span>'+esc(new Date(series[series.length-1].time).toLocaleDateString())+'</span></div>';
+  }
+
+  function magnitudeBars(rows,valueOf,labelOf,formatOf,tailLabel){
+    if(!rows.length)return '<p class="viz-empty">Nothing ordered yet.</p>';
+    var top=rows.slice(0,10),rest=rows.slice(10),
+        max=valueOf(top[0])||1;
+    var bars='<div class="viz-bars">'+top.map(function(r){
+      var w=Math.max(1.5,valueOf(r)/max*100);
+      return '<div class="viz-bar-row">'+
+        '<span class="viz-bar-label" title="'+esc(labelOf(r))+'">'+esc(labelOf(r))+'</span>'+
+        '<span class="viz-bar-track"><span class="viz-bar-fill" style="width:'+w.toFixed(2)+'%;background:'+VIZ.seq+'"></span></span>'+
+        '<b class="viz-bar-value">'+esc(formatOf(r))+'</b></div>';
+    }).join('')+'</div>';
+    if(rest.length){
+      var tail=rest.reduce(function(t,r){return t+valueOf(r)},0);
+      bars+='<p class="viz-tail"><span>'+rest.length+' '+esc(tailLabel)+'</span><b>'+esc(formatOf({__tail:tail}))+'</b></p>';
+    }
+    return bars;
+  }
+
+  var salesWindow=30;
+
+  function renderSales(){
+    var box=document.getElementById('admin-sales');
+    if(!box)return;
+    if(!toolsLoaded){
+      box.innerHTML='<section class="glass-panel span-2"><p class="viz-empty">Loading orders…</p></section>';
+      ensureTools().then(function(){if(activeTab==='sales')renderSales()});
+      return;
+    }
+
+    var rows=ordersInWindow(salesWindow),
+        lookup=productIndex(),
+        sum=salesSummary(rows),
+        series=dailySeries(rows,salesWindow),
+        windowDays=Math.max(1,series.length),
+        ranges=[[7,'7 days'],[30,'30 days'],[90,'90 days'],[0,'All time']];
+
+    var picker='<div class="range-picker" role="group" aria-label="Time range">'+ranges.map(function(r){
+      return '<button type="button" data-sales-range="'+r[0]+'" class="'+(salesWindow===r[0]?'active':'')+'"'+
+        ' aria-pressed="'+(salesWindow===r[0])+'">'+esc(r[1])+'</button>';
+    }).join('')+'</div>';
+
+    if(!orders.length){
+      box.innerHTML='<div class="sales-head"><div><h2>Sales</h2>'+
+        '<p class="panel-note">Orders appear here once a customer sends one from the catalog.</p></div></div>'+
+        '<section class="glass-panel span-2"><p class="viz-empty">No orders recorded yet. '+
+        'Nothing is stored until a customer taps WhatsApp on their cart.</p></section>';
+      return;
+    }
+
+    var products=topProducts(rows,lookup),
+        categories=topCategories(rows,lookup),
+        restock=restockRows(rows,lookup,windowDays);
+
+    box.innerHTML=
+      '<div class="sales-head"><div><h2>Sales</h2>'+
+        '<p class="panel-note">From the order log — references, items and totals. No customer details are stored.</p></div>'+
+        picker+'</div>'+
+
+      '<div class="stat-grid">'+
+        salesTile('Orders',sum.orders)+
+        salesTile('Pieces',sum.pieces)+
+        salesTile('Revenue',money(Math.round(sum.revenue*100)/100))+
+        salesTile('Average order',money(Math.round(sum.average*100)/100))+
+      '</div>'+
+
+      '<div class="panel-grid">'+
+        '<section class="glass-panel span-2"><h2>Order value per day</h2>'+
+          '<p class="panel-note">'+windowDays+' days · '+sum.orders+(sum.orders===1?' order':' orders')+'</p>'+
+          revenueChart(series)+'</section>'+
+
+        '<section class="glass-panel"><h2>Most ordered products</h2>'+
+          '<p class="panel-note">By pieces ordered</p>'+
+          magnitudeBars(products,function(r){return r.__tail!==undefined?r.__tail:r.pieces},
+            function(r){return r.name},
+            function(r){return String(r.__tail!==undefined?r.__tail:r.pieces)},
+            'other products')+'</section>'+
+
+        '<section class="glass-panel"><h2>Categories by revenue</h2>'+
+          '<p class="panel-note">Share of the money taken</p>'+
+          magnitudeBars(categories,function(r){return r.__tail!==undefined?r.__tail:r.revenue},
+            function(r){return r.name},
+            function(r){return money(Math.round((r.__tail!==undefined?r.__tail:r.revenue)*100)/100)},
+            'other categories')+'</section>'+
+
+        '<section class="glass-panel span-2"><h2>What to reorder</h2>'+
+          '<p class="panel-note">Stock on hand against how fast it actually sold over these '+windowDays+
+            ' days. Products that did not sell in this period have no rate to measure and are not listed.</p>'+
+          restockList(restock)+'</section>'+
+      '</div>';
+  }
+
+  function coverLabel(r){
+    if(r.state==='out')return 'Out of stock';
+    if(r.state==='untracked')return 'No stock count';
+    if(!isFinite(r.cover))return 'No recent sales';
+    if(r.cover<1)return 'Under a day left';
+    return Math.round(r.cover)+(Math.round(r.cover)===1?' day left':' days left');
+  }
+
+  function restockRow(r){
+    var glyph=r.state==='out'?'▲':r.state==='warn'?'●':r.state==='untracked'?'?':'✓';
+    return '<div class="restock-row state-'+r.state+'">'+
+      '<span class="restock-flag" aria-hidden="true">'+glyph+'</span>'+
+      '<span class="restock-main"><b>'+esc(r.name)+'</b><span>'+esc(r.category||'')+'</span></span>'+
+      '<span class="restock-nums">'+
+        '<span><i>'+(r.tracked?r.stock:'—')+'</i> in stock</span>'+
+        '<span><i>'+r.pieces+'</i> sold</span>'+
+        '<span><i>'+(r.rate<10?r.rate.toFixed(1):Math.round(r.rate))+'</i> a day</span>'+
+      '</span>'+
+      '<span class="restock-cover">'+esc(coverLabel(r))+'</span>'+
+    '</div>';
+  }
+
+  function restockList(rows){
+    if(!rows.length)return '<p class="viz-empty">Nothing sold in this period, so there is no rate to measure.</p>';
+
+    var urgent=rows.filter(function(r){return r.state==='out'||r.state==='warn'}),
+        untracked=rows.filter(function(r){return r.state==='untracked'}),
+        fine=rows.length-urgent.length-untracked.length,
+        html='';
+
+    html+=urgent.length
+      ? '<p class="restock-lead"><b>'+urgent.length+'</b> '+(urgent.length===1?'product is':'products are')+
+        ' out or down to under three weeks of cover.</p>'+
+        '<div class="restock-list">'+urgent.slice(0,12).map(restockRow).join('')+'</div>'
+      : '<p class="restock-lead restock-ok">Nothing with a stock count is running short.</p>';
+
+    /* Most of this catalog carries a stock status but no exact quantity, so
+       these cannot be given a reorder date. Naming the best sellers among them
+       is the actionable part: count those first. */
+    if(untracked.length){
+      var worth=untracked.slice().sort(function(a,b){return b.pieces-a.pieces}).slice(0,6);
+      html+='<p class="restock-lead restock-untracked">'+
+        '<b>'+untracked.length+'</b> '+(untracked.length===1?'product sold but has':'products sold but have')+
+        ' no stock quantity recorded, so they cannot be given a reorder date. '+
+        'Your best sellers among them are worth counting first.</p>'+
+        '<div class="restock-list">'+worth.map(restockRow).join('')+'</div>';
+    }
+
+    if(fine>0)html+='<p class="viz-tail"><span>'+fine+' other '+(fine===1?'product has':'products have')+
+      ' over three weeks of cover</span><b>OK</b></p>';
+    return html;
+  }
 
   function renderOrders(){
     var box=document.getElementById('orders-list');
@@ -459,8 +791,13 @@
       if(slice.length<g.products.length)truncated=true;
       shown+=slice.length;
       var c=g.category;
+      // The box has to reflect the selection, or render() rebuilds it unchecked
+      // and the next click selects the category again instead of clearing it.
+      var picked=g.products.filter(function(p){return selected.has(Number(p.id))}).length,
+          allPicked=g.products.length>0&&picked===g.products.length;
       return '<section class="category-section" data-category="'+esc(c.slug)+'">'+
-        '<h2><label class="select-category"><input type="checkbox" data-select-category="'+esc(c.slug)+'"> '+esc(c.name)+'</label>'+
+        '<h2><label class="select-category"><input type="checkbox" data-select-category="'+esc(c.slug)+'"'+(allPicked?' checked':'')+
+          (picked&&!allPicked?' data-partial':'')+'> '+esc(c.name)+'</label>'+
         '<span>'+esc(c.group||'Other')+' · '+g.products.length+' items</span>'+
         '<span class="category-tools">'+
           '<button type="button" data-category-edit="'+esc(c.slug)+'">Edit</button>'+
@@ -474,6 +811,10 @@
     content.innerHTML=chips+(body||'<div class="notice">No products match this filter.</div>')+
       (truncated?'<div class="list-sentinel" id="list-sentinel">Loading more of '+total+'…</div>':
         (total?'<p class="list-end">'+total+' products shown.</p>':''));
+
+    // A part-selected category shows the dash rather than a tick. `indeterminate`
+    // is a property, not an attribute, so it has to be set after the markup lands.
+    content.querySelectorAll('[data-select-category][data-partial]').forEach(function(box){box.indeterminate=true});
 
     observeSentinel();
     updateBulkBar();
@@ -499,7 +840,9 @@
       b.classList.toggle('active',on);
       b.setAttribute('aria-selected',String(on));
     });
-    if(activeTab==='overview'){renderOverview()}else{renderProducts()}
+    if(activeTab==='overview'){renderOverview()}
+    else if(activeTab==='sales'){renderSales()}
+    else{renderProducts()}
   }
   function formSnapshot(form){return new URLSearchParams(new FormData(form)).toString()}
   function openDialog(dialog,form){if(form)snapshots.set(form,formSnapshot(form));dialog.showModal()}
@@ -542,11 +885,13 @@
   function exportCsv(){var rows=[['product_id','sku','category','category_slug','category_group','name','brand','price','options_json','tiers_json','stock','stock_quantity','stock_updated_at','visibility','colors_json','flavors_json','variant_stock_json','variant_quantity_json','details','image','images_json','added_at','restocked_at']];allProducts().forEach(function(p){var category=catalog.find(function(c){return c.slug===p.category});rows.push([p.id,p.sku||'',p.categoryName,p.category,(category&&category.group)||'Other',p.name,p.brand||'',p.price==null?'':p.price,JSON.stringify(p.options||[]),JSON.stringify(p.tiers||[]),p.stock||'in-stock',p.stock_quantity||0,p.stock_updated_at||'',p.visibility||'published',JSON.stringify(p.colors||[]),JSON.stringify(p.flavors||[]),JSON.stringify(p.variant_stock||{}),JSON.stringify(p.variant_quantity||{}),p.type||'',p.image||'',JSON.stringify(p.images||[]),p.added_at||'',p.restocked_at||''])});var csv=rows.map(function(row){return row.map(function(v){return'"'+String(v).replace(/"/g,'""')+'"'}).join(',')}).join('\r\n'),link=document.createElement('a');link.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));link.download='DR-PHONE-catalog-'+new Date().toISOString().slice(0,10)+'.csv';link.click();URL.revokeObjectURL(link.href)}
   function printPrices(){var body=allProducts().filter(function(p){return(p.visibility||'published')==='published'}).map(function(p){return'<tr><td>'+esc(p.sku||'')+'</td><td>'+esc(p.categoryName)+'</td><td>'+esc(p.name)+'</td><td>'+esc(p.brand||'')+'</td><td>'+esc(productPrice(p))+'</td><td>'+esc((p.stock||'in-stock').replace(/-/g,' '))+'</td></tr>'}).join(''),win=window.open('','_blank');if(!win)return;win.document.write('<title>DR PHONE Price List</title><style>body{font:12px Arial;padding:24px}h1{color:#e00000}table{width:100%;border-collapse:collapse}th,td{padding:7px;border-bottom:1px solid #ddd;text-align:left}</style><h1>DR PHONE Wholesale Price List</h1><p>'+new Date().toLocaleDateString()+'</p><table><thead><tr><th>SKU</th><th>Category</th><th>Product</th><th>Brand</th><th>Price</th><th>Stock</th></tr></thead><tbody>'+body+'</tbody></table>');win.document.close();win.print()}
   function categoryRequest(action,slug,extra){var data=new FormData();data.set('action',action);data.set('slug',slug);Object.keys(extra||{}).forEach(function(k){data.set(k,extra[k])});return request(data).then(function(j){consume(j);reloadTools()}).catch(function(e){tell(e.message,true)})}
-  content.onclick=function(e){var categoryEdit=e.target.closest('[data-category-edit]');if(categoryEdit){var cat=catalog.find(function(c){return c.slug===categoryEdit.dataset.categoryEdit});if(!cat)return;categoryForm.reset();categoryForm.elements.action.value='update_category';categoryForm.elements.original_slug.value=cat.slug;categoryForm.elements.name.value=cat.name;categoryForm.elements.group.value=cat.group||'Other';categoryDialog.querySelector('h2').textContent='Edit category';openDialog(categoryDialog,categoryForm);return}var categoryDelete=e.target.closest('[data-category-delete]');if(categoryDelete){var target=catalog.find(function(c){return c.slug===categoryDelete.dataset.categoryDelete});if(target&&confirm('Delete '+target.name+'? Only empty categories can be deleted.'))categoryRequest('delete_category',target.slug);return}var categoryOrder=e.target.closest('[data-category-order]');if(categoryOrder){categoryRequest('reorder_category',categoryOrder.dataset.category,{direction:categoryOrder.dataset.categoryOrder});return}var edit=e.target.closest('.edit');if(edit){openEdit(Number(edit.closest('article').dataset.id));return}var del=e.target.closest('.delete');if(del){removeProduct(Number(del.closest('article').dataset.id));return}var check=e.target.closest('[data-select]');if(check){var id=Number(check.dataset.select);check.checked?selected.add(id):selected.delete(id);updateBulkBar();return}var category=e.target.closest('[data-select-category]');if(category){var c=catalog.find(function(x){return x.slug===category.dataset.selectCategory});(c?c.products:[]).forEach(function(p){category.checked?selected.add(Number(p.id)):selected.delete(Number(p.id))});render()}}
+  content.onclick=function(e){var categoryEdit=e.target.closest('[data-category-edit]');if(categoryEdit){var cat=catalog.find(function(c){return c.slug===categoryEdit.dataset.categoryEdit});if(!cat)return;categoryForm.reset();categoryForm.elements.action.value='update_category';categoryForm.elements.original_slug.value=cat.slug;categoryForm.elements.name.value=cat.name;categoryForm.elements.group.value=cat.group||'Other';categoryDialog.querySelector('h2').textContent='Edit category';openDialog(categoryDialog,categoryForm);return}var categoryDelete=e.target.closest('[data-category-delete]');if(categoryDelete){var target=catalog.find(function(c){return c.slug===categoryDelete.dataset.categoryDelete});if(target&&confirm('Delete '+target.name+'? Only empty categories can be deleted.'))categoryRequest('delete_category',target.slug);return}var categoryOrder=e.target.closest('[data-category-order]');if(categoryOrder){categoryRequest('reorder_category',categoryOrder.dataset.category,{direction:categoryOrder.dataset.categoryOrder});return}var edit=e.target.closest('.edit');if(edit){openEdit(Number(edit.closest('article').dataset.id));return}var del=e.target.closest('.delete');if(del){removeProduct(Number(del.closest('article').dataset.id));return}var check=e.target.closest('[data-select]');if(check){var id=Number(check.dataset.select);check.checked?selected.add(id):selected.delete(id);updateBulkBar();return}var category=e.target.closest('[data-select-category]');if(category){var g=visibleProducts().find(function(x){return x.category.slug===category.dataset.selectCategory});var on=category.checked;((g&&g.products)||[]).forEach(function(p){on?selected.add(Number(p.id)):selected.delete(Number(p.id))});render()}}
   enhanceForms();
   document.getElementById('apply-bulk').onclick=function(){var data=new FormData();data.set('action','bulk_update');data.set('ids',Array.from(selected).join(','));data.set('stock',document.getElementById('bulk-stock').value);data.set('visibility',document.getElementById('bulk-visibility').value);data.set('category',document.getElementById('bulk-category').value);request(data).then(function(j){selected.clear();consume(j);reloadTools()}).catch(function(e){tell(e.message,true)})};
   document.getElementById('verify-stock').onclick=function(){var data=new FormData();data.set('action','verify_inventory');data.set('ids',Array.from(selected).join(','));request(data).then(function(j){selected.clear();consume(j);reloadTools()}).catch(function(e){tell(e.message,true)})};
   document.addEventListener('click',function(e){
+    var range=e.target.closest&&e.target.closest('[data-sales-range]');
+    if(range){salesWindow=Number(range.dataset.salesRange)||0;renderSales();return}
     var chip=e.target.closest&&e.target.closest('[data-filter]');
     if(chip){setFilter(chip.dataset.filter);return}
     var tab=e.target.closest&&e.target.closest('[data-tab-button]');

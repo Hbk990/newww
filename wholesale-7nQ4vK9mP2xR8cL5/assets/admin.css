@@ -240,6 +240,12 @@ body[data-tab='overview'] .toolbar,
 body[data-tab='overview'] .bulk-bar,
 body[data-tab='overview'] .admin-content { display: none; }
 body[data-tab='products'] .admin-overview { display: none; }
+body[data-tab='sales'] .toolbar,
+body[data-tab='sales'] .bulk-bar,
+body[data-tab='sales'] .admin-content,
+body[data-tab='sales'] .admin-overview { display: none; }
+body[data-tab='overview'] .admin-sales,
+body[data-tab='products'] .admin-sales { display: none; }
 
 /* ---------- 04  Overview -------------------------------------------------- */
 

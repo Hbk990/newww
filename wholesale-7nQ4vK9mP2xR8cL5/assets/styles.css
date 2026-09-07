@@ -595,6 +595,27 @@ html[data-motion='lite'] .header-rule { animation: none; }
   .site-header.is-stuck .brand-logo { width: 74px; height: 34px; }
 }
 
+/* Under 375px the five controls plus their gaps come to 332px against 284-324px
+   of usable width, so the lock icon wrapped onto a line of its own and the
+   header ate 189px of a 568px screen. Two deliberate rows instead: the primary
+   actions, then the search sharing its line with the lock. Menu 44 + logo 88 +
+   phone 44 + cart 72 + three 8px gaps = 272, inside the 284px a 320px screen
+   gives. The zero-height ::after is what forces the break, so the layout does
+   not depend on the search field's min-content width. */
+@media (max-width: 374px) {
+  .header-inner { gap: 8px; }
+  .header-inner::after { content: ""; width: 100%; height: 0; order: 5; margin-top: -8px; }
+  #menu-open { order: 1; }
+  .brand { order: 2; }
+  .contact-pill { order: 3; }
+  .cart-trigger { order: 4; margin-left: auto; }
+  /* basis 0, not auto: the field's content width is wider than the row, so an
+     auto basis would claim the whole line and push the lock onto a third row. */
+  .search-wrap { order: 10; flex: 1 1 0; flex-basis: 0; min-width: 0; }
+  .admin-link { order: 11; }
+  .lock-link { order: 12; }
+}
+
 /* ---------- 06  Hero + marquee ------------------------------------------ */
 
 .content {
@@ -926,7 +947,9 @@ html[data-motion='off'] .hero-rule { animation: none; }
 
 .product-heading { flex-wrap: wrap; align-items: center; }
 .result-title { min-width: 0; flex: 1; }
-.result-tools { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+/* Count + view toggle + sort come to more than a 320px screen can hold on one
+   line, so they wrap rather than overflowing the heading. */
+.result-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-left: auto; }
 .result-tools .result-count { margin-left: 0; }
 
 .back-button {
@@ -964,6 +987,184 @@ html[data-motion='off'] .hero-rule { animation: none; }
   font-weight: 700;
 }
 .sort-control select:hover { border-color: var(--ink); }
+
+/* ---------- Filters + view toggle --------------------------------------- */
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border: 2px solid var(--grey-100);
+  border-radius: 14px;
+  background: var(--paper);
+}
+.filter-field { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.filter-field > span {
+  color: var(--grey-600);
+  font-size: var(--step--2);
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.filter-field select,
+.filter-price input {
+  height: 40px;
+  max-width: 190px;
+  padding: 0 10px;
+  border: 2px solid var(--grey-100);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--step--1);
+  font-weight: 700;
+}
+.filter-price input { width: 84px; text-align: center; font-variant-numeric: tabular-nums; }
+.filter-price i { color: var(--grey-600); font-style: normal; font-weight: 800; }
+.filter-field select:focus-visible,
+.filter-price input:focus-visible { outline: 3px solid var(--red); outline-offset: 1px; }
+
+.filter-toggle, .filter-clear {
+  height: 40px;
+  padding: 0 14px;
+  border: 2px solid var(--grey-100);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--step--1);
+  font-weight: 800;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) linear, background var(--dur-fast) linear, color var(--dur-fast) linear;
+}
+.filter-toggle:hover, .filter-clear:hover { border-color: var(--ink); }
+.filter-toggle.active { border-color: var(--red); background: var(--red); color: #fff; }
+.filter-clear { margin-left: auto; color: var(--red-deep); }
+
+.view-toggle { display: inline-flex; border: 2px solid var(--grey-100); border-radius: 999px; overflow: hidden; }
+.view-toggle button {
+  height: 38px;
+  padding: 0 14px;
+  border: 0;
+  background: transparent;
+  color: var(--grey-600);
+  font: inherit;
+  font-size: var(--step--1);
+  font-weight: 800;
+  cursor: pointer;
+  transition: background var(--dur-fast) linear, color var(--dur-fast) linear;
+}
+.view-toggle button.active { background: var(--ink); color: #fff; }
+.result-count i { font-style: normal; color: var(--grey-600); font-weight: 700; }
+
+/* ---------- Order pad (compact list) ------------------------------------ */
+
+.order-pad {
+  border: 2px solid var(--grey-100);
+  border-radius: var(--radius-lg);
+  background: var(--paper);
+  overflow: hidden;
+}
+.pad-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 2px solid var(--grey-100);
+  transition: background var(--dur-fast) linear;
+}
+.pad-row:last-child { border-bottom: 0; }
+.pad-row:hover { background: #fafafa; }
+.pad-row.has-qty { background: var(--red-wash); }
+
+.pad-thumb {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 2px solid var(--grey-100);
+  border-radius: 10px;
+  background: var(--paper);
+  overflow: hidden;
+  cursor: pointer;
+}
+.pad-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pad-noimg { display: block; width: 100%; height: 100%; background: var(--grey-100); }
+
+.pad-main { min-width: 0; }
+.pad-name {
+  display: block;
+  font-size: var(--step-0);
+  font-weight: 800;
+  line-height: 1.25;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.pad-meta {
+  display: block;
+  margin-top: 2px;
+  color: var(--grey-600);
+  font-size: var(--step--2);
+  font-weight: 700;
+}
+.pad-meta .stock { margin-left: 6px; }
+.pad-choices { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.pad-choices .product-select { margin: 0; }
+.pad-choices .product-select select { height: 34px; font-size: var(--step--1); }
+
+.pad-buy { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.pad-price {
+  font-size: var(--step-0);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* An <input> with no width contributes ~20 characters of intrinsic size, which
+   made the auto grid track 319px wide. Pin the field instead. */
+.pad-buy .qty-wrap { width: auto; }
+.pad-buy .qty-step { width: 38px; flex: 0 0 auto; }
+.pad-buy .qty-input { width: 56px; min-width: 48px; height: 38px; }
+.pad-out { color: var(--red-deep); font-size: var(--step--2); font-weight: 800; }
+.pad-variants {
+  height: 38px;
+  padding: 0 12px;
+  border: 2px solid var(--ink);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--step--1);
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.pad-variants:hover { background: var(--ink); color: #fff; }
+.pad-variants b { color: var(--red); }
+.pad-variants:hover b { color: #fff; }
+
+@media (max-width: 560px) {
+  /* 44px, not 40: the thumbnail opens the product, so it is a touch target. */
+  .pad-row { grid-template-columns: 44px minmax(0, 1fr); row-gap: 8px; padding: 12px; }
+  .pad-thumb { width: 44px; height: 44px; align-self: start; }
+  /* Indent the buy row under the name rather than under the thumbnail, so the
+     price reads as belonging to the product above it. */
+  .pad-buy { grid-column: 2 / -1; flex-direction: row; align-items: center; justify-content: space-between; }
+  .pad-name { -webkit-line-clamp: 3; }
+
+  /* The field labels cost more width than they earn: the select already reads
+     "All brands" and the price boxes are placeholdered Min / Max. */
+  .filter-bar { gap: 8px; padding: 10px; }
+  .filter-field > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .filter-field select { max-width: none; }
+  .filter-price { flex: 1 1 auto; }
+  .filter-price input { width: 100%; min-width: 0; }
+  .filter-clear { margin-left: 0; width: 100%; }
+}
 
 .product-grid {
   display: grid;
@@ -1347,6 +1548,54 @@ html[data-motion='off'] .hero-rule { animation: none; }
   font-variant-numeric: tabular-nums;
 }
 .qty-hint.is-max { color: var(--red-deep); }
+
+/* Quantity price breaks. The ladder is informational, the nudge is the one
+   that moves order size, so the nudge gets the red. */
+.tier-ladder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 9px 0 0;
+  padding: 8px 10px;
+  border: 2px dashed var(--grey-100);
+  border-radius: 12px;
+}
+.tier-head {
+  flex: 1 0 100%;
+  color: var(--grey-600);
+  font-size: var(--step--2);
+  font-weight: 800;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+.tier-steps { display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.tier-step {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--red-wash);
+  font-variant-numeric: tabular-nums;
+  transition: background var(--dur-fast) linear, color var(--dur-fast) linear;
+}
+.tier-step b { font-size: var(--step--2); font-weight: 800; color: var(--grey-600); }
+.tier-step i { font-style: normal; font-size: var(--step--1); font-weight: 900; color: var(--ink); }
+.tier-step.is-active { background: var(--red); }
+.tier-step.is-active b, .tier-step.is-active i { color: #fff; }
+
+.tier-nudge {
+  display: block;
+  margin-top: 4px;
+  color: var(--red-deep);
+  font-size: var(--step--2);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.tier-nudge[hidden] { display: none; }
+/* .flavor-row small sets its own grey and outranks the rule above. */
+.flavor-row .tier-nudge { color: var(--red-deep); font-weight: 800; }
 
 .qty-wrap { min-width: 0; }
 .buy-row .qty-wrap, .buy-row .qty { width: 100%; }
@@ -1945,7 +2194,13 @@ html[data-motion='off'] .skeleton { animation: none; }
      .qty-input rule above on specificity, so iOS would still zoom on these. */
   .cart-line .qty-input { height: 46px; min-width: 56px; font-size: 16px; }
   .flavor-row .qty-input { font-size: 16px; }
-  .cart-line .qty-step, .flavor-row .qty-step { width: 44px; }
+  .cart-line .qty-step, .flavor-row .qty-step, .pad-buy .qty-step { width: 44px; }
+  .pad-buy .qty-input { height: 46px; width: 60px; }
+  /* .pad-choices .product-select select sets its own 12px and outranks the
+     blanket rule at the top of this block. */
+  .pad-choices .product-select select { height: 46px; font-size: 16px; }
+  .filter-field select, .filter-price input, .filter-toggle, .filter-clear { height: 46px; font-size: 16px; }
+  .view-toggle button { height: 44px; }
 
   .favorite-button { width: 44px; height: 44px; font-size: 18px; }
   .color-picker button { min-height: 44px; padding: 6px 14px; }

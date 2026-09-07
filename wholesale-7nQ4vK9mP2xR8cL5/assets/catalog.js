@@ -20,6 +20,14 @@
       lineNotes = {}, detailProduct = null, flavorQuery = '',
       customer = { name: '', phone: '', business: '', notes: '' }, orderReference = '', cartSavedAt = 0;
 
+  /* Browsing 1157 products two cards to a screen is slow for a buyer who already
+     knows what they want, so the same results also render as a compact order pad.
+     The choice is remembered; the filters deliberately are not, because a stale
+     hidden filter looks like missing stock. */
+  var VIEW_KEY = 'dr-phone-view-mode';
+  var viewMode = 'grid',
+      filters = { brand: '', inStock: false, min: '', max: '' };
+
   var content = document.getElementById('content'),
       search = document.getElementById('search');
 
@@ -80,6 +88,60 @@
         tiers = Array.isArray(p.tiers) ? p.tiers : [];
     tiers.forEach(function (t) { if (line.quantity >= Number(t.min)) base = Number(t.price); });
     return base;
+  }
+
+  /* ---- quantity price breaks ------------------------------------------- *
+   * The catalog has always priced tiers (see unitPrice above) but never showed
+   * them, so a buyer had no way to know that 50 pieces cost less each. The
+   * server sorts tiers ascending by `min`; these guard against a hand-edited
+   * catalog.json anyway. */
+
+  function tierList(p) {
+    return (Array.isArray(p.tiers) ? p.tiers : [])
+      .map(function (t) { return { min: Number(t.min), price: Number(t.price) }; })
+      .filter(function (t) { return t.min > 1 && isFinite(t.min) && isFinite(t.price) && t.price >= 0; })
+      .sort(function (a, b) { return a.min - b.min; });
+  }
+
+  function basePrice(p, s) {
+    var o = options(p)[s.option];
+    return o ? Number(o.price) : 0;
+  }
+
+  /* Index of the break the given quantity has reached, or -1. */
+  function activeTier(list, qty) {
+    var active = -1;
+    list.forEach(function (t, i) { if (qty >= t.min) active = i; });
+    return active;
+  }
+
+  function tierLadder(p, s, qty) {
+    var list = tierList(p);
+    if (!list.length) return '';
+    var active = activeTier(list, qty);
+    return '<div class="tier-ladder" data-tier-ladder>' +
+      '<span class="tier-head">Price breaks</span>' +
+      '<span class="tier-steps">' + list.map(function (t, i) {
+        return '<span class="tier-step' + (i === active ? ' is-active' : '') + '">' +
+          '<b>' + t.min + '+</b><i>' + money(t.price) + '</i></span>';
+      }).join('') + '</span></div>';
+  }
+
+  /* The nudge only fires when the break is actually within reach: not when the
+   * buyer is nowhere near it, and never for a break the stock cannot cover. */
+  function tierNudgeText(p, s, qty, ceiling) {
+    var list = tierList(p);
+    if (!list.length || qty <= 0) return '';
+    for (var i = 0; i < list.length; i++) {
+      if (qty >= list[i].min) continue;
+      var need = list[i].min - qty;
+      if (ceiling !== null && ceiling !== undefined && isFinite(ceiling) && list[i].min > ceiling) return '';
+      // Stay quiet when the break is out of proportion to what they are buying
+      // ("999 more" against a quantity of 1). The ladder still shows it.
+      if (need > qty * 20) return '';
+      return need + ' more → ' + money(list[i].price) + ' each';
+    }
+    return 'Best price · ' + money(list[list.length - 1].price) + ' each';
   }
 
   function variantKeys(p, s) {
@@ -314,6 +376,7 @@
           (qty >= ceiling || status === 'out-of-stock' ? ' disabled' : '') + '>+</button>' +
       '</div>' +
       (opts.hint === false ? '' : '<small class="qty-hint">' + esc(qtyHintText(p, s, qty, ceiling, status)) + '</small>') +
+      (function (t) { return t ? '<small class="tier-nudge" data-tier-nudge>' + esc(t) + '</small>' : '<small class="tier-nudge" data-tier-nudge hidden></small>'; })(tierNudgeText(p, s, qty, ceiling)) +
     '</div>';
   }
 
@@ -365,6 +428,13 @@
       hint.classList.toggle('is-max', qty > 0 && qty >= ceiling);
     }
 
+    var nudge = wrap && wrap.querySelector('[data-tier-nudge]');
+    if (nudge) {
+      var text = tierNudgeText(p, s, qty, ceiling);
+      nudge.textContent = text;
+      nudge.hidden = !text;
+    }
+
     var row = node.closest ? node.closest('.flavor-row') : null;
     if (row) {
       row.classList.toggle('out-of-stock', status === 'out-of-stock');
@@ -372,11 +442,27 @@
       if (avail) avail.textContent = availabilityText(p, s, status);
     }
 
+    // Order-pad rows tint once they carry a quantity, so a buyer scrolling a long
+    // list can see what they have already filled in.
+    var padRow = node.closest ? node.closest('.pad-row') : null;
+    if (padRow) padRow.classList.toggle('has-qty', qty > 0);
+
     var card = node.closest ? node.closest('.product-card') : null;
     var chip = card && card.querySelector('.stock');
     if (chip) {
       chip.className = 'stock ' + status;
       chip.textContent = stockLabel(p, s, status);
+    }
+
+    // Light up the break this quantity has reached. The ladder sits outside the
+    // qty wrap, so look it up from the card or the open detail panel.
+    var scope = card || (node.closest ? node.closest('.detail-controls') : null),
+        ladder = scope && scope.querySelector('[data-tier-ladder]');
+    if (ladder) {
+      var reached = activeTier(tierList(p), qty);
+      ladder.querySelectorAll('.tier-step').forEach(function (step, i) {
+        step.classList.toggle('is-active', i === reached);
+      });
     }
   }
 
@@ -674,17 +760,51 @@
      placeholder; without one, the open category is the pool. */
   function searchScope() { return search.value.trim() ? null : activeCategory(); }
 
-  function getProducts() {
+  /* The category or search hit list, before the brand/stock/price filters. The
+     filter bar's own choices are built from this, so it never offers a brand
+     that would return nothing. */
+  function basePool() {
     var q = search.value.trim().toLowerCase(),
         category = searchScope(),
         pool = category ? category.products : allProducts().map(function (x) { return x.product; });
     if (q) {
-      pool = pool.filter(function (p) {
+      return pool.filter(function (p) {
         return [p.sku, p.name, p.brand, p.color, p.type, (p.colors || []).join(' '), (p.flavors || []).join(' ')]
           .join(' ').toLowerCase().indexOf(q) >= 0;
       });
-    } else if (!category) return [];
-    var result = pool.slice();
+    }
+    return category ? pool : [];
+  }
+
+  function filtersActive() {
+    return !!(filters.brand || filters.inStock || filters.min !== '' || filters.max !== '');
+  }
+
+  function brandsIn(pool) {
+    var seen = {};
+    pool.forEach(function (p) { if (p.brand) seen[p.brand] = true; });
+    return Object.keys(seen).sort(function (a, b) { return a.localeCompare(b); });
+  }
+
+  function applyFilters(pool) {
+    var min = filters.min === '' ? null : Number(filters.min),
+        max = filters.max === '' ? null : Number(filters.max);
+    return pool.filter(function (p) {
+      if (filters.brand && p.brand !== filters.brand) return false;
+      // "In stock" means orderable: anything not marked out of stock, on any variant.
+      if (filters.inStock && (p.stock || 'in-stock') === 'out-of-stock') return false;
+      if (min !== null || max !== null) {
+        var price = minPrice(p);
+        if (!isFinite(price)) return false;
+        if (min !== null && isFinite(min) && price < min) return false;
+        if (max !== null && isFinite(max) && price > max) return false;
+      }
+      return true;
+    });
+  }
+
+  function getProducts() {
+    var result = applyFilters(basePool()).slice();
     if (sortMode === 'name') result.sort(function (a, b) { return a.name.localeCompare(b.name); });
     if (sortMode === 'brand') result.sort(function (a, b) { return (a.brand || '').localeCompare(b.brand || '') || a.name.localeCompare(b.name); });
     if (sortMode === 'price-low') result.sort(function (a, b) { return minPrice(a) - minPrice(b); });
@@ -867,6 +987,8 @@
   function productCard(p, index) {
     var o = options(p), c = colors(p), f = flavors(p), s = choice(p),
         status = variantStatus(p, s),
+        cardLine = findLine(lineKey(p.id, s.option, s.color, s.flavor)),
+        cardQty = cardLine ? cardLine.quantity : 0,
         meta = [p.sku, p.type].filter(Boolean).join(' · ');
 
     var price = o.length > 1
@@ -902,19 +1024,85 @@
         '<h3>' + esc(p.name) + '</h3>' +
         (meta ? '<p class="product-meta">' + esc(meta) + '</p>' : '') +
         price +
+        tierLadder(p, s, cardQty) +
         (o.length > 1 ? selectMarkup('Choose option', 'option', o, s.option, p) : '') +
         colorPicker +
         '<div class="buy-row">' + buy + '</div>' +
       '</div></article>';
   }
 
+  /* One order-pad line: the same product, roughly a sixth of the height of its
+     card, so a buyer filling a big order sees a dozen at a time instead of two.
+     Flavored products still route through the detail panel — a dozen flavors
+     cannot sit in a single row. */
+  function productRow(p) {
+    var o = options(p), c = colors(p), f = flavors(p), s = choice(p),
+        status = variantStatus(p, s),
+        line = findLine(lineKey(p.id, s.option, s.color, s.flavor)),
+        qty = line ? line.quantity : 0,
+        unit = o[s.option] || o[0];
+
+    var control;
+    if (f.length) control = '<button class="pad-variants" data-open-product="' + p.id + '">Flavors <b>' + f.length + '</b></button>';
+    else if (status === 'out-of-stock') control = '<span class="pad-out">Out of stock</span>';
+    else control = qtyControl(p, s, { hint: false });
+
+    return '<div class="pad-row' + (qty ? ' has-qty' : '') + '">' +
+      '<button class="pad-thumb" data-open-product="' + p.id + '" aria-label="Open ' + esc(p.name) + '">' +
+        (p.image ? '<img src="' + esc(p.image) + '" alt="" loading="lazy" width="44" height="44">' : '<span class="pad-noimg" aria-hidden="true"></span>') +
+      '</button>' +
+      '<div class="pad-main">' +
+        '<b class="pad-name">' + esc(p.name) + '</b>' +
+        '<span class="pad-meta">' + esc([p.sku, p.brand].filter(Boolean).join(' · ')) +
+          '<i class="stock ' + esc(status) + '">' + esc(stockLabel(p, s, status)) + '</i></span>' +
+        (o.length > 1 || c.length > 1
+          ? '<span class="pad-choices">' +
+              (o.length > 1 ? selectMarkup('Option', 'option', o, s.option, p) : '') +
+              (c.length > 1 ? selectMarkup('Color', 'color', c, s.color, p) : '') +
+            '</span>'
+          : '') +
+      '</div>' +
+      '<div class="pad-buy">' +
+        '<span class="pad-price">' + (unit ? money(unit.price) : 'On request') + '</span>' +
+        control +
+      '</div></div>';
+  }
+
+  function filterBar(pool) {
+    var brands = brandsIn(pool);
+    return '<div class="filter-bar">' +
+      (brands.length > 1
+        ? '<label class="filter-field"><span>Brand</span><select data-filter="brand">' +
+            '<option value="">All brands</option>' +
+            brands.map(function (b) {
+              return '<option value="' + esc(b) + '"' + (b === filters.brand ? ' selected' : '') + '>' + esc(b) + '</option>';
+            }).join('') + '</select></label>'
+        : '') +
+      '<button type="button" class="filter-toggle' + (filters.inStock ? ' active' : '') + '" data-filter="inStock"' +
+        ' aria-pressed="' + (filters.inStock ? 'true' : 'false') + '">In stock only</button>' +
+      '<label class="filter-field filter-price"><span>Price</span>' +
+        '<input type="text" inputmode="decimal" data-filter="min" placeholder="Min" value="' + esc(filters.min) + '" aria-label="Minimum price">' +
+        '<i aria-hidden="true">–</i>' +
+        '<input type="text" inputmode="decimal" data-filter="max" placeholder="Max" value="' + esc(filters.max) + '" aria-label="Maximum price">' +
+      '</label>' +
+      (filtersActive() ? '<button type="button" class="filter-clear" data-filter="clear">Clear filters</button>' : '') +
+    '</div>';
+  }
+
   function renderResults() {
-    var category = searchScope(), products = getProducts(), q = search.value.trim();
+    var category = searchScope(), pool = basePool(), products = getProducts(), q = search.value.trim();
     content.innerHTML =
       '<div class="section-heading product-heading">' +
         '<button class="back-button" id="back" aria-label="Back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H6M11 18l-6-6 6-6"/></svg></button>' +
         '<div class="result-title"><h2>' + esc(category ? category.name : 'Results for “' + q + '”') + '</h2></div>' +
-        '<div class="result-tools"><span class="result-count">' + products.length + ' items</span>' +
+        '<div class="result-tools"><span class="result-count">' + products.length + ' items' +
+            (filtersActive() && pool.length !== products.length ? ' <i>of ' + pool.length + '</i>' : '') + '</span>' +
+          '<div class="view-toggle" role="group" aria-label="View">' +
+            '<button type="button" data-view="grid" class="' + (viewMode === 'grid' ? 'active' : '') + '"' +
+              ' aria-pressed="' + (viewMode === 'grid' ? 'true' : 'false') + '">Cards</button>' +
+            '<button type="button" data-view="list" class="' + (viewMode === 'list' ? 'active' : '') + '"' +
+              ' aria-pressed="' + (viewMode === 'list' ? 'true' : 'false') + '">Order pad</button>' +
+          '</div>' +
           '<label class="sort-control"><span>Sort</span><select id="sort">' +
             '<option value="original">Original order</option>' +
             '<option value="name">Name A–Z</option>' +
@@ -923,9 +1111,14 @@
             '<option value="price-high">Price: high to low</option>' +
           '</select></label></div>' +
       '</div>' +
+      filterBar(pool) +
       (products.length
-        ? '<div class="product-grid">' + products.map(productCard).join('') + '</div>'
-        : '<div class="empty-state"><h3>No products found</h3><p>Try a different search term or category.</p></div>');
+        ? (viewMode === 'list'
+            ? '<div class="order-pad">' + products.map(productRow).join('') + '</div>'
+            : '<div class="product-grid">' + products.map(productCard).join('') + '</div>')
+        : '<div class="empty-state"><h3>No products found</h3><p>' +
+            (filtersActive() ? 'No product matches these filters. Try clearing them.' : 'Try a different search term or category.') +
+          '</p></div>');
 
     var sortSelect = document.getElementById('sort');
     sortSelect.value = sortMode;
@@ -935,11 +1128,15 @@
       search.value = '';
       syncSearchClear();
       sortMode = 'original';
+      filters = { brand: '', inStock: false, min: '', max: '' };
       history.replaceState(null, '', location.pathname);
       render();
     };
 
     content.onchange = function (e) {
+      var brand = e.target.closest('[data-filter="brand"]');
+      if (brand) { filters.brand = brand.value; renderResults(); return; }
+
       var el = e.target.closest('[data-choice]');
       if (!el) return;
       var found = findProduct(el.dataset.id);
@@ -949,7 +1146,35 @@
       selections[key] = s;
       renderResults();
     };
+
+    /* Price fields re-filter as you type, but rebuilding the list would steal
+       focus mid-keystroke, so the field is put back afterwards. */
+    content.oninput = function (e) {
+      var box = e.target.closest('[data-filter="min"], [data-filter="max"]');
+      if (!box) return;
+      var which = box.dataset.filter, caret = box.selectionStart;
+      filters[which] = box.value.replace(/[^0-9.]/g, '');
+      renderResults();
+      var again = content.querySelector('[data-filter="' + which + '"]');
+      if (again) { again.focus(); try { again.setSelectionRange(caret, caret); } catch (err) {} }
+    };
     content.onclick = function (e) {
+      var view = e.target.closest('[data-view]');
+      if (view) {
+        viewMode = view.dataset.view;
+        try { localStorage.setItem(VIEW_KEY, viewMode); } catch (err) {}
+        renderResults();
+        return;
+      }
+      var filter = e.target.closest('.filter-bar [data-filter]');
+      if (filter) {
+        if (filter.dataset.filter === 'inStock') { filters.inStock = !filters.inStock; renderResults(); return; }
+        if (filter.dataset.filter === 'clear') {
+          filters = { brand: '', inStock: false, min: '', max: '' };
+          renderResults();
+          return;
+        }
+      }
       var favorite = e.target.closest('[data-favorite]');
       if (favorite) { toggleFavorite(favorite.dataset.favorite); return; }
       var open = e.target.closest('[data-open-product]');
@@ -1037,6 +1262,7 @@
           '<button data-detail-favorite class="favorite-button ' + (favorites.indexOf(Number(p.id)) >= 0 ? 'active' : '') + '" aria-label="Save product">' + heart() + '</button></div>' +
         (p.type ? '<p class="product-meta">' + esc(p.type) + '</p>' : '') +
         (o.length > 1 ? selectMarkup('Choose option', 'option', o, s.option, p) : '<p class="price">' + (o[0] ? money(o[0].price) : 'Price on request') + '</p>') +
+        tierLadder(p, s, (function (l) { return l ? l.quantity : 0; })(findLine(lineKey(p.id, s.option, s.color, s.flavor)))) +
         (c.length > 1 ? '<div class="color-picker"><span>Choose color</span><div>' + c.map(function (color) {
           return '<button data-detail-color="' + esc(color) + '" class="' + (color === s.color ? 'active' : '') + '">' + esc(color) + '</button>';
         }).join('') + '</div></div>' : '') +
@@ -1284,6 +1510,7 @@
   try { recent = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); if (!Array.isArray(recent)) recent = []; } catch (e) { recent = []; }
   try { lineNotes = JSON.parse(localStorage.getItem(NOTES_KEY) || '{}'); } catch (e) { lineNotes = {}; }
   try { recentCollapsed = localStorage.getItem(RECENT_COLLAPSED_KEY) === '1'; } catch (e) { recentCollapsed = false; }
+  try { viewMode = localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid'; } catch (e) { viewMode = 'grid'; }
   try {
     customer = JSON.parse(sessionStorage.getItem(CUSTOMER_KEY) || '{"name":"","phone":"","business":"","notes":""}');
   } catch (e) { customer = { name: '', phone: '', business: '', notes: '' }; }

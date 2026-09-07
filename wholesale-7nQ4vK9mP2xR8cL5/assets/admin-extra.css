@@ -272,3 +272,110 @@
   .quick-field span, .variant-row span { font-size: 11px; }
   .admin-product p { font-size: 12px; }
 }
+
+/* ---------- Sales tab ---------------------------------------------------- */
+
+.sales-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 0 0 18px;
+}
+.sales-head h2 { margin: 0; font-size: 19px; letter-spacing: -.02em; }
+.sales-head .panel-note { margin: 6px 0 0; max-width: 62ch; }
+
+.range-picker { display: inline-flex; border: 1px solid var(--glass-line); border-radius: 999px; overflow: hidden; }
+.range-picker button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  background: transparent;
+  color: var(--text-mid);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background var(--dur) linear, color var(--dur) linear;
+}
+.range-picker button:hover { color: var(--text-hi); background: var(--glass); }
+.range-picker button.active { background: var(--red); color: #fff; }
+
+/* A read-out, not a deep link: no hover lift, no pointer. */
+.stat-tile.stat-static { cursor: default; }
+.stat-tile.stat-static:hover { transform: none; }
+
+/* Single-series line. The stroke is non-scaling so the 2px spec survives the
+   preserveAspectRatio="none" stretch. */
+.viz-line { display: block; width: 100%; height: 190px; overflow: visible; }
+.viz-axis {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  color: var(--text-low);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.viz-axis span:nth-child(2) { color: var(--text-mid); font-weight: 700; }
+
+/* Restock report. Status is carried by a glyph and a worded label as well as
+   colour, so it survives colour-blindness, greyscale print and forced colours. */
+.restock-lead { margin: 0 0 14px; color: var(--text-mid); font-size: 12px; }
+.restock-lead b { color: var(--text-hi); font-size: 14px; }
+.restock-lead.restock-ok { color: var(--ok); }
+
+.restock-list { display: grid; gap: 8px; }
+.restock-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 2fr) minmax(0, 2fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--glass-line);
+  border-radius: 10px;
+  background: var(--glass);
+}
+.restock-flag { font-size: 12px; line-height: 1; text-align: center; }
+.restock-row.state-out .restock-flag,
+.restock-row.state-out .restock-cover { color: #ff4d4d; }
+.restock-row.state-warn .restock-flag,
+.restock-row.state-warn .restock-cover { color: var(--warn); }
+.restock-row.state-good .restock-flag,
+.restock-row.state-good .restock-cover { color: var(--ok); }
+.restock-row.state-out { border-color: rgba(255, 77, 77, .34); }
+
+.restock-main { min-width: 0; }
+.restock-main b {
+  display: block;
+  overflow: hidden;
+  color: var(--text-hi);
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.restock-main span { color: var(--text-low); font-size: 11px; }
+
+.restock-nums { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--text-low); font-size: 11px; }
+.restock-nums i { color: var(--text-mid); font-style: normal; font-weight: 800; font-variant-numeric: tabular-nums; }
+.restock-cover { font-size: 12px; font-weight: 800; white-space: nowrap; text-align: right; }
+
+@media (max-width: 760px) {
+  .restock-row { grid-template-columns: 20px minmax(0, 1fr) auto; row-gap: 6px; }
+  .restock-nums { grid-column: 2 / -1; }
+  .restock-cover { grid-column: 2 / -1; text-align: left; }
+  .sales-head { align-items: flex-start; }
+  .range-picker { width: 100%; }
+  .range-picker button { flex: 1 1 0; padding: 0 6px; }
+}
+
+@media (pointer: coarse) {
+  .range-picker button { min-height: 44px; }
+  .restock-row { padding: 12px; }
+}
+
+.restock-lead.restock-untracked { margin-top: 20px; color: var(--text-mid); }
+.restock-row.state-untracked .restock-flag,
+.restock-row.state-untracked .restock-cover { color: var(--text-low); }
