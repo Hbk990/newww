@@ -1,4 +1,4 @@
-DR PHONE WHOLESALE — HARDENED INSTALLATION (v14)
+DR PHONE WHOLESALE — HARDENED INSTALLATION (v15)
 
 READ THIS FIRST — WHICH ROUTE TO TAKE
 This ZIP is a complete install and it contains a copy of the catalog data as
@@ -6,16 +6,21 @@ it stood when the package was built. Two situations:
 
   A) You have added, edited or deleted products through the dashboard, or you
      have customer orders in the order log, since your last install.
-     -> Do NOT do a full replace. Upload only these eight files over the top,
+     -> Do NOT do a full replace. Upload only these files over the top,
         keeping everything else on the server exactly as it is:
           wholesale-.../assets/styles.css
           wholesale-.../assets/catalog.js
-          wholesale-.../assets/admin.css
           wholesale-.../assets/admin-extra.css
           wholesale-.../assets/admin.js
           wholesale-.../index.php
           wholesale-.../admin/index.php
+          wholesale-.../admin/api.php
           wholesale-.../api/order.php
+          wholesale-.../api/order-status.php   (new file)
+          wholesale-.../inc/bootstrap.php
+          wholesale-.../.htaccess
+        Then DELETE wholesale-.../assets/opencv.js from the server: it is
+        10.9 MB, nothing uses it any more, and it never worked.
         That upgrades the software and leaves your data alone. Nothing else in
         this package has changed.
 
@@ -102,12 +107,33 @@ Mobile
 - Below 361px the product grid is one card per row; two-up left too little
   space for a usable quantity control.
 
+WHAT IS NEW IN v15
+Cancelled and never-sent orders
+- An order is recorded the moment a customer taps WhatsApp, which is before the
+  message is even written. WhatsApp tells this site nothing, so the site cannot
+  know whether it was sent, deleted or cancelled afterwards.
+- Orders therefore start as UNCONFIRMED, and either side can settle them: the
+  customer is asked "Did you send order DR-...?" when they come back to the
+  catalog, and the Order log has Confirm / Cancel / Restore on every order plus
+  a status filter.
+- The Sales tab and "What to reorder" count CONFIRMED orders only, so phantom
+  orders can no longer inflate your revenue or overstate how fast stock moves.
+  The value of anything still waiting is shown above the figures, so nothing is
+  hidden from you.
+- Cancelling keeps the record (struck through) instead of deleting it, so you
+  can still see what was cancelled. Delete is still there for genuine rubbish.
+- Orders recorded before this version keep counting; they are treated as
+  confirmed rather than being wiped from your history.
+- In the Order log, the "Items" button now actually hides and shows the items.
+  It never did before.
+
 REMOVED IN v15
 - The OpenCV image audit has been removed. It could never run: the library
   builds its own code from text at startup, which the catalog's security policy
   forbids, so it always failed after 60 seconds with a message that wrongly
-  blamed the upload. Removing it also deletes a 10.9 MB file, which is why this
-  package is roughly half the size of the last one.
+  blamed the upload. Removing it also deletes a 10.9 MB file: the installed
+  folder drops from 28.3 MB to 17.3 MB, and this ZIP from 20 MB to 16 MB (the
+  file compressed well, so the download shrinks less than the install does).
 - The "Image quality audit" in Operations is a different, server-side check and
   still works; it reports missing and low-resolution pictures.
 - If storage/opencv-image-audit.json exists on the server, delete it. Nothing
