@@ -1443,6 +1443,7 @@
        fire-and-forget and survives the navigation; window.open must stay
        synchronous inside the click handler or the popup blocker eats it. */
     logOrder();
+    rememberPendingOrder(total);
 
     window.open('https://wa.me/' + String(window.DR_PHONE.phone || '').replace(/\D/g, '').replace(/^00/, '') +
       '?text=' + encodeURIComponent(lines.join('\n')), '_blank', 'noopener');
@@ -1462,6 +1463,82 @@
       });
       navigator.sendBeacon('api/order.php', new Blob([body], { type: 'application/json' }));
     } catch (e) { /* logging must never block the order */ }
+  }
+
+  /* ---- did the order actually get sent? -------------------------------- *
+   * The order is recorded when the WhatsApp button is tapped, which is before
+   * the message is composed. WhatsApp reports nothing back, so the only way to
+   * know is to ask: when the customer returns to this tab, offer Yes / No.
+   * Ignoring the question is fine — the order stays unconfirmed and the shop
+   * settles it from the dashboard. */
+
+  var PENDING_KEY = 'dr-phone-pending-order',
+      PENDING_MAX_AGE = 6 * 60 * 60 * 1000;   // an answer days later means nothing
+
+  function rememberPendingOrder(total) {
+    try {
+      localStorage.setItem(PENDING_KEY, JSON.stringify({
+        reference: orderReference, total: total, at: Date.now()
+      }));
+    } catch (e) {}
+  }
+  function clearPendingOrder() { try { localStorage.removeItem(PENDING_KEY); } catch (e) {} }
+  function readPendingOrder() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(PENDING_KEY) || 'null');
+      if (!raw || !raw.reference) return null;
+      var age = Date.now() - Number(raw.at || 0);
+      if (age > PENDING_MAX_AGE) { clearPendingOrder(); return null; }
+      // Opening WhatsApp can fire a blur/focus pair straight away on some
+      // setups; don't ask before they have had a chance to send anything.
+      if (age < 1500) return null;
+      return raw;
+    } catch (e) { return null; }
+  }
+
+  function answerPendingOrder(reference, status) {
+    clearPendingOrder();
+    try {
+      fetch('api/order-status.php', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csrf: window.DR_PHONE.csrf || '', reference: reference, status: status })
+      }).catch(function () {});
+    } catch (e) {}
+  }
+
+  function showOrderConfirm() {
+    var pending = readPendingOrder();
+    if (!pending || document.getElementById('order-confirm')) return;
+
+    var bar = document.createElement('div');
+    bar.id = 'order-confirm';
+    bar.className = 'order-confirm';
+    bar.setAttribute('role', 'status');
+    bar.innerHTML =
+      '<div class="order-confirm-text">' +
+        '<b>Did you send order ' + esc(pending.reference) + '?</b>' +
+        '<span>Telling us keeps your order from being missed.</span>' +
+      '</div>' +
+      '<div class="order-confirm-actions">' +
+        '<button type="button" data-order-answer="confirmed">Yes, sent</button>' +
+        '<button type="button" class="ghost" data-order-answer="cancelled">No</button>' +
+        '<button type="button" class="order-confirm-close" data-order-answer="" aria-label="Ask me later">&times;</button>' +
+      '</div>';
+    document.body.appendChild(bar);
+    requestAnimationFrame(function () { bar.classList.add('open'); });
+
+    bar.addEventListener('click', function (e) {
+      var button = e.target.closest && e.target.closest('[data-order-answer]');
+      if (!button) return;
+      var answer = button.dataset.orderAnswer;
+      // Dismissed rather than answered: forget the prompt, leave the order
+      // unconfirmed so the shop can settle it.
+      if (answer) answerPendingOrder(pending.reference, answer); else clearPendingOrder();
+      bar.classList.remove('open');
+      setTimeout(function () { if (bar.parentNode) bar.parentNode.removeChild(bar); }, 260);
+    });
   }
 
   /* ----------------------------------------------------------- the panels */
@@ -1533,6 +1610,14 @@
   Array.prototype.forEach.call(document.querySelectorAll('[data-close-panel]'), function (b) { b.onclick = closePanels; });
   document.getElementById('panel-overlay').onclick = closePanels;
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closePanels(); });
+
+  /* Coming back from WhatsApp: a tab switch on a phone, a window focus on a
+     desktop, or a fresh load if they closed the tab and returned later. */
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') showOrderConfirm();
+  });
+  window.addEventListener('focus', showOrderConfirm);
+  setTimeout(showOrderConfirm, 1200);
 
   document.getElementById('cart-clear').onclick = function () {
     cart = [];

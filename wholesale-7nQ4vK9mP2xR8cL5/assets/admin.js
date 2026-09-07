@@ -1,6 +1,6 @@
 (function(){
   'use strict';
-  var catalog=[],settings={},stats={},backups=[],activity=[],audit=[],opencvAudit={},orders=[],selected=new Set(),inventoryOnly=false,categoryFilter='',opencvRunning=false,opencvPaused=false;
+  var catalog=[],settings={},stats={},backups=[],activity=[],audit=[],orders=[],selected=new Set(),inventoryOnly=false,categoryFilter='';
   var toolsLoaded=false,activeTab='overview',activeFilter='all',renderLimit=100,listObserver=null;
   var categoryGroups=['Audio & Wearables','Mobile Accessories & Power','Gaming & Computers','Cameras, Security & Projection','Home & Personal Care','Car Electronics','Storage, Network & TV','Toys, Lifestyle & Miscellaneous','Other'];
   var search=document.getElementById('admin-search'),content=document.getElementById('admin-content'),notice=document.getElementById('notice');
@@ -39,8 +39,6 @@
     var backupLink=document.createElement('a');backupLink.href='api.php?download=data-backup';backupLink.className='download-backup';backupLink.textContent='Download off-server data backup';document.querySelector('.operations-grid section:nth-child(3)').appendChild(backupLink);setupVariantEditors();
     var pictureSection=document.createElement('section');pictureSection.className='picture-import-section';pictureSection.innerHTML='<h3>Bulk product pictures</h3><p>Upload pictures after the CSV. Name the main picture exactly like the SKU (for example <b>DR-00001.jpg</b>). Use <b>DR-00001-2.jpg</b>, <b>-3</b>, and so on for gallery pictures. New uploads are resized and compressed when the server supports it.</p><form id="image-import-form" enctype="multipart/form-data"><input type="hidden" name="action" value="import_product_images"><input name="product_images[]" type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" multiple required><button type="submit">Match and upload pictures</button><button type="button" id="prune-images" class="secondary">Delete unused pictures</button></form><div id="image-import-result" class="image-import-result" aria-live="polite"></div>';
     document.querySelector('.operations-grid').insertBefore(pictureSection,document.querySelector('.operations-grid section:nth-child(2)'));
-    var opencvSection=document.createElement('section');opencvSection.className='opencv-audit-section full-tool';opencvSection.innerHTML='<h3>OpenCV image audit</h3><p>Free technical screening performed inside this browser. It checks resolution, blur, lighting, contrast and basic crop/background risks.</p><div class="opencv-actions"><button type="button" id="opencv-new">Audit new/changed</button><button type="button" id="opencv-all" class="secondary">Audit entire catalog</button><button type="button" id="opencv-pause" class="secondary" disabled>Pause</button><button type="button" id="opencv-clear" class="secondary">Clear results</button></div><div id="opencv-progress" class="opencv-progress" aria-live="polite">OpenCV loads only when an audit starts.</div><div id="opencv-summary" class="opencv-summary"></div><div id="opencv-list" class="tool-list opencv-list"></div>';
-    document.querySelector('.operations-grid').insertBefore(opencvSection,document.querySelector('.operations-grid section:nth-child(3)'));
   }
   function allProducts(){return[].concat.apply([],catalog.map(function(c){return c.products.map(function(p){return Object.assign({category:c.slug,categoryName:c.name},p)})}))}
   function tell(message,error){notice.innerHTML='<div class="notice'+(error?' error':'')+'">'+esc(message)+'</div>';setTimeout(function(){notice.innerHTML=''},5000)}
@@ -48,13 +46,6 @@
   function money(v){if(v==null||v==='')return'Price on request';var currency=String(settings.currency||'USD').toUpperCase();try{return new Intl.NumberFormat('en-US',{style:'currency',currency:currency,minimumFractionDigits:Number.isInteger(Number(v))?0:2}).format(Number(v))}catch(e){return currency+' '+Number(v).toFixed(Number.isInteger(Number(v))?0:2)}}
   function productPrice(p){if(Array.isArray(p.options)&&p.options.length)return p.options.map(function(o){return o.name+' '+money(o.price)}).join(', ');return money(p.price)}
   function syncCurrencyLabel(){var input=productForm&&productForm.price,label=input&&input.parentElement;if(label&&label.firstChild)label.firstChild.nodeValue='Single price ('+String(settings.currency||'USD').toUpperCase()+')'}
-  function loadOpenCv(){if(window.cv&&window.cv.Mat)return Promise.resolve(window.cv);var existing=document.getElementById('opencv-runtime');if(!existing){existing=document.createElement('script');existing.id='opencv-runtime';existing.src='../assets/opencv.js?v=4.x';existing.async=true;document.head.appendChild(existing)}return new Promise(function(resolve,reject){var started=Date.now();function ready(){if(window.cv){Promise.resolve(window.cv).then(function(runtime){if(runtime&&runtime.Mat){window.cv=runtime;resolve(runtime);return}setTimeout(ready,100)},reject);return}if(Date.now()-started>60000){reject(Error('OpenCV could not load. Check that assets/opencv.js was uploaded.'));return}setTimeout(ready,100)}existing.addEventListener('error',function(){reject(Error('OpenCV file could not be loaded.'))},{once:true});ready()})}
-  function backgroundUniformity(src){var values=[],w=src.cols,h=src.rows,d=src.data,channels=src.channels(),size=Math.max(2,Math.floor(Math.min(w,h)*.04)),corners=[[0,0],[Math.max(0,w-size),0],[0,Math.max(0,h-size)],[Math.max(0,w-size),Math.max(0,h-size)]];corners.forEach(function(c){for(var y=c[1];y<Math.min(h,c[1]+size);y+=Math.max(1,Math.floor(size/4)))for(var x=c[0];x<Math.min(w,c[0]+size);x+=Math.max(1,Math.floor(size/4))){var i=(y*w+x)*channels;values.push((Number(d[i])+Number(d[i+1]||d[i])+Number(d[i+2]||d[i]))/3)}});if(!values.length)return 0;var mean=values.reduce(function(a,b){return a+b},0)/values.length,variance=values.reduce(function(a,b){return a+Math.pow(b-mean,2)},0)/values.length;return Math.max(0,Math.min(100,100-Math.sqrt(variance)*2))}
-  function analyzeWithOpenCv(product){return new Promise(function(resolve){var image=new Image();image.decoding='async';image.onload=function(){var src,gray,lap,edges,mean,stddev,lapMean,lapStd;try{src=cv.imread(image);gray=new cv.Mat();lap=new cv.Mat();edges=new cv.Mat();mean=new cv.Mat();stddev=new cv.Mat();lapMean=new cv.Mat();lapStd=new cv.Mat();cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);cv.meanStdDev(gray,mean,stddev);var brightness=mean.data64F[0]||0,contrast=stddev.data64F[0]||0;cv.Laplacian(gray,lap,cv.CV_64F);cv.meanStdDev(lap,lapMean,lapStd);var sharpness=Math.pow(lapStd.data64F[0]||0,2);cv.Canny(gray,edges,75,150);var w=src.cols,h=src.rows,band=Math.max(2,Math.floor(Math.min(w,h)*.025)),total=0,border=0;for(var y=0;y<h;y++)for(var x=0;x<w;x++){if(edges.data[y*w+x]){total++;if(x<band||x>=w-band||y<band||y>=h-band)border++}}var cropRisk=total?Math.min(100,border/total*100):0,background=backgroundUniformity(src),reasons=[],fail=false;if(w<500||h<500){reasons.push('Resolution below 500 × 500');fail=true}if(sharpness<40){reasons.push('Strong blur risk');fail=true}else if(sharpness<90)reasons.push('Possible softness or blur');if(brightness<45||brightness>225){reasons.push(brightness<45?'Image is very dark':'Image is strongly overexposed');fail=true}else if(brightness<65||brightness>210)reasons.push(brightness<65?'Image may be too dark':'Image may be too bright');if(contrast<20)reasons.push('Low contrast');if(cropRisk>14)reasons.push('Many edges touch the image border; check cropping');if(background<45)reasons.push('Background is inconsistent near the corners');if(Math.max(w,h)/Math.max(1,Math.min(w,h))>2.8)reasons.push('Unusual image aspect ratio');resolve({id:Number(product.id),image:String(product.image),status:fail?'fail':(reasons.length?'warning':'pass'),width:w,height:h,sharpness:sharpness,brightness:brightness,contrast:contrast,crop_risk:cropRisk,background_uniformity:background,reasons:reasons})}catch(error){resolve({id:Number(product.id),image:String(product.image),status:'fail',width:0,height:0,sharpness:0,brightness:0,contrast:0,crop_risk:0,background_uniformity:0,reasons:['OpenCV could not analyze this image']})}finally{[src,gray,lap,edges,mean,stddev,lapMean,lapStd].forEach(function(mat){if(mat&&mat.delete)mat.delete()})}};image.onerror=function(){resolve({id:Number(product.id),image:String(product.image),status:'fail',width:0,height:0,sharpness:0,brightness:0,contrast:0,crop_risk:0,background_uniformity:0,reasons:['Image could not be loaded']})};image.src='../'+product.image})}
-  function saveOpenCvBatch(items,finished){var data=new FormData();data.set('action','save_opencv_audit');data.set('results',JSON.stringify(items));if(finished)data.set('finished','1');return request(data)}
-  function renderOpenCvAudit(){var products=allProducts().filter(function(p){return p.image}),current=products.map(function(p){return opencvAudit[String(p.id)]}).filter(function(r,i){return r&&r.image===products[i].image}),pass=current.filter(function(r){return r.status==='pass'}).length,warning=current.filter(function(r){return r.status==='warning'}).length,fail=current.filter(function(r){return r.status==='fail'}).length,summary=document.getElementById('opencv-summary'),list=document.getElementById('opencv-list');if(!summary||!list)return;summary.innerHTML='<b>'+current.length+'</b> current results · <span class="cv-pass">'+pass+' passed</span> · <span class="cv-warning">'+warning+' warnings</span> · <span class="cv-fail">'+fail+' failed</span> · '+Math.max(0,products.length-current.length)+' not audited';var flagged=products.map(function(p){return{product:p,result:opencvAudit[String(p.id)]}}).filter(function(x){return x.result&&x.result.image===x.product.image&&x.result.status!=='pass'});list.innerHTML=flagged.slice(0,100).map(function(x){var r=x.result;return'<button data-cv-edit="'+x.product.id+'"><strong><span class="cv-dot '+r.status+'"></span>'+esc(x.product.name)+'</strong><span>'+esc(r.width+'×'+r.height+' · sharpness '+r.sharpness+' · brightness '+r.brightness+' · '+((r.reasons||[]).join('; ')||r.status))+'</span></button>'}).join('')||(current.length?'<p>No warnings or failures in current results.</p>':'<p>No OpenCV results yet.</p>')}
-  function waitWhilePaused(){return new Promise(function(resolve){function check(){opencvPaused?setTimeout(check,150):resolve()}check()})}
-  async function runOpenCvAudit(all){if(opencvRunning)return;var products=allProducts().filter(function(p){return p.image&&(all||!opencvAudit[String(p.id)]||opencvAudit[String(p.id)].image!==p.image)}),progress=document.getElementById('opencv-progress'),pause=document.getElementById('opencv-pause');if(!products.length){tell('Every current product picture already has an audit result.');return}opencvRunning=true;opencvPaused=false;pause.disabled=false;pause.textContent='Pause';document.getElementById('opencv-new').disabled=true;document.getElementById('opencv-all').disabled=true;try{progress.textContent='Loading OpenCV…';await loadOpenCv();var batch=[];for(var i=0;i<products.length;i++){await waitWhilePaused();progress.textContent='Analyzing '+(i+1)+' / '+products.length+' — '+products[i].name;var result=await analyzeWithOpenCv(products[i]);opencvAudit[String(result.id)]=Object.assign({},result,{audited_at:new Date().toISOString()});batch.push(result);if(batch.length===20||i===products.length-1){await saveOpenCvBatch(batch,i===products.length-1);batch=[];renderOpenCvAudit()}await new Promise(function(resolve){setTimeout(resolve,10)})}progress.textContent='Audit completed: '+products.length+' pictures checked.';tell('OpenCV image audit completed.')}catch(error){progress.textContent='Audit stopped: '+error.message;tell(error.message,true)}finally{opencvRunning=false;opencvPaused=false;pause.disabled=true;pause.textContent='Pause';document.getElementById('opencv-new').disabled=false;document.getElementById('opencv-all').disabled=false;renderOpenCvAudit()}}
   function renderTwoFactor(){var box=document.querySelector('.two-factor-setting');if(!box)return;if(settings.two_factor_enabled){box.innerHTML='<strong>Two-factor authentication is enabled</strong><small>'+Number(settings.recovery_codes_remaining||0)+' unused recovery codes remain.</small><button type="button" id="disable-two-factor" class="secondary">Disable two-factor authentication</button>';document.getElementById('disable-two-factor').onclick=function(){if(!settingsForm.current_password.value){tell('Enter the current admin password first.',true);return}if(!confirm('Disable two-factor authentication?'))return;var data=new FormData();data.set('action','disable_two_factor');data.set('current_password',settingsForm.current_password.value);request(data).then(function(j){consume(j);renderTwoFactor()}).catch(function(e){tell(e.message,true)})};return}box.innerHTML='<strong>Two-factor authentication is off</strong><small>Set it up with an authenticator app. Confirmation is required before it becomes active.</small><button type="button" id="begin-two-factor">Set up authenticator</button><div id="two-factor-confirm" hidden><code id="two-factor-key"></code><label>6-digit verification code<input id="two-factor-code" inputmode="numeric" maxlength="6" pattern="\\d{6}"></label><button type="button" id="confirm-two-factor">Confirm and enable</button></div>';document.getElementById('begin-two-factor').onclick=function(){if(!settingsForm.current_password.value){tell('Enter the current admin password first.',true);return}var data=new FormData();data.set('action','begin_two_factor');data.set('current_password',settingsForm.current_password.value);request(data).then(function(j){document.getElementById('two-factor-confirm').hidden=false;document.getElementById('two-factor-key').textContent='Setup key: '+j.setup_key;document.getElementById('two-factor-code').focus();tell(j.message)}).catch(function(e){tell(e.message,true)})};document.getElementById('confirm-two-factor').onclick=function(){var data=new FormData();data.set('action','confirm_two_factor');data.set('current_password',settingsForm.current_password.value);data.set('otp',document.getElementById('two-factor-code').value);request(data).then(function(j){consume(j);alert('Save these one-time recovery codes somewhere safe:\n\n'+j.recovery_codes.join('\n')+'\n\nEach code works once.');renderTwoFactor()}).catch(function(e){tell(e.message,true)})}}
   function updateBulkBar(){document.getElementById('bulk-bar').hidden=!selected.size;document.getElementById('selected-count').textContent=selected.size}
 
@@ -279,6 +270,13 @@
     return orders.filter(function(o){var t=Date.parse(o.time);return isFinite(t)&&t>=cut});
   }
 
+  /* Only confirmed orders are counted. An order is recorded the moment the
+     customer taps WhatsApp, before the message exists, so an unconfirmed row is
+     an intention, not a sale — counting it would inflate revenue and overstate
+     how fast stock is moving. Nothing is hidden: renderSales() shows what the
+     unconfirmed rows are worth right next to the figures. */
+  function countable(rows){return rows.filter(function(o){return statusOf(o)==='confirmed'})}
+
   /* Product lookup by recorded id first (exact), then SKU, then name. Orders
      written before the id was recorded only carry the SKU. */
   function productIndex(){
@@ -467,7 +465,10 @@
       return;
     }
 
-    var rows=ordersInWindow(salesWindow),
+    var windowRows=ordersInWindow(salesWindow),
+        rows=countable(windowRows),
+        pendingRows=windowRows.filter(function(o){return statusOf(o)==='unconfirmed'}),
+        pendingValue=pendingRows.reduce(function(t,o){return t+(Number(o.total)||0)},0),
         lookup=productIndex(),
         sum=salesSummary(rows),
         series=dailySeries(rows,salesWindow),
@@ -495,6 +496,14 @@
       '<div class="sales-head"><div><h2>Sales</h2>'+
         '<p class="panel-note">From the order log — references, items and totals. No customer details are stored.</p></div>'+
         picker+'</div>'+
+
+      (pendingRows.length
+        ? '<button type="button" class="sales-pending" data-sales-pending>'+
+            '<b>'+pendingRows.length+'</b> '+(pendingRows.length===1?'order is':'orders are')+
+            ' waiting to be confirmed, worth '+esc(money(Math.round(pendingValue*100)/100))+
+            '. They are not counted below. <i>Review them</i>'+
+          '</button>'
+        : '')+
 
       '<div class="stat-grid">'+
         salesTile('Orders',sum.orders)+
@@ -582,25 +591,46 @@
     return html;
   }
 
+  /* Records written before confirmation existed carry no status. They are read
+     as confirmed, matching order_status() on the server, so installing this
+     version does not blank the shop's sales history. */
+  function statusOf(o){
+    var s=String((o&&o.status)||'');
+    return (s==='unconfirmed'||s==='confirmed'||s==='cancelled')?s:'confirmed';
+  }
+  var STATUS_LABEL={unconfirmed:'Unconfirmed',confirmed:'Confirmed',cancelled:'Cancelled'};
+  var orderStatusFilter='';
+
   function renderOrders(){
     var box=document.getElementById('orders-list');
     if(!box)return;
     var q=(document.getElementById('orders-search')||{}).value||'';
     var needle=q.trim().toLowerCase();
     var rows=orders.filter(function(o){
+      if(orderStatusFilter&&statusOf(o)!==orderStatusFilter)return false;
       if(!needle)return true;
       return String(o.reference||'').toLowerCase().indexOf(needle)>=0;
     });
     var summary=document.getElementById('orders-summary');
-    if(summary)summary.textContent=orders.length
-      ? orders.length+' orders recorded'+(needle?' · '+rows.length+' matching':'')
-      : 'No orders recorded yet. Orders appear here when a customer sends one on WhatsApp.';
+    if(summary){
+      var pending=orders.filter(function(o){return statusOf(o)==='unconfirmed'}).length;
+      summary.textContent=orders.length
+        ? orders.length+' orders recorded'+(pending?' · '+pending+' unconfirmed':'')+
+          ((needle||orderStatusFilter)?' · '+rows.length+' shown':'')
+        : 'No orders recorded yet. Orders appear here when a customer sends one on WhatsApp.';
+    }
     box.innerHTML=rows.slice(0,40).map(function(o){
-      return '<div class="order-row"><div><strong>'+esc(o.reference)+'</strong>'+
+      var st=statusOf(o);
+      return '<div class="order-row status-'+st+'"><div><strong>'+esc(o.reference)+
+        ' <span class="order-status">'+esc(STATUS_LABEL[st])+'</span></strong>'+
         '<span>'+new Date(o.time).toLocaleString()+' · '+o.item_count+' items · '+o.pieces+' pieces</span></div>'+
         '<b>'+esc(o.currency||'USD')+' '+Number(o.total||0).toFixed(2)+'</b>'+
+        (st==='confirmed'?'':'<button type="button" class="order-mark confirm" data-order-status="confirmed" data-reference="'+esc(o.reference)+'">Confirm</button>')+
+        (st==='cancelled'
+          ? '<button type="button" class="order-mark" data-order-status="unconfirmed" data-reference="'+esc(o.reference)+'">Restore</button>'
+          : '<button type="button" class="order-mark cancel" data-order-status="cancelled" data-reference="'+esc(o.reference)+'">Cancel</button>')+
         '<button type="button" class="order-open" data-order-detail="'+esc(o.reference)+'">Items</button>'+
-        '<button type="button" class="order-del" data-order-delete="'+esc(o.reference)+'" aria-label="Delete order">×</button>'+
+        '<button type="button" class="order-del" data-order-delete="'+esc(o.reference)+'" aria-label="Delete order permanently">×</button>'+
         '<div class="order-items" hidden>'+o.items.map(function(i){
           var variant=[i.option,i.color,i.flavor].filter(Boolean).join(' · ');
           return '<span>'+esc(i.sku||'')+' '+esc(i.name)+(variant?' ('+esc(variant)+')':'')+
@@ -870,14 +900,14 @@
   function saveCategory(e){e.preventDefault();request(categoryForm).then(function(j){snapshots.delete(categoryForm);categoryDialog.close();consume(j);reloadTools()}).catch(function(e){tell(e.message,true)})}
   function saveSettings(e){e.preventDefault();request(settingsForm).then(function(j){snapshots.delete(settingsForm);settingsDialog.close();['current_password','new_password','confirm_password','new_customer_passcode','confirm_customer_passcode'].forEach(function(name){if(settingsForm[name])settingsForm[name].value=''});consume(j);if(j.settings&&j.settings.two_factor_enabled&&j.settings.two_factor_secret)alert('Authenticator setup key:\n\n'+j.settings.two_factor_secret+'\n\nAdd this key to your authenticator app before logging out.');reloadTools()}).catch(function(e){tell(e.message,true)})}
   function removeProduct(id){if(!confirm('Remove this product permanently? A backup will be created first.'))return;var data=new FormData();data.set('action','delete_product');data.set('id',String(id));request(data).then(function(j){selected.delete(id);consume(j);reloadTools()}).catch(function(e){tell(e.message,true)})}
-  function renderOperations(){document.getElementById('audit-summary').textContent=audit.length?audit.length+' products need attention.':'No missing or low-resolution local images found.';document.getElementById('audit-list').innerHTML=audit.slice(0,30).map(function(i){return'<button data-edit-audit="'+i.id+'"><strong>'+esc(i.name)+'</strong><span>'+esc(i.reason)+'</span></button>'}).join('')||'<p>All checked images look usable.</p>';document.getElementById('backup-list').innerHTML=backups.slice(0,15).map(function(b){return'<button data-restore="'+esc(b.name)+'"><strong>'+new Date(b.time).toLocaleString()+'</strong><span>Restore this copy</span></button>'}).join('')||'<p>No backups yet.</p>';document.getElementById('activity-list').innerHTML=activity.slice(0,30).map(function(a){return'<div><strong>'+esc(a.action)+'</strong><span>'+new Date(a.time).toLocaleString()+(a.admin?' · '+esc(a.admin):'')+(a.ip?' · IP '+esc(a.ip):'')+(a.detail?' · '+esc(a.detail):'')+'</span></div>'}).join('')||'<p>No activity recorded yet.</p>';renderOpenCvAudit()}
+  function renderOperations(){document.getElementById('audit-summary').textContent=audit.length?audit.length+' products need attention.':'No missing or low-resolution local images found.';document.getElementById('audit-list').innerHTML=audit.slice(0,30).map(function(i){return'<button data-edit-audit="'+i.id+'"><strong>'+esc(i.name)+'</strong><span>'+esc(i.reason)+'</span></button>'}).join('')||'<p>All checked images look usable.</p>';document.getElementById('backup-list').innerHTML=backups.slice(0,15).map(function(b){return'<button data-restore="'+esc(b.name)+'"><strong>'+new Date(b.time).toLocaleString()+'</strong><span>Restore this copy</span></button>'}).join('')||'<p>No backups yet.</p>';document.getElementById('activity-list').innerHTML=activity.slice(0,30).map(function(a){return'<div><strong>'+esc(a.action)+'</strong><span>'+new Date(a.time).toLocaleString()+(a.admin?' · '+esc(a.admin):'')+(a.ip?' · IP '+esc(a.ip):'')+(a.detail?' · '+esc(a.detail):'')+'</span></div>'}).join('')||'<p>No activity recorded yet.</p>'}
   /* Backups, the activity log and the image audits are an order of magnitude more
      expensive to build than the catalog, so they live behind ?tools=1 and are only
      fetched when something actually needs them. */
   function reloadTools(){if(!toolsLoaded)return Promise.resolve();return fetchTools()}
   function fetchTools(){
     return fetch('api.php?tools=1',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(j){
-      backups=j.backups||[];activity=j.activity||[];audit=j.image_audit||[];opencvAudit=j.opencv_audit||opencvAudit;orders=j.orders||[];
+      backups=j.backups||[];activity=j.activity||[];audit=j.image_audit||[];orders=j.orders||[];
       toolsLoaded=true;renderOperations();renderOverviewTools();renderOrders();
     }).catch(function(){/* tools are supplementary; never block the dashboard */})
   }
@@ -915,7 +945,6 @@
   var imageImportForm=document.getElementById('image-import-form'),imageImportResult=document.getElementById('image-import-result');
   imageImportForm.onsubmit=function(e){e.preventDefault();var count=imageImportForm.querySelector('[type="file"]').files.length;if(!count){tell('Choose at least one picture.',true);return}var submit=imageImportForm.querySelector('[type="submit"]');submit.disabled=true;submit.textContent='Uploading '+count+' picture'+(count===1?'':'s')+'…';imageImportResult.textContent='Matching filenames to product codes…';request(imageImportForm).then(function(j){var lines=[j.message];if(j.unmatched&&j.unmatched.length)lines.push('Not matched: '+j.unmatched.join(', '));if(j.errors&&j.errors.length)lines.push('Could not import: '+j.errors.join(' | '));imageImportResult.textContent=lines.join('\n');imageImportResult.classList.toggle('has-warning',!!((j.unmatched&&j.unmatched.length)||(j.errors&&j.errors.length)));imageImportForm.reset();consume(j);reloadTools()}).catch(function(error){imageImportResult.textContent=error.message;imageImportResult.classList.add('has-warning');tell(error.message,true)}).finally(function(){submit.disabled=false;submit.textContent='Match and upload pictures'})};
   document.getElementById('prune-images').onclick=function(){if(!confirm('Delete every uploaded picture that is not used by the current catalog? Old catalog backups may still mention those pictures.'))return;var data=new FormData();data.set('action','prune_orphan_images');request(data).then(function(j){imageImportResult.textContent=j.message;imageImportResult.classList.remove('has-warning');tell(j.message);reloadTools()}).catch(function(error){tell(error.message,true)})};
-  document.getElementById('opencv-new').onclick=function(){runOpenCvAudit(false)};document.getElementById('opencv-all').onclick=function(){if(confirm('Recheck every main product picture? This runs locally and may take several minutes.'))runOpenCvAudit(true)};document.getElementById('opencv-pause').onclick=function(){if(!opencvRunning)return;opencvPaused=!opencvPaused;this.textContent=opencvPaused?'Resume':'Pause';document.getElementById('opencv-progress').textContent=opencvPaused?'Audit paused.':'Resuming audit…'};document.getElementById('opencv-clear').onclick=function(){if(!confirm('Clear all saved OpenCV audit results? Product pictures will not be deleted.'))return;var data=new FormData();data.set('action','clear_opencv_audit');request(data).then(function(j){opencvAudit={};renderOpenCvAudit();tell(j.message)}).catch(function(error){tell(error.message,true)})};
   document.querySelectorAll('[data-close]').forEach(function(b){b.onclick=function(){closeDialog(b.closest('dialog'))}});[productDialog,categoryDialog,settingsDialog,operationsDialog].forEach(function(d){d.addEventListener('cancel',function(e){e.preventDefault();closeDialog(d)})});
   search.oninput=render;productForm.onsubmit=saveProduct;categoryForm.onsubmit=saveCategory;settingsForm.onsubmit=saveSettings;
   /* Overview -> Products deep links, and the category bars. */
@@ -946,6 +975,25 @@
   document.addEventListener('click',function(e){
     var detail=e.target.closest&&e.target.closest('[data-order-detail]');
     if(detail){var items=detail.parentNode.querySelector('.order-items');items.hidden=!items.hidden;return}
+    var pending=e.target.closest&&e.target.closest('[data-sales-pending]');
+    if(pending){
+      orderStatusFilter='unconfirmed';
+      var filter=document.getElementById('orders-status');
+      if(filter)filter.value='unconfirmed';
+      renderOrders();
+      ensureTools().then(function(){renderOrders();openDialog(document.getElementById('operations-dialog'))});
+      return;
+    }
+    var mark=e.target.closest&&e.target.closest('[data-order-status]');
+    if(mark){
+      var body=new FormData();
+      body.set('action','set_order_status');
+      body.set('reference',mark.dataset.reference);
+      body.set('status',mark.dataset.orderStatus);
+      request(body).then(function(j){orders=j.orders||[];renderOrders();if(activeTab==='sales')renderSales();tell(j.message)})
+        .catch(function(err){tell(err.message,true)});
+      return;
+    }
     var del=e.target.closest&&e.target.closest('[data-order-delete]');
     if(del){
       if(!confirm('Delete this order from the log? The catalog is not affected.'))return;
@@ -954,6 +1002,10 @@
     }
   });
   document.addEventListener('input',function(e){if(e.target.id==='orders-search')renderOrders()});
+  document.addEventListener('change',function(e){
+    if(e.target.id!=='orders-status')return;
+    orderStatusFilter=e.target.value;renderOrders();
+  });
 
   /* ---- session survival (A5) ------------------------------------------- */
 

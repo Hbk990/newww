@@ -103,17 +103,41 @@ if (!$items) json_response(['ok' => false, 'error' => 'No valid items.'], 400);
 $settings = settings();
 $orders = load_json(ORDERS_FILE, []);
 
-// One reference is one order: re-sending replaces rather than duplicates.
+/* This runs when the customer taps WhatsApp, which is BEFORE the message is
+ * composed, let alone sent. WhatsApp tells the site nothing, so the server can
+ * never learn whether it was really sent, deleted or cancelled. The row is
+ * therefore recorded as "unconfirmed" and only counts towards the sales and
+ * reorder figures once the customer says they sent it (on returning to the tab)
+ * or the administrator confirms it in the dashboard. */
+
+// One reference is one order: re-sending replaces rather than duplicates. An
+// already-confirmed or cancelled order keeps the decision that was made about it.
+$existingStatus = 'unconfirmed';
+foreach ($orders as $existing) {
+    if ((string)($existing['reference'] ?? '') === $reference) {
+        $existingStatus = order_status($existing);
+        break;
+    }
+}
 $orders = array_values(array_filter($orders, fn($o) => (string)($o['reference'] ?? '') !== $reference));
 array_unshift($orders, [
     'reference' => $reference,
     'time' => gmdate('c'),
     'currency' => (string)($settings['currency'] ?? 'USD'),
+    'status' => $existingStatus,
     'items' => $items,
     'item_count' => count($items),
     'pieces' => $pieces,
     'total' => round($total, 2),
 ]);
 
+/* References are guessable (DR-YYYYMMDD-NNNN), so the customer-facing status
+ * endpoint must not accept any reference a caller cares to name. Remembering
+ * this session's own references is what lets it tell them apart. */
+$own = $_SESSION['own_orders'] ?? [];
+if (!is_array($own)) $own = [];
+if (!in_array($reference, $own, true)) $own[] = $reference;
+$_SESSION['own_orders'] = array_slice($own, -50);
+
 save_json(ORDERS_FILE, array_slice($orders, 0, 2000));
-json_response(['ok' => true, 'reference' => $reference, 'total' => round($total, 2)]);
+json_response(['ok' => true, 'reference' => $reference, 'total' => round($total, 2), 'status' => $existingStatus]);

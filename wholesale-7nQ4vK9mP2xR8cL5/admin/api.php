@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
        Operations dialog or the Overview panels are opened. It used to be returned on
        every GET — including the reload fired after every single save. */
     if(($_GET['tools']??'')==='1'){
-        json_response(['ok'=>true,'backups'=>catalog_backups(),'activity'=>load_json(ACTIVITY_FILE,[]),'image_audit'=>image_audit($currentCatalog),'opencv_audit'=>load_json(OPENCV_AUDIT_FILE,[]),'orders'=>load_json(ORDERS_FILE,[])]);
+        json_response(['ok'=>true,'backups'=>catalog_backups(),'activity'=>load_json(ACTIVITY_FILE,[]),'image_audit'=>image_audit($currentCatalog),'orders'=>load_json(ORDERS_FILE,[])]);
     }
 
     json_response(['ok'=>true,'catalog'=>$currentCatalog,'settings'=>$siteSettings,'csrf'=>csrf_token(),'stats'=>catalog_stats($currentCatalog)]);
@@ -217,6 +217,24 @@ try {
         json_response(['ok'=>true,'message'=>'Order updated.','catalog'=>$data]);
     }
 
+    /* The administrator's half of order confirmation. The customer confirms from
+       the catalog after WhatsApp; whoever gets there first wins, and either can
+       change it again. Cancelling keeps the row — deleting it would hide the
+       cancellation from the sales figures rather than explaining it. */
+    if($action==='set_order_status'){
+        $reference=clean_text($_POST['reference']??'',60);
+        $status=(string)($_POST['status']??'');
+        if(!in_array($status,ORDER_STATUSES,true))throw new RuntimeException('Unknown order status.');
+        $orders=load_json(ORDERS_FILE,[]); $found=false;
+        foreach($orders as &$order){
+            if((string)($order['reference']??'')!==$reference)continue;
+            $order['status']=$status; $order['status_by']='admin'; $order['status_at']=gmdate('c'); $found=true; break;
+        }
+        unset($order);
+        if(!$found)throw new RuntimeException('Order not found.');
+        save_json(ORDERS_FILE,$orders); log_activity('Order marked '.$status,$reference);
+        json_response(['ok'=>true,'message'=>'Order marked '.$status.'.','orders'=>$orders]);
+    }
     if($action==='delete_order'){
         $reference=clean_text($_POST['reference']??'',60);
         $orders=load_json(ORDERS_FILE,[]);
@@ -267,12 +285,6 @@ try {
         json_response(['ok'=>true,'message'=>$matched.' pictures matched ('.$primary.' primary, '.$gallery.' gallery); '.$removed.' replaced files removed.','catalog'=>$data,'matched'=>$matched,'primary'=>$primary,'gallery'=>$gallery,'removed'=>$removed,'unmatched'=>array_slice($unmatched,0,100),'errors'=>array_slice($errors,0,100)]);
     }
     if($action==='prune_orphan_images'){$deleted=prune_orphan_product_images($data);log_activity('Unused pictures cleaned',$deleted.' files deleted');json_response(['ok'=>true,'message'=>$deleted?$deleted.' unused picture files deleted.':'No unused picture files were found.']);}
-    if($action==='save_opencv_audit'){
-        $decoded=json_decode((string)($_POST['results']??''),true);if(!is_array($decoded)||count($decoded)>50)throw new RuntimeException('Invalid image-audit results.');$saved=load_json(OPENCV_AUDIT_FILE,[]);$count=0;
-        foreach($decoded as $result){if(!is_array($result))continue;$id=max(0,(int)($result['id']??0));$image=clean_text($result['image']??'',250);$status=(string)($result['status']??'warning');if(!$id||!preg_match('#^(uploads/products/[A-Za-z0-9._-]+|https?://)#',$image)||!in_array($status,['pass','warning','fail'],true))continue;$reasons=[];foreach(array_slice((array)($result['reasons']??[]),0,10) as $reason){$clean=clean_text($reason,180);if($clean!=='')$reasons[]=$clean;}$saved[(string)$id]=['id'=>$id,'image'=>$image,'status'=>$status,'width'=>max(0,(int)($result['width']??0)),'height'=>max(0,(int)($result['height']??0)),'sharpness'=>round(max(0,(float)($result['sharpness']??0)),1),'brightness'=>round(min(255,max(0,(float)($result['brightness']??0))),1),'contrast'=>round(min(255,max(0,(float)($result['contrast']??0))),1),'crop_risk'=>round(min(100,max(0,(float)($result['crop_risk']??0))),1),'background_uniformity'=>round(min(100,max(0,(float)($result['background_uniformity']??0))),1),'reasons'=>$reasons,'audited_at'=>gmdate('c')];$count++;}
-        save_json(OPENCV_AUDIT_FILE,$saved);if(!empty($_POST['finished']))log_activity('OpenCV image audit completed',count($saved).' stored results');json_response(['ok'=>true,'message'=>$count.' image-audit results saved.']);
-    }
-    if($action==='clear_opencv_audit'){save_json(OPENCV_AUDIT_FILE,[]);log_activity('OpenCV image-audit results cleared');json_response(['ok'=>true,'message'=>'Saved OpenCV audit results cleared.','opencv_audit'=>[]]);}
     if($action==='import_csv'){
         if(empty($_FILES['csv'])||($_FILES['csv']['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_OK)throw new RuntimeException('Choose a CSV file exported from the dashboard.');
         $handle=fopen($_FILES['csv']['tmp_name'],'r'); if(!$handle)throw new RuntimeException('Could not read CSV file.');

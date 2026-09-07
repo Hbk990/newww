@@ -2154,6 +2154,72 @@ html[data-motion='off'] .skeleton { animation: none; }
 }
 .cart-stale button:hover { background: rgba(0, 0, 0, .08); }
 
+/* ---------- Order confirmation prompt ----------------------------------- */
+
+/* Shown when the customer comes back from WhatsApp. A bar, not a dialog: it
+   must never block the catalog, and ignoring it is a valid answer. */
+.order-confirm {
+  position: fixed;
+  z-index: 120;
+  left: 50%;
+  bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: min(560px, calc(100vw - 24px));
+  padding: 14px 16px;
+  border: 2px solid var(--ink);
+  border-radius: 16px;
+  background: var(--paper);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, .22);
+  transform: translate(-50%, 130%);
+  opacity: 0;
+  transition: transform var(--dur-base) var(--ease-spring), opacity var(--dur-base) var(--ease-out);
+}
+.order-confirm.open { transform: translate(-50%, 0); opacity: 1; }
+html[data-motion='off'] .order-confirm { transition: none; }
+
+.order-confirm-text { min-width: 0; flex: 1; }
+.order-confirm-text b { display: block; font-size: var(--step-0); font-weight: 900; }
+.order-confirm-text span { display: block; margin-top: 2px; color: var(--grey-600); font-size: var(--step--2); font-weight: 600; }
+
+.order-confirm-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.order-confirm-actions button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--ink);
+  color: #fff;
+  font: inherit;
+  font-size: var(--step--1);
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--dur-fast) linear, color var(--dur-fast) linear;
+}
+.order-confirm-actions button:hover { background: var(--red); border-color: var(--red); }
+.order-confirm-actions .ghost { background: var(--paper); color: var(--ink); }
+.order-confirm-actions .ghost:hover { background: var(--ink); color: #fff; }
+.order-confirm-close {
+  width: 40px;
+  padding: 0;
+  border-color: var(--grey-100) !important;
+  background: var(--paper) !important;
+  color: var(--grey-600) !important;
+  font-size: 20px;
+}
+.order-confirm-close:hover { border-color: var(--ink) !important; color: var(--ink) !important; }
+
+@media (max-width: 560px) {
+  .order-confirm { flex-direction: column; align-items: stretch; gap: 10px; }
+  .order-confirm-actions button { flex: 1 1 auto; }
+  /* .order-confirm-actions button is a class+type selector, so it outranks a
+     lone class here; the dismiss button has to match at least as specifically
+     or it stretches with the others. */
+  .order-confirm-actions .order-confirm-close { flex: 0 0 46px; }
+}
+
 /* ==========================================================================
    13  TOUCH DEVICES
    Scoped to (pointer: coarse) so the desktop layout is untouched — these rules
@@ -2237,6 +2303,8 @@ html[data-motion='off'] .skeleton { animation: none; }
   .product-meta, .cart-line small { font-size: 11px; }
 
   .qty-step { width: 44px; }
+  .order-confirm-actions button { min-height: 46px; }
+  .order-confirm-actions .order-confirm-close { width: 46px; }
 }
 
 /* Below 361px a two-up grid gives each card 135px, so the whole quantity

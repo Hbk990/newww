@@ -10,7 +10,6 @@ define('SETTINGS_FILE', STORAGE_DIR . '/settings.json');
 define('BACKUP_DIR', STORAGE_DIR . '/backups');
 define('AUTH_ATTEMPTS_FILE', STORAGE_DIR . '/auth-attempts.json');
 define('ACTIVITY_FILE', STORAGE_DIR . '/activity.json');
-define('OPENCV_AUDIT_FILE', STORAGE_DIR . '/opencv-image-audit.json');
 define('IMAGE_AUDIT_CACHE_FILE', STORAGE_DIR . '/image-audit-cache.json');
 define('ORDERS_FILE', STORAGE_DIR . '/orders.json');
 define('INSTALL_LOCK_FILE', STORAGE_DIR . '/installation.lock');
@@ -23,7 +22,7 @@ header('X-Robots-Tag: noindex, nofollow, noarchive, nosnippet, noimageindex');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
-header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-".CSP_NONCE."' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; connect-src 'self'; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'");
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-".CSP_NONCE."'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; connect-src 'self'; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'");
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
     ini_set('session.use_strict_mode', '1');
@@ -261,6 +260,20 @@ function clean_options(mixed $value): array {
         $result[]=['name'=>clean_text($parts[0],100),'price'=>max(0,(float)$parts[1])];
     }
     return $result;
+}
+
+/* Order lifecycle: unconfirmed -> confirmed | cancelled.
+ *
+ * Records written before confirmation existed carry no status field. They are
+ * read as "confirmed" rather than "unconfirmed": they pre-date the idea, and
+ * treating them as unconfirmed would silently wipe the shop's sales history the
+ * moment this version is installed. Only order.php writes "unconfirmed", and it
+ * writes it explicitly. */
+const ORDER_STATUSES = ['unconfirmed', 'confirmed', 'cancelled'];
+
+function order_status(array $order): string {
+    $status = (string)($order['status'] ?? '');
+    return in_array($status, ORDER_STATUSES, true) ? $status : 'confirmed';
 }
 
 function clean_tiers(mixed $value): array {

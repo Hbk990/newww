@@ -64,14 +64,6 @@ BULK PRODUCT PICTURES
 - "Delete unused pictures" removes orphan files not used by the current catalog. Data backups do not contain image copies.
 - The server retains the latest 10 catalog/settings backups and automatically removes older ones.
 
-FREE OPENCV IMAGE AUDIT
-- Open Admin Dashboard > Catalog operations > OpenCV image audit.
-- "Audit new/changed" checks only pictures that do not have a current saved result.
-- "Audit entire catalog" rechecks every main product picture.
-- The audit runs locally in the admin browser and does not send images to an AI service.
-- Results measure resolution, sharpness, brightness, contrast, border-edge crop risk and background uniformity.
-- Results are screening warnings, not proof that a picture shows the correct product model.
-
 VISUAL PRODUCT VARIATIONS
 - Product options, colors, flavors, availability and per-variation quantities are managed only through visual Add/Edit/Delete controls.
 - The obsolete manual option/color/flavor/stock-override textareas have been removed from the dashboard.
@@ -109,6 +101,17 @@ Mobile
 - Below 375px the header is two tidy rows instead of three ragged ones.
 - Below 361px the product grid is one card per row; two-up left too little
   space for a usable quantity control.
+
+REMOVED IN v15
+- The OpenCV image audit has been removed. It could never run: the library
+  builds its own code from text at startup, which the catalog's security policy
+  forbids, so it always failed after 60 seconds with a message that wrongly
+  blamed the upload. Removing it also deletes a 10.9 MB file, which is why this
+  package is roughly half the size of the last one.
+- The "Image quality audit" in Operations is a different, server-side check and
+  still works; it reports missing and low-resolution pictures.
+- If storage/opencv-image-audit.json exists on the server, delete it. Nothing
+  reads it any more.
 
 NOTE ON PRICE TIERS
 A single cart line is capped at 999 pieces, so a tier whose minimum quantity is

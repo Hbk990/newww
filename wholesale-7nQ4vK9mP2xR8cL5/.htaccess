@@ -10,7 +10,7 @@ Options -Indexes
 
 # storage/.htaccess and inc/.htaccess deny these directories outright; this is the
 # belt-and-braces layer in case AllowOverride is limited to the document root.
-<FilesMatch "^(config\.php|catalog\.json|settings\.json|orders\.json|activity\.json|auth-attempts\.json|image-audit-cache\.json|opencv-image-audit\.json)$">
+<FilesMatch "^(config\.php|catalog\.json|settings\.json|orders\.json|activity\.json|auth-attempts\.json|image-audit-cache\.json)$">
   Require all denied
 </FilesMatch>
 
