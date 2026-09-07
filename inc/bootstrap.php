@@ -18,7 +18,6 @@ const UPLOAD_DIR = ROOT_DIR . '/uploads/products';
 define('CSP_NONCE', base64_encode(random_bytes(18)));
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
-header('X-Robots-Tag: noindex, nofollow, noarchive, nosnippet, noimageindex');
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
@@ -30,7 +29,7 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
     session_name('dr_phone_session');
     session_set_cookie_params([
         'lifetime' => 0,
-        'path' => '/wholesale-7nQ4vK9mP2xR8cL5/',
+        'path' => '/',
         'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
         'httponly' => true,
         'samesite' => 'Strict',
