@@ -1904,3 +1904,91 @@ html[data-motion='off'] .skeleton { animation: none; }
   line-height: 1;
 }
 .cart-stale button:hover { background: rgba(0, 0, 0, .08); }
+
+/* ==========================================================================
+   13  TOUCH DEVICES
+   Scoped to (pointer: coarse) so the desktop layout is untouched — these rules
+   only apply where the primary input is a finger.
+
+   Two measured problems drive this block:
+
+   1. iOS Safari force-zooms the page when you focus a control whose font-size
+      is under 16px. Several fields here were 11-14px, so tapping the quantity
+      box — the whole point of this design — lurched the page on every iPhone.
+      16px is the threshold; it is not a style choice.
+
+   2. Apple HIG and Material both specify 44x44px minimum touch targets. The
+      favourite heart was 34x34, colour swatches 30px tall, the +/- steps 40px.
+   ========================================================================== */
+
+@media (pointer: coarse) {
+
+  /* --- 1. never below 16px, or iOS zooms --- */
+  input, select, textarea,
+  .search-wrap input,
+  .sort-control select,
+  .product-select select,
+  .flavor-search input,
+  .password-wrap input,
+  .order-fields input,
+  .order-fields textarea,
+  .line-note,
+  .qty-input {
+    font-size: 16px;
+  }
+  /* the note field is secondary; give it room now that the text is larger */
+  .line-note { max-width: 100%; height: 44px; }
+
+  /* --- 2. touch targets --- */
+  .qty-input { height: 46px; }
+  /* .cart-line/.flavor-row set their own 14px font, which outranks the blanket
+     .qty-input rule above on specificity, so iOS would still zoom on these. */
+  .cart-line .qty-input { height: 46px; min-width: 56px; font-size: 16px; }
+  .flavor-row .qty-input { font-size: 16px; }
+  .cart-line .qty-step, .flavor-row .qty-step { width: 44px; }
+
+  .favorite-button { width: 44px; height: 44px; font-size: 18px; }
+  .color-picker button { min-height: 44px; padding: 6px 14px; }
+  .product-select select { height: 46px; }
+
+  .icon-btn, .lock-link { width: 44px; height: 44px; }
+  /* the pill collapses to an icon under 700px, which left it 2px short */
+  .contact-pill, .admin-link { min-height: 44px; min-width: 44px; }
+  .brand { display: flex; align-items: center; min-height: 44px; }
+  .skip-link { min-height: 44px; display: flex; align-items: center; }
+  .cart-trigger { min-height: 44px; }
+  .back-button { width: 44px; height: 44px; }
+  .sort-control select { min-height: 44px; }
+  .search-wrap input { height: 46px; }
+  .search-clear { width: 34px; height: 34px; }
+
+  .panel-close { width: 44px; height: 44px; }
+  .remove-line { width: 44px; height: 44px; }
+  .saved-products-actions button { width: 44px; height: 44px; }
+  .saved-product-item .remove-recent { width: 30px !important; height: 30px; }
+
+  .add-cart, .choose-flavors { min-height: 48px; }
+  .cart-footer button { min-height: 50px; }
+  .gate-submit, .show-password { height: 48px; }
+  .show-password { top: 5px; right: 5px; }
+  .password-wrap input { height: 58px; }
+
+  .category-row { padding-top: 22px; padding-bottom: 22px; }
+  .detail-thumbnails img { width: 62px; height: 62px; }
+  .flavor-row { min-height: 64px; }
+
+  /* 9px badges are unreadable on a phone in daylight */
+  .stock { font-size: 11px; }
+  .product-meta, .cart-line small { font-size: 11px; }
+
+  .qty-step { width: 44px; }
+}
+
+/* Below 361px a two-up grid gives each card 135px, so the whole quantity
+   control gets 103px — two 44px steps would leave 15px for the number. One
+   card per row instead: the card grows to ~284px and the control fits at full
+   size. Measured on a 320px viewport; 393px (Pixel 5) is already fine two-up. */
+@media (pointer: coarse) and (max-width: 360px) {
+  .product-grid { grid-template-columns: minmax(0, 1fr); }
+  .qty-input { min-width: 56px; }
+}

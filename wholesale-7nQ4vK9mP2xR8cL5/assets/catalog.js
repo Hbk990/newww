@@ -494,7 +494,17 @@
     });
     document.addEventListener('focusin', function (e) {
       var input = e.target.closest && e.target.closest('[data-qty-input]');
-      if (input) { try { input.select(); } catch (err) {} }
+      if (!input) return;
+      try { input.select(); } catch (err) {}
+      // On a phone the on-screen keyboard covers roughly the lower half of the
+      // screen. A quantity box on a lower card ends up behind it, so you cannot
+      // see the number you are typing. Bring it to the middle.
+      if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) {
+        setTimeout(function () {
+          var node = input.closest('.qty-wrap') || input;
+          try { node.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (err) {}
+        }, 180);   // after the keyboard has animated in and resized the viewport
+      }
     });
     document.addEventListener('keydown', function (e) {
       var input = e.target.closest && e.target.closest('[data-qty-input]');

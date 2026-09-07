@@ -9,6 +9,9 @@
 
 .bulk-bar { position: sticky; top: 10px; z-index: 5; }
 .select-category input { width: 17px; height: 17px; accent-color: var(--red); }
+/* Wrapper around the per-product select box. Its only job is to be a bigger
+   click target than the checkbox itself; see the touch block at the bottom. */
+.row-check-tap { display: grid; place-items: center; cursor: pointer; }
 
 /* ---------- Operations dialog -------------------------------------------- */
 
@@ -201,3 +204,71 @@
 
 /* The order log is the tallest tool list; give it more room before scrolling. */
 .orders-section .tool-list { max-height: 360px; }
+
+/* ==========================================================================
+   TOUCH DEVICES
+   Scoped to (pointer: coarse); the desktop dashboard is untouched.
+   Same two drivers as the storefront: iOS zooms on any control under 16px,
+   and 44x44px is the minimum touch target. The worst offenders here were the
+   bulk-select checkbox (16x16), the row move arrows (32x34) and the inline
+   price/stock fields (11-12px, so every tap zoomed the page).
+   ========================================================================== */
+
+@media (pointer: coarse) {
+
+  /* --- never below 16px, or iOS zooms on focus --- */
+  input, select, textarea,
+  .toolbar input, #admin-category-filter, #admin-search,
+  .quick-input, .quick-select,
+  .orders-toolbar input,
+  .variant-row input, .variant-row select,
+  .form-grid input, .form-grid select, .form-grid textarea,
+  .auth-card input,
+  dialog > form > label input, dialog > form > label select {
+    font-size: 16px;
+  }
+
+  /* --- touch targets --- */
+  .quick-input { height: 46px; width: 88px; }
+  .quick-select { height: 46px; }
+  .quick-edit { gap: 10px; flex-wrap: wrap; }
+
+  .row-move { width: 44px; height: 44px; }
+  /* A 22px checkbox is the right size to look at and the wrong size to hit.
+     Chrome ignores an author border on a native checkbox, so the hit area is
+     grown on the wrapping label instead — a label click toggles its box. */
+  .row-check, .select-category input[type="checkbox"] { width: 22px; height: 22px; }
+  .row-check-tap { width: 44px; height: 44px; }
+  .select-category { min-height: 44px; }
+  .admin-product { grid-template-columns: 44px 48px minmax(0, 1fr); }
+  .admin-actions button { min-height: 44px; padding: 0 14px; }
+  /* catches the filter/sort selects that sit outside .toolbar */
+  select, #admin-category-filter { min-height: 46px; }
+
+  .tab { min-height: 46px; }
+  .header-button, .admin-header a { min-height: 46px; }
+  .category-tools button { min-height: 44px; }
+  .chip { min-height: 44px; }
+  .icon-button, .panel-close { width: 44px; height: 44px; }
+  .variant-remove { width: 44px; height: 44px; }
+
+  .toolbar input, .toolbar button, .toolbar select { min-height: 46px; }
+  .bulk-bar select, .bulk-bar button { min-height: 46px; }
+  .form-grid input, .form-grid select { min-height: 46px; }
+  .auth-card input, .auth-card button { height: 52px; }
+  .operations-grid button { min-height: 46px; }
+
+  /* the Overview category bars are tappable, so they need real height */
+  .viz-bar-row { padding: 12px 8px; min-height: 44px; }
+  .viz-bar-track { height: 14px; }
+
+  .orders-toolbar input, .orders-toolbar button { min-height: 46px; }
+  .order-open { min-height: 44px; padding: 0 14px; }
+  .order-del { width: 44px; height: 44px; }
+
+  /* 9px pills and labels are unreadable on a phone */
+  .stock-pill, .visibility-pill { font-size: 11px; }
+  .viz-icon { font-size: 11px; }
+  .quick-field span, .variant-row span { font-size: 11px; }
+  .admin-product p { font-size: 12px; }
+}

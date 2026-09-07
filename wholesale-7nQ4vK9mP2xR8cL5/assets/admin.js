@@ -380,6 +380,18 @@
   }
 
   function bindQuickEdit(){
+    var coarse=window.matchMedia&&window.matchMedia('(pointer: coarse)').matches;
+    content.addEventListener('focusin',function(e){
+      var input=e.target.closest&&e.target.closest('.quick-input');
+      if(!input)return;
+      try{input.select()}catch(err){}
+      /* The phone keyboard hides the bottom of the screen. A price or stock
+         box on a lower row would sit behind it while you type. */
+      if(coarse)setTimeout(function(){
+        var row=input.closest('.admin-product')||input;
+        try{row.scrollIntoView({block:'center',behavior:'smooth'})}catch(err){}
+      },180);
+    });
     content.addEventListener('focusout',function(e){
       var cell=e.target.closest&&e.target.closest('.quick-edit');
       if(cell&&(e.target.matches('[data-quick-price]')||e.target.matches('[data-quick-stock]')))commitQuickEdit(cell);
@@ -401,7 +413,10 @@
     var visibility=p.visibility||'published',
         review=p.stock_updated_at?'Reviewed '+new Date(p.stock_updated_at).toLocaleDateString():'Stock not reviewed';
     return '<article class="admin-product" data-id="'+p.id+'">'+
-      '<input class="row-check" type="checkbox" data-select="'+p.id+'" aria-label="Select '+esc(p.name)+'"'+(selected.has(Number(p.id))?' checked':'')+'>'+
+      // Wrapped in a label so the tap area is the full grid cell, not the 16px
+      // box: Chrome ignores an author border on a native checkbox, so the hit
+      // area cannot be grown on the input itself.
+      '<label class="row-check-tap"><input class="row-check" type="checkbox" data-select="'+p.id+'" aria-label="Select '+esc(p.name)+'"'+(selected.has(Number(p.id))?' checked':'')+'></label>'+
       // width/height + lazy: without these the browser eagerly fetched every one of
       // the catalog's product images (15.6 MB) on each dashboard load.
       (p.image
