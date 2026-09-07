@@ -735,13 +735,18 @@
       return;
     }
     if (!revealObserver) {
+      /* Start the reveal a screen early, so a card has already faded in by the
+         time it is scrolled to. The old margins waited until a card was ~100px
+         onto the screen and 5% of its own height showing, which on a phone meant
+         stopping mid-scroll left a visibly empty slot at the bottom: the card
+         was there, just still at opacity 0. */
       revealObserver = new IntersectionObserver(function (entries) {
         entries.forEach(function (entry) {
           if (!entry.isIntersecting) return;
           entry.target.classList.add('is-revealed');
           revealObserver.unobserve(entry.target);   // one shot; cheap at 98 cards
         });
-      }, { rootMargin: '0px 0px -8% 0px', threshold: 0.05 });
+      }, { rootMargin: '600px 0px 600px 0px', threshold: 0 });
     }
     Array.prototype.forEach.call(nodes, function (n) { revealObserver.observe(n); });
   }
@@ -1123,11 +1128,14 @@
       buy = qtyControl(p, s);
     }
 
-    return '<article class="product-card" data-reveal style="--reveal-delay:' + (index % 8) * 45 + 'ms">' +
+    return '<article class="product-card" data-reveal style="--reveal-delay:' + (index < 8 ? index * 45 : 0) + 'ms">' +
       '<button class="favorite-button ' + (favorites.indexOf(Number(p.id)) >= 0 ? 'active' : '') + '"' +
         ' data-favorite="' + p.id + '" aria-label="Save ' + esc(p.name) + '">' + heart() + '</button>' +
       '<button class="image-frame" data-open-product="' + p.id + '" aria-label="Open ' + esc(p.name) + '">' +
-        (p.image ? '<img src="' + esc(p.image) + '" alt="' + esc(p.name) + '" loading="lazy">' : '<div class="image-missing">Image unavailable</div>') +
+        /* width/height give the frame its shape before the picture arrives, so
+           the card does not jump as each one lands; decoding="async" keeps that
+           work off the thread that is handling the scroll. */
+        (p.image ? '<img src="' + esc(p.image) + '" alt="' + esc(p.name) + '" loading="lazy" decoding="async" width="600" height="600">' : '<div class="image-missing">Image unavailable</div>') +
       '</button>' +
       '<div class="product-info">' +
         '<div class="product-label-row"><p class="product-brand">' + esc(p.brand || 'DR PHONE') + '</p>' +
@@ -1200,8 +1208,63 @@
     '</div>';
   }
 
+  /* ---- the grid is built in batches -------------------------------------
+   * A search for a common word matches hundreds of products: "xo" matches 231.
+   * Building all of them in one go was 358 KB of HTML and ~1.1 seconds of
+   * blocked main thread on a mid-range phone — the tap registered, then nothing
+   * moved, then everything appeared at once. The first batch is built now and
+   * the rest as the customer scrolls towards them.
+   *
+   * The count survives a re-render of the SAME result set — choosing a colour
+   * re-renders — and resets only when the result set itself changes, so nobody
+   * gets thrown back to the top of a long list. */
+  var GRID_BATCH = 60, gridLimit = GRID_BATCH, gridSignature = '', gridObserver = null;
+
+  function resultSignature(products) {
+    return [selected || '', search.value.trim(), sortMode, viewMode, filters.brand,
+            filters.inStock, filters.min, filters.max, products.length].join('|');
+  }
+
+  /* Adds the next batch to the end of the grid. Appending rather than
+     re-rendering keeps every card the customer has already scrolled past, along
+     with the quantities they have typed into them. */
+  function extendGrid(products, build) {
+    var box = content.querySelector('.product-grid, .order-pad');
+    if (!box) return;
+    var to = Math.min(products.length, gridLimit + GRID_BATCH), html = '';
+    for (var i = gridLimit; i < to; i++) html += build(products[i], i);
+    if (!html) return;
+    box.insertAdjacentHTML('beforeend', html);
+    gridLimit = to;
+    observeReveals(box);
+    if (gridLimit >= products.length) {
+      var done = content.querySelector('.grid-sentinel');
+      if (done) done.remove();
+      if (gridObserver) { gridObserver.disconnect(); gridObserver = null; }
+    }
+  }
+
+  function watchGridSentinel(products, build) {
+    if (gridObserver) { gridObserver.disconnect(); gridObserver = null; }
+    var sentinel = content.querySelector('.grid-sentinel');
+    if (!sentinel) return;
+    if (!('IntersectionObserver' in window)) {   // no observer: show everything
+      while (gridLimit < products.length) extendGrid(products, build);
+      return;
+    }
+    // A screen and a half of warning, so the next batch is ready on arrival.
+    gridObserver = new IntersectionObserver(function (entries) {
+      if (entries.some(function (e) { return e.isIntersecting; })) extendGrid(products, build);
+    }, { rootMargin: '1200px 0px' });
+    gridObserver.observe(sentinel);
+  }
+
   function renderResults() {
     var category = searchScope(), pool = basePool(), products = getProducts(), q = search.value.trim();
+    var signature = resultSignature(products);
+    if (signature !== gridSignature) { gridSignature = signature; gridLimit = GRID_BATCH; }
+    var build = viewMode === 'list' ? productRow : productCard,
+        shown = products.slice(0, gridLimit);
     content.innerHTML =
       '<div class="section-heading product-heading">' +
         '<button class="back-button" id="back" aria-label="Back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H6M11 18l-6-6 6-6"/></svg></button>' +
@@ -1225,8 +1288,9 @@
       filterBar(pool) +
       (products.length
         ? (viewMode === 'list'
-            ? '<div class="order-pad">' + products.map(productRow).join('') + '</div>'
-            : '<div class="product-grid">' + products.map(productCard).join('') + '</div>')
+            ? '<div class="order-pad">' + shown.map(productRow).join('') + '</div>'
+            : '<div class="product-grid">' + shown.map(productCard).join('') + '</div>') +
+          (products.length > gridLimit ? '<div class="grid-sentinel" aria-hidden="true"></div>' : '')
         : '<div class="empty-state"><h3>No products found</h3><p>' +
             (filtersActive() ? 'No product matches these filters. Try clearing them.' : 'Try a different search term or category.') +
           '</p></div>');
@@ -1307,6 +1371,7 @@
     };
 
     observeReveals(content);
+    watchGridSentinel(products, build);
   }
 
   function render() {
@@ -1529,6 +1594,8 @@
 
   function shareWhatsApp() {
     if (!cart.length) return;
+    orderReference = newOrderReference();
+    try { sessionStorage.setItem(REFERENCE_KEY, orderReference); } catch (e) {}
     var lines = ['Hello DR PHONE, I would like to order:', 'Reference: ' + orderReference], total = 0;
     if (customer.name) lines.push('Customer: ' + customer.name);
     if (customer.business) lines.push('Business: ' + customer.business);
@@ -1565,8 +1632,15 @@
      sent: they stay in this browser and travel in the WhatsApp message only.
      The server re-prices every line from the catalog, so nothing here is
      authoritative. */
+  function newOrderReference() {
+    var bytes = new Uint8Array(16);
+    window.crypto.getRandomValues(bytes);
+    return 'DR-' + new Date().toISOString().slice(0, 10).replace(/-/g, '') + '-' +
+      Array.from(bytes, function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+  }
+
   function logOrder() {
-    if (!cart.length || !navigator.sendBeacon) return;
+    if (!cart.length) return;
     try {
       var body = JSON.stringify({
         csrf: window.DR_PHONE.csrf || '',
@@ -1576,7 +1650,8 @@
           return { productId: l.productId, option: l.option, color: l.color, flavor: l.flavor, quantity: l.quantity };
         })
       });
-      navigator.sendBeacon('api/order.php', new Blob([body], { type: 'application/json' }));
+      var sent = navigator.sendBeacon && navigator.sendBeacon('api/order.php', new Blob([body], { type: 'application/json' }));
+      if (!sent) fetch('api/order.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true }).catch(function () {});
     } catch (e) { /* logging must never block the order */ }
   }
 

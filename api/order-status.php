@@ -27,7 +27,7 @@ if (!hash_equals((string)($_SESSION['csrf'] ?? ''), (string)($payload['csrf'] ??
 }
 
 $reference = clean_text($payload['reference'] ?? '', 60);
-if (!preg_match('/^DR-[0-9]{8}-[0-9]{4}(-[0-9]{1,2})?$/', $reference)) {
+if (!preg_match('/^DR-[0-9]{8}-(?:[0-9]{4}(?:-[0-9]{1,2})?|[a-f0-9]{32})$/', $reference)) {
     json_response(['ok' => false, 'error' => 'Invalid reference.'], 400);
 }
 
@@ -39,6 +39,7 @@ if (!in_array($status, ['confirmed', 'cancelled'], true)) {
 /* Authorisation is the recorded owner, not the reference and not a list held in
  * the session. A caller who merely knows a reference cannot reach this: they
  * would have to hold the session secret the row was written with. */
+$orderLock = lock_order_updates();
 $orders = load_json(ORDERS_FILE, []);
 $found = false;
 foreach ($orders as &$order) {

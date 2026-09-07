@@ -180,13 +180,20 @@ body.panel-open { overflow: hidden; }
   transition:
     opacity var(--dur-slow) var(--ease-out) var(--reveal-delay, 0ms),
     transform var(--dur-slow) var(--ease-out) var(--reveal-delay, 0ms);
-  will-change: transform, opacity;
 }
 [data-reveal].is-revealed {
   opacity: 1;
   transform: none;
-  will-change: auto;
 }
+
+/* `will-change: transform, opacity` used to sit on both rules above. It is a
+   promise to the browser that a thing is about to animate, and the browser keeps
+   its word by giving each one its own compositor layer — 229 of them on a search
+   for "xo", nearly all for cards far off screen. Transform and opacity are
+   composited anyway, so the hint bought nothing and cost the phone real memory.
+   (content-visibility was tried here too and measured no better than this, so it
+   is deliberately not used: the batched grid in catalog.js is what fixed the
+   long lists.) */
 
 .reveal-line {
   display: block;

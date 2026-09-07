@@ -222,6 +222,7 @@ try {
        change it again. Cancelling keeps the row — deleting it would hide the
        cancellation from the sales figures rather than explaining it. */
     if($action==='set_order_status'){
+        $orderLock=lock_order_updates();
         $reference=clean_text($_POST['reference']??'',60);
         $status=(string)($_POST['status']??'');
         if(!in_array($status,ORDER_STATUSES,true))throw new RuntimeException('Unknown order status.');
@@ -236,6 +237,7 @@ try {
         json_response(['ok'=>true,'message'=>'Order marked '.$status.'.','orders'=>$orders]);
     }
     if($action==='delete_order'){
+        $orderLock=lock_order_updates();
         $reference=clean_text($_POST['reference']??'',60);
         $orders=load_json(ORDERS_FILE,[]);
         $kept=array_values(array_filter($orders,fn($o)=>(string)($o['reference']??'')!==$reference));
@@ -244,6 +246,7 @@ try {
         json_response(['ok'=>true,'message'=>'Order removed.','orders'=>$kept]);
     }
     if($action==='clear_orders'){
+        $orderLock=lock_order_updates();
         save_json(ORDERS_FILE,[]); log_activity('Order log cleared');
         json_response(['ok'=>true,'message'=>'Order log cleared.','orders'=>[]]);
     }

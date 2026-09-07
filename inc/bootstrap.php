@@ -47,6 +47,14 @@ function load_json(string $path, array $fallback = []): array {
     return is_array($decoded) ? $decoded : $fallback;
 }
 
+// Hold across the entire order read/modify/write, not just the final rename.
+// PHP closes this handle at request shutdown, including json_response exits.
+function lock_order_updates() {
+    $lock = fopen(ORDERS_FILE . '.transaction.lock', 'c');
+    if ($lock === false || !flock($lock, LOCK_EX)) throw new RuntimeException('Could not lock orders.');
+    return $lock;
+}
+
 function save_json(string $path, array $data): void {
     $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     if ($json === false) throw new RuntimeException('Could not encode data.');

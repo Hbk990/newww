@@ -32,7 +32,7 @@ if (!hash_equals((string)($_SESSION['csrf'] ?? ''), (string)($payload['csrf'] ??
 }
 
 $reference = clean_text($payload['reference'] ?? '', 60);
-if (!preg_match('/^DR-[0-9]{8}-[0-9]{4}$/', $reference)) json_response(['ok' => false, 'error' => 'Invalid reference.'], 400);
+if (!preg_match('/^DR-[0-9]{8}-(?:[0-9]{4}|[a-f0-9]{32})$/', $reference)) json_response(['ok' => false, 'error' => 'Invalid reference.'], 400);
 
 // Free text typed by the customer, so it is cleaned and capped like any other.
 // It is only ever echoed back to the dashboard, which escapes it.
@@ -109,67 +109,28 @@ foreach ($lines as $line) {
 if (!$items) json_response(['ok' => false, 'error' => 'No valid items.'], 400);
 
 $settings = settings();
+$orderLock = lock_order_updates();
 $orders = load_json(ORDERS_FILE, []);
 
-/* This runs when the customer taps WhatsApp, which is BEFORE the message is
- * composed, let alone sent. WhatsApp tells the site nothing, so the server can
- * never learn whether it was really sent, deleted or cancelled. The row is
- * therefore recorded as "unconfirmed" and only counts towards the sales and
- * reorder figures once the customer says they sent it (on returning to the tab)
- * or the administrator confirms it in the dashboard. */
-
-/* The reference is chosen by the browser and is only four random digits, so it
- * must never be treated as proof of identity. Ownership is this session's secret
- * instead: a row may only be replaced, or later confirmed and cancelled, by the
- * session that wrote it. Without this, one customer could post an order under
- * another customer's reference — which both destroyed that order and handed the
- * attacker the right to cancel it. */
+// Existing receipt snapshots are immutable. A repeated request is idempotent.
 $owner = order_owner_fingerprint();
-
-$existingStatus = 'unconfirmed';
-$existingName = '';
-$existingIndex = null;
-foreach ($orders as $index => $existing) {
+$requestHash = hash('sha256', json_encode([$customerName, $lines]));
+foreach ($orders as $existing) {
     if ((string)($existing['reference'] ?? '') !== $reference) continue;
-    $existingIndex = $index;
-    $existingStatus = order_status($existing);
-    $existingName = (string)($existing['customer'] ?? '');
-    break;
-}
-
-if ($existingIndex !== null && !hash_equals((string)($orders[$existingIndex]['owner'] ?? ''), $owner)) {
-    /* Someone else's row — or one written before ownership was recorded. Leave it
-     * completely alone and file this order under the next free reference. Two
-     * browsers can pick the same four digits on the same day by chance, so this
-     * has to keep both orders rather than reject the second. The suffix keeps the
-     * customer's quoted reference a prefix of it, so searching still finds it. */
-    for ($suffix = 2; $suffix <= 99; $suffix++) {
-        $candidate = $reference . '-' . $suffix;
-        $taken = false;
-        foreach ($orders as $existing) {
-            if ((string)($existing['reference'] ?? '') === $candidate) { $taken = true; break; }
-        }
-        if (!$taken) { $reference = $candidate; break; }
+    if (hash_equals((string)($existing['owner'] ?? ''), $owner) &&
+        hash_equals((string)($existing['request_hash'] ?? ''), $requestHash)) {
+        json_response(['ok' => true, 'reference' => $reference, 'total' => $existing['total'], 'status' => order_status($existing)]);
     }
-    $existingIndex = null;
-    $existingStatus = 'unconfirmed';
-    $existingName = '';
-}
-
-// One reference is one order: re-sending replaces rather than duplicates. An
-// already-confirmed or cancelled order keeps the decision that was made about it.
-if ($existingIndex !== null) {
-    array_splice($orders, $existingIndex, 1);
+    json_response(['ok' => false, 'error' => 'Reference already used. Refresh the catalog and submit a new order.'], 409);
 }
 array_unshift($orders, [
     'reference' => $reference,
     'time' => gmdate('c'),
     'currency' => (string)($settings['currency'] ?? 'USD'),
-    // Re-sending an order from a browser where the name box has since been
-    // cleared must not wipe the name the receipt is filed under.
-    'customer' => $customerName !== '' ? $customerName : $existingName,
-    'status' => $existingStatus,
+    'customer' => $customerName,
+    'status' => 'unconfirmed',
     'owner' => $owner,
+    'request_hash' => $requestHash,
     'items' => $items,
     'item_count' => count($items),
     'pieces' => $pieces,
@@ -177,4 +138,4 @@ array_unshift($orders, [
 ]);
 
 save_json(ORDERS_FILE, array_slice($orders, 0, 2000));
-json_response(['ok' => true, 'reference' => $reference, 'total' => round($total, 2), 'status' => $existingStatus]);
+json_response(['ok' => true, 'reference' => $reference, 'total' => round($total, 2), 'status' => 'unconfirmed']);
