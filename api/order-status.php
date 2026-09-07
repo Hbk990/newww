@@ -8,10 +8,10 @@ require_once __DIR__ . '/../inc/bootstrap.php';
  * before the message exists. When the customer comes back to the catalog tab the
  * storefront asks whether they sent it; the answer lands here.
  *
- * Only two answers are accepted, and only for a reference this session created.
- * Order references are guessable (DR-YYYYMMDD-NNNN), so without the ownership
- * check any customer could cancel another customer's order by guessing four
- * digits. Nothing here stores or reads personal data.
+ * Only two answers are accepted, and only for an order this session actually
+ * placed — proven by the owner fingerprint on the row, not by the reference,
+ * which is four guessable digits chosen by the browser. Nothing here stores or
+ * reads personal data.
  */
 
 if (!is_customer()) json_response(['ok' => false, 'error' => 'Authentication required.'], 401);
@@ -27,14 +27,8 @@ if (!hash_equals((string)($_SESSION['csrf'] ?? ''), (string)($payload['csrf'] ??
 }
 
 $reference = clean_text($payload['reference'] ?? '', 60);
-if (!preg_match('/^DR-[0-9]{8}-[0-9]{4}$/', $reference)) {
+if (!preg_match('/^DR-[0-9]{8}-[0-9]{4}(-[0-9]{1,2})?$/', $reference)) {
     json_response(['ok' => false, 'error' => 'Invalid reference.'], 400);
-}
-
-// The customer may only speak for orders this session placed.
-$own = $_SESSION['own_orders'] ?? [];
-if (!is_array($own) || !in_array($reference, $own, true)) {
-    json_response(['ok' => false, 'error' => 'That order does not belong to this session.'], 403);
 }
 
 $status = (string)($payload['status'] ?? '');
@@ -42,10 +36,16 @@ if (!in_array($status, ['confirmed', 'cancelled'], true)) {
     json_response(['ok' => false, 'error' => 'Unknown status.'], 400);
 }
 
+/* Authorisation is the recorded owner, not the reference and not a list held in
+ * the session. A caller who merely knows a reference cannot reach this: they
+ * would have to hold the session secret the row was written with. */
 $orders = load_json(ORDERS_FILE, []);
 $found = false;
 foreach ($orders as &$order) {
     if ((string)($order['reference'] ?? '') !== $reference) continue;
+    if (!order_owned_by_session($order)) {
+        json_response(['ok' => false, 'error' => 'That order does not belong to this session.'], 403);
+    }
     $order['status'] = $status;
     $order['status_by'] = 'customer';
     $order['status_at'] = gmdate('c');

@@ -110,34 +110,57 @@ $orders = load_json(ORDERS_FILE, []);
  * reorder figures once the customer says they sent it (on returning to the tab)
  * or the administrator confirms it in the dashboard. */
 
+/* The reference is chosen by the browser and is only four random digits, so it
+ * must never be treated as proof of identity. Ownership is this session's secret
+ * instead: a row may only be replaced, or later confirmed and cancelled, by the
+ * session that wrote it. Without this, one customer could post an order under
+ * another customer's reference — which both destroyed that order and handed the
+ * attacker the right to cancel it. */
+$owner = order_owner_fingerprint();
+
+$existingStatus = 'unconfirmed';
+$existingIndex = null;
+foreach ($orders as $index => $existing) {
+    if ((string)($existing['reference'] ?? '') !== $reference) continue;
+    $existingIndex = $index;
+    $existingStatus = order_status($existing);
+    break;
+}
+
+if ($existingIndex !== null && !hash_equals((string)($orders[$existingIndex]['owner'] ?? ''), $owner)) {
+    /* Someone else's row — or one written before ownership was recorded. Leave it
+     * completely alone and file this order under the next free reference. Two
+     * browsers can pick the same four digits on the same day by chance, so this
+     * has to keep both orders rather than reject the second. The suffix keeps the
+     * customer's quoted reference a prefix of it, so searching still finds it. */
+    for ($suffix = 2; $suffix <= 99; $suffix++) {
+        $candidate = $reference . '-' . $suffix;
+        $taken = false;
+        foreach ($orders as $existing) {
+            if ((string)($existing['reference'] ?? '') === $candidate) { $taken = true; break; }
+        }
+        if (!$taken) { $reference = $candidate; break; }
+    }
+    $existingIndex = null;
+    $existingStatus = 'unconfirmed';
+}
+
 // One reference is one order: re-sending replaces rather than duplicates. An
 // already-confirmed or cancelled order keeps the decision that was made about it.
-$existingStatus = 'unconfirmed';
-foreach ($orders as $existing) {
-    if ((string)($existing['reference'] ?? '') === $reference) {
-        $existingStatus = order_status($existing);
-        break;
-    }
+if ($existingIndex !== null) {
+    array_splice($orders, $existingIndex, 1);
 }
-$orders = array_values(array_filter($orders, fn($o) => (string)($o['reference'] ?? '') !== $reference));
 array_unshift($orders, [
     'reference' => $reference,
     'time' => gmdate('c'),
     'currency' => (string)($settings['currency'] ?? 'USD'),
     'status' => $existingStatus,
+    'owner' => $owner,
     'items' => $items,
     'item_count' => count($items),
     'pieces' => $pieces,
     'total' => round($total, 2),
 ]);
-
-/* References are guessable (DR-YYYYMMDD-NNNN), so the customer-facing status
- * endpoint must not accept any reference a caller cares to name. Remembering
- * this session's own references is what lets it tell them apart. */
-$own = $_SESSION['own_orders'] ?? [];
-if (!is_array($own)) $own = [];
-if (!in_array($reference, $own, true)) $own[] = $reference;
-$_SESSION['own_orders'] = array_slice($own, -50);
 
 save_json(ORDERS_FILE, array_slice($orders, 0, 2000));
 json_response(['ok' => true, 'reference' => $reference, 'total' => round($total, 2), 'status' => $existingStatus]);
