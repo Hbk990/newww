@@ -825,22 +825,90 @@
 
   /* --------------------------------------------------------- menu / strips */
 
-  function renderMenu() {
-    var nav = document.getElementById('menu-categories');
-    if (!nav) return;
-    nav.innerHTML = '<button data-category="">All categories</button>' + categoryGroups().map(function (group) {
-      var active = group.categories.some(function (c) { return c.slug === selected; });
-      return '<details class="menu-category-group"' + (active ? ' open' : '') + '>' +
+  /* Filtering the category menu. 47 categories in eight groups is a lot to scroll
+     on a phone, so the panel has its own search. It only ever filters category
+     names — the header search is the one that looks inside products. */
+  var menuQuery = '';
+
+  function menuMatches(category, groupName) {
+    var q = menuQuery.trim().toLowerCase();
+    if (!q) return true;
+    // Matching the group name too means typing "audio" reveals everything under
+    // Audio & Wearables, not just categories with "audio" in their own name.
+    return String(category.name || '').toLowerCase().indexOf(q) >= 0 ||
+           String(groupName || '').toLowerCase().indexOf(q) >= 0;
+  }
+
+  function renderMenuList() {
+    var box = document.getElementById('menu-category-list');
+    if (!box) return;
+    var q = menuQuery.trim(), shown = 0, total = 0;
+
+    var html = categoryGroups().map(function (group) {
+      var hits = group.categories.filter(function (c) { return menuMatches(c, group.name); });
+      total += group.categories.length;
+      shown += hits.length;
+      if (!hits.length) return '';
+      var active = hits.some(function (c) { return c.slug === selected; });
+      // While searching, every group holding a hit is opened: a closed group
+      // would hide the very thing that was searched for.
+      return '<details class="menu-category-group"' + (q || active ? ' open' : '') + '>' +
         '<summary><span>' + esc(group.name) + '</span></summary>' +
-        group.categories.map(function (c) {
+        hits.map(function (c) {
           return '<button data-category="' + esc(c.slug) + '" class="' + (c.slug === selected ? 'active' : '') + '">' +
             '<span>' + esc(c.name) + '</span><small>' + c.products.length + '</small></button>';
         }).join('') + '</details>';
     }).join('');
+
+    box.innerHTML = (q ? '<p class="menu-count">' + shown + ' of ' + total + ' categories</p>' : '') +
+      (html || '<p class="menu-empty">No category matches &ldquo;' + esc(q) + '&rdquo;.</p>');
+
+    var clear = document.getElementById('menu-search-clear');
+    if (clear) clear.hidden = !q;
+  }
+
+  function renderMenu() {
+    var nav = document.getElementById('menu-categories');
+    if (!nav) return;
+    nav.innerHTML =
+      '<div class="menu-tools">' +
+        '<button class="menu-all" data-category="">All categories</button>' +
+        '<label class="menu-search">' +
+          '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>' +
+          '<input id="menu-search-input" type="search" autocomplete="off" placeholder="Search categories"' +
+            ' aria-label="Search categories" value="' + esc(menuQuery) + '">' +
+          '<button type="button" id="menu-search-clear" class="menu-clear" aria-label="Clear category search"' + (menuQuery ? '' : ' hidden') + '>' +
+            '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>' +
+        '</label>' +
+      '</div>' +
+      '<div id="menu-category-list"></div>';
+    renderMenuList();
+
+    /* Only the list is rebuilt as you type, never the field, so the caret and
+       focus are untouched — no need to put them back afterwards. */
+    nav.oninput = function (e) {
+      if (e.target.id !== 'menu-search-input') return;
+      menuQuery = e.target.value;
+      renderMenuList();
+    };
+
     nav.onclick = function (e) {
+      if (e.target.closest('#menu-search-clear')) {
+        menuQuery = '';
+        var field = document.getElementById('menu-search-input');
+        if (field) { field.value = ''; field.focus(); }
+        renderMenuList();
+        return;
+      }
       var b = e.target.closest('[data-category]');
       if (!b) return;
       selected = b.dataset.category || null;
+      // The menu is built once, not on every render, so clearing the state is
+      // not enough — the field and the list have to be put back by hand.
+      menuQuery = '';
+      var field = document.getElementById('menu-search-input');
+      if (field) field.value = '';
+      renderMenuList();
       search.value = '';
       syncSearchClear();
       sortMode = 'original';

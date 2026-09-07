@@ -1695,6 +1695,97 @@ html[data-motion='off'] .hero-rule { animation: none; }
 .side-panel nav small { margin-left: auto; color: var(--grey-600); font-weight: 700; font-variant-numeric: tabular-nums; }
 .side-panel nav button:hover small { color: rgba(255, 255, 255, .75); }
 
+/* ---------- Category search inside the menu panel ----------------------- */
+
+.menu-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 12px;
+}
+
+/* The base rule makes every nav button a full-width row; this one sits inline
+   beside the search field instead. */
+.side-panel nav .menu-all {
+  width: auto;
+  flex: 0 0 auto;
+  padding: 10px 15px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  font-size: var(--step--1);
+  font-weight: 800;
+}
+.side-panel nav .menu-all:hover { padding-left: 15px; background: var(--ink); color: #fff; }
+
+.menu-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 150px;
+  min-width: 0;
+}
+.menu-search > svg {
+  position: absolute;
+  left: 12px;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--grey-600);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+.menu-search input {
+  width: 100%;
+  height: 42px;
+  padding: 0 38px 0 34px;
+  border: 2px solid var(--grey-100);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--step--1);
+  font-weight: 700;
+  outline: 0;
+  transition: border-color var(--dur-fast) linear;
+}
+.menu-search input::placeholder { color: var(--grey-600); font-weight: 600; }
+.menu-search input:focus { border-color: var(--red); }
+.menu-search input::-webkit-search-cancel-button { display: none; }
+
+/* Overrides the full-width nav-button base rule. */
+.side-panel nav .menu-clear {
+  position: absolute;
+  right: 5px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--grey-100);
+  color: var(--ink);
+}
+.side-panel nav .menu-clear:hover { padding-left: 0; background: var(--red); color: #fff; }
+.side-panel nav .menu-clear[hidden] { display: none; }
+.menu-clear svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+
+.menu-count {
+  margin: 0 0 8px;
+  color: var(--grey-600);
+  font-size: var(--step--2);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.menu-empty {
+  margin: 14px 2px;
+  color: var(--grey-600);
+  font-size: var(--step--1);
+  font-weight: 600;
+}
+
 .menu-category-group { border-bottom: 1px solid var(--grey-100); }
 .menu-category-group summary {
   display: flex;
@@ -2272,6 +2363,9 @@ html[data-motion='off'] .order-confirm { transition: none; }
   .color-picker button { min-height: 44px; padding: 6px 14px; }
   .product-select select { height: 46px; }
 
+  .menu-search input { height: 46px; font-size: 16px; padding-right: 50px; }
+  .side-panel nav .menu-clear { width: 44px; height: 44px; right: 1px; }
+  .side-panel nav .menu-all { min-height: 44px; }
   .icon-btn, .lock-link { width: 44px; height: 44px; }
   /* the pill collapses to an icon under 700px, which left it 2px short */
   .contact-pill, .admin-link { min-height: 44px; min-width: 44px; }
