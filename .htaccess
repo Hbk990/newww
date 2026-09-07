@@ -22,7 +22,10 @@ Options -Indexes
 
 <IfModule mod_deflate.c>
   AddOutputFilterByType DEFLATE text/html text/plain text/css text/xml
-  AddOutputFilterByType DEFLATE application/javascript application/x-javascript
+  # text/javascript is what Apache actually labels a .js file (RFC 9239 made it
+  # the registered type). Listing only application/javascript meant every script
+  # was served uncompressed — 76 KB of catalog.js on each customer's first visit.
+  AddOutputFilterByType DEFLATE text/javascript application/javascript application/x-javascript
   AddOutputFilterByType DEFLATE application/json image/svg+xml
 </IfModule>
 
