@@ -73,6 +73,52 @@
   function findProduct(id) {
     return allProducts().find(function (x) { return Number(x.product.id) === Number(id); });
   }
+
+  /* ---- search matching ---------------------------------------------------
+   * "xo fg05" has to find "XO – FG05 Skin & Neck Care Device". Matching the
+   * whole query as one substring cannot do it: an en dash sits between the two
+   * words. So each word of the query is matched on its own, in any order,
+   * against a copy of the text with every space and punctuation mark removed —
+   * which is also what makes "fg-05", "fg05" and "fg 05" the same search.
+   *
+   * Dropping the punctuation alone would be too generous: "xo" would then match
+   * the middle of "Moxom". So the token boundaries are remembered and a word
+   * must BEGIN at one. It may run past one, which is what lets "fg05" match
+   * "FG 05" — tokens break at punctuation and where letters meet digits.
+   *
+   * The same rule runs in assets/admin.js, so the shop and the dashboard find
+   * the same products for the same words. */
+  function searchIndex(text) {
+    var s = String(text == null ? '' : text).toLowerCase(), joined = '', starts = {}, prev = 0;
+    for (var i = 0; i < s.length; i++) {
+      var ch = s.charAt(i),
+          kind = (ch >= '0' && ch <= '9') ? 1
+               : (((ch >= 'a' && ch <= 'z') || ch.toLowerCase() !== ch.toUpperCase()) ? 2 : 0);
+      if (!kind) { prev = 0; continue; }
+      if (kind !== prev) starts[joined.length] = 1;
+      joined += ch; prev = kind;
+    }
+    return { text: joined, starts: starts };
+  }
+  function matchesQuery(haystack, query) {
+    var words = String(query == null ? '' : query).trim().split(/\s+/), index = null;
+    for (var w = 0; w < words.length; w++) {
+      var needle = searchIndex(words[w]).text;
+      if (!needle) continue;
+      if (!index) index = searchIndex(haystack);
+      var found = false;
+      for (var at = index.text.indexOf(needle); at >= 0; at = index.text.indexOf(needle, at + 1)) {
+        if (index.starts[at]) { found = true; break; }
+      }
+      if (!found) return false;
+    }
+    return true;
+  }
+  function searchText(product, category) {
+    return [product.sku, product.name, product.brand, product.color, product.type,
+            (product.colors || []).join(' '), (product.flavors || []).join(' '),
+            category && category.name, category && category.group, category && category.slug].join(' ');
+  }
   function options(p) {
     if (Array.isArray(p.options) && p.options.length) return p.options;
     return typeof p.price === 'number' ? [{ name: 'Standard', price: p.price }] : [];
@@ -764,16 +810,13 @@
      filter bar's own choices are built from this, so it never offers a brand
      that would return nothing. */
   function basePool() {
-    var q = search.value.trim().toLowerCase(),
-        category = searchScope(),
-        pool = category ? category.products : allProducts().map(function (x) { return x.product; });
+    var q = search.value.trim(), category = searchScope();
     if (q) {
-      return pool.filter(function (p) {
-        return [p.sku, p.name, p.brand, p.color, p.type, (p.colors || []).join(' '), (p.flavors || []).join(' ')]
-          .join(' ').toLowerCase().indexOf(q) >= 0;
-      });
+      return allProducts().filter(function (x) {
+        return matchesQuery(searchText(x.product, x.category), q);
+      }).map(function (x) { return x.product; });
     }
-    return category ? pool : [];
+    return category ? category.products : [];
   }
 
   function filtersActive() {
@@ -1517,14 +1560,18 @@
       '?text=' + encodeURIComponent(lines.join('\n')), '_blank', 'noopener');
   }
 
-  /* Sends only what was ordered — no name, phone, business or notes. The server
-     re-prices every line from the catalog, so nothing here is authoritative. */
+  /* Sends what was ordered plus the customer's name, which is what the shop
+     files the receipt under. The phone number, business name and notes are not
+     sent: they stay in this browser and travel in the WhatsApp message only.
+     The server re-prices every line from the catalog, so nothing here is
+     authoritative. */
   function logOrder() {
     if (!cart.length || !navigator.sendBeacon) return;
     try {
       var body = JSON.stringify({
         csrf: window.DR_PHONE.csrf || '',
         reference: orderReference,
+        customer_name: customer.name || '',
         lines: cart.filter(function (l) { return l.quantity > 0; }).map(function (l) {
           return { productId: l.productId, option: l.option, color: l.color, flavor: l.flavor, quantity: l.quantity };
         })

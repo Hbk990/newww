@@ -1,20 +1,60 @@
-DR PHONE WHOLESALE — INSTALLATION (v16)
+DR PHONE WHOLESALE — INSTALLATION (v17)
 
 WHAT CHANGED IN THIS VERSION
-The catalog no longer lives in a hidden folder. It now sits at the root of the
-domain, so the address is simply:
 
-    https://drphonewholesale.online
+1. SEARCHING FOR MORE THAN ONE WORD NOW WORKS
+   Typing "xo fg05" used to find nothing, even though "xo" and "fg-05" each
+   found things on their own. The search now looks for every word you type,
+   in any order, and ignores dashes and spaces inside product codes. So all of
+   these now find the same two products:
 
-The old address still works — anyone opening
-https://drphonewholesale.online/wholesale-7nQ4vK9mP2xR8cL5/ is forwarded to the
-new one automatically, so links you have already sent to customers keep working.
+       xo fg05      XO FG05      fg05 xo      xo fg 05      fg-05
 
-The search-engine block has also been removed. Google may now find and list the
-site. Your products are still behind the customer passcode, so a search engine
-only ever sees the passcode page, never your prices.
+   It also stopped matching the middle of a word: searching "xo" no longer
+   returns Mo-XO-m products, and searching "cable" no longer returns things
+   labelled "Retracable". Same behaviour in the dashboard and in the customer
+   catalog — they now share one rule.
 
-READ THIS BEFORE YOU START — THIS UPGRADE MOVES FILES
+2. ORDER RECEIPTS
+   Every order in the Order log now has a RECEIPT button. It opens a printable
+   receipt with the customer, the reference, the date, every line with its
+   quantity and price, and the total — and "Print / Save PDF" saves it under
+   the customer's name and reference, for example
+
+       Hassan Bitar · DR-20260907-4002.pdf
+
+   The order log now shows each order by customer name and reference, and the
+   search box beside it finds an order by either — "hassan", "4002", or
+   "hassan 4002" all work.
+
+   FOR THIS, ONE NEW THING IS SAVED ON THE SERVER: the customer's NAME.
+   Nothing else about them. Phone numbers, business names and order notes are
+   still never stored — they go into the WhatsApp message only, exactly as
+   before. Orders taken before this version have no name and show their
+   reference alone; their receipts still open.
+
+INSTALLING THIS UPDATE
+If you are already running v16 (the site answers at
+https://drphonewholesale.online with no folder name after it), this is a simple
+in-place update:
+
+  1. Upload this ZIP into public_html and extract it there, overwriting when
+     asked. Nothing moves and nothing is deleted.
+  2. IMPORTANT: after extracting, put back your own storage/orders.json if you
+     want to keep your order history, and your own storage/catalog.json if you
+     have added or edited products since this ZIP was built. The ZIP carries the
+     catalog as of its build date and no order history at all.
+  3. Delete the ZIP from the server.
+  4. Open the dashboard, open Operations > Order log, and check that an order
+     shows a Receipt button.
+
+You do not have to sign in again, and no addresses change.
+
+If you are still on a version older than v16 — the site only answers at
+.../wholesale-7nQ4vK9mP2xR8cL5/ — follow the migration below instead. It moves
+the site to the domain root and is the same one-time move v16 described.
+
+READ THIS ONLY IF YOU ARE UPGRADING FROM BEFORE v16 — THAT UPGRADE MOVES FILES
 Previous versions installed into public_html/wholesale-7nQ4vK9mP2xR8cL5/.
 This one installs into public_html itself. That means the old folder has to go,
 and your data has to come with it. Do the steps in this order.
@@ -115,6 +155,15 @@ NOTE ON PRICE TIERS
 A single cart line is capped at 999 pieces, so a tier whose minimum quantity is
 1000 or more can never be reached and will never apply. Keep tier minimums
 below 1000.
+
+WHAT THE ORDER LOG STORES (v17)
+- Reference, date, status, every line with SKU, variant, quantity, unit price
+  and line total, the piece count, the order total — and the CUSTOMER'S NAME.
+- It does NOT store the phone number, the business name, or the order notes.
+  Those three are typed into the cart, travel in the WhatsApp message, and never
+  reach the server. The Export CSV button exports the same fields, name included.
+- If you ever want the name gone too, delete the order from the log; there is no
+  separate place it is kept.
 
 REMOVED IN v15
 - The OpenCV image audit was removed. It could never run: the library builds its

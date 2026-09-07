@@ -41,6 +41,43 @@
     document.querySelector('.operations-grid').insertBefore(pictureSection,document.querySelector('.operations-grid section:nth-child(2)'));
   }
   function allProducts(){return[].concat.apply([],catalog.map(function(c){return c.products.map(function(p){return Object.assign({category:c.slug,categoryName:c.name},p)})}))}
+
+  /* ---- search matching ---------------------------------------------------
+   * "xo fg05" has to find "XO – FG05 Skin & Neck Care Device". Matching the
+   * whole query as one substring cannot do it: an en dash sits between the two
+   * words. So each word of the query is matched on its own, in any order,
+   * against a copy of the text with every space and punctuation mark removed —
+   * which is also what makes "fg-05", "fg05" and "fg 05" the same search.
+   *
+   * Dropping the punctuation alone would be too generous: "xo" would then match
+   * the middle of "Moxom". So the token boundaries are remembered and a word
+   * must BEGIN at one. It may run past one, which is what lets "fg05" match
+   * "FG 05" — tokens break at punctuation and where letters meet digits. */
+  function searchIndex(text){
+    var s=String(text==null?'':text).toLowerCase(),joined='',starts={},prev=0;
+    for(var i=0;i<s.length;i++){
+      var ch=s.charAt(i),
+          kind=(ch>='0'&&ch<='9')?1:(((ch>='a'&&ch<='z')||ch.toLowerCase()!==ch.toUpperCase())?2:0);
+      if(!kind){prev=0;continue}
+      if(kind!==prev)starts[joined.length]=1;
+      joined+=ch;prev=kind;
+    }
+    return {text:joined,starts:starts};
+  }
+  function matchesQuery(haystack,query){
+    var words=String(query==null?'':query).trim().split(/\s+/),index=null;
+    for(var w=0;w<words.length;w++){
+      var needle=searchIndex(words[w]).text;
+      if(!needle)continue;
+      if(!index)index=searchIndex(haystack);
+      var found=false;
+      for(var at=index.text.indexOf(needle);at>=0;at=index.text.indexOf(needle,at+1)){
+        if(index.starts[at]){found=true;break}
+      }
+      if(!found)return false;
+    }
+    return true;
+  }
   function tell(message,error){notice.innerHTML='<div class="notice'+(error?' error':'')+'">'+esc(message)+'</div>';setTimeout(function(){notice.innerHTML=''},5000)}
   function refreshSelects(){var options=catalog.map(function(c){return'<option value="'+esc(c.slug)+'">'+esc(c.name)+'</option>'}).join('');productForm.category.innerHTML=options;document.getElementById('bulk-category').innerHTML='<option value="">Category unchanged</option>'+options;var filter=document.getElementById('admin-category-filter');if(filter){if(categoryFilter&&!catalog.some(function(c){return c.slug===categoryFilter}))categoryFilter='';filter.innerHTML='<option value="">All categories</option>'+options;filter.value=categoryFilter}}
   function money(v){if(v==null||v==='')return'Price on request';var currency=String(settings.currency||'USD').toUpperCase();try{return new Intl.NumberFormat('en-US',{style:'currency',currency:currency,minimumFractionDigits:Number.isInteger(Number(v))?0:2}).format(Number(v))}catch(e){return currency+' '+Number(v).toFixed(Number.isInteger(Number(v))?0:2)}}
@@ -236,16 +273,18 @@
     return counts;
   }
 
-  /* Products matching the search box, the category filter and the active chip. */
+  /* Products matching the search box, the category filter and the active chip.
+     The category's own name, group and slug are part of each product's
+     searchable text, so searching a category still shows everything in it. */
   function visibleProducts(){
-    var q=search.value.trim().toLowerCase(),test=(FILTERS[activeFilter]||FILTERS.all).test,groups=[];
+    var q=search.value.trim(),test=(FILTERS[activeFilter]||FILTERS.all).test,groups=[];
     catalog.forEach(function(c){
       if(categoryFilter&&c.slug!==categoryFilter)return;
-      var categoryMatches=!!q&&[c.name,c.group,c.slug].join(' ').toLowerCase().indexOf(q)>=0;
+      var categoryText=' '+[c.name,c.group,c.slug].join(' ');
       var matches=c.products.filter(function(p){
         if(!test(p))return false;
-        if(!q||categoryMatches)return true;
-        return [p.sku,p.name,p.brand,(p.colors||[]).join(' '),(p.flavors||[]).join(' '),p.type].join(' ').toLowerCase().indexOf(q)>=0;
+        if(!q)return true;
+        return matchesQuery([p.sku,p.name,p.brand,(p.colors||[]).join(' '),(p.flavors||[]).join(' '),p.type].join(' ')+categoryText,q);
       });
       if(matches.length)groups.push({category:c,products:matches});
     });
@@ -604,12 +643,15 @@
   function renderOrders(){
     var box=document.getElementById('orders-list');
     if(!box)return;
-    var q=(document.getElementById('orders-search')||{}).value||'';
-    var needle=q.trim().toLowerCase();
+    var needle=((document.getElementById('orders-search')||{}).value||'').trim();
+    /* Same matcher as the product search, so "hassan 4002" finds the order the
+       way "xo fg05" finds the product: every word, in any order, punctuation
+       ignored. A receipt is filed under a name and a reference, so both are
+       searched. */
     var rows=orders.filter(function(o){
       if(orderStatusFilter&&statusOf(o)!==orderStatusFilter)return false;
       if(!needle)return true;
-      return String(o.reference||'').toLowerCase().indexOf(needle)>=0;
+      return matchesQuery([o.reference,o.customer].filter(Boolean).join(' '),needle);
     });
     var summary=document.getElementById('orders-summary');
     if(summary){
@@ -621,32 +663,125 @@
     }
     box.innerHTML=rows.slice(0,40).map(function(o){
       var st=statusOf(o);
-      return '<div class="order-row status-'+st+'"><div><strong>'+esc(o.reference)+
+      return '<div class="order-row status-'+st+'"><div><strong>'+esc(receiptName(o))+
         ' <span class="order-status">'+esc(STATUS_LABEL[st])+'</span></strong>'+
         '<span>'+new Date(o.time).toLocaleString()+' · '+o.item_count+' items · '+o.pieces+' pieces</span></div>'+
         '<b>'+esc(o.currency||'USD')+' '+Number(o.total||0).toFixed(2)+'</b>'+
-        (st==='confirmed'?'':'<button type="button" class="order-mark confirm" data-order-status="confirmed" data-reference="'+esc(o.reference)+'">Confirm</button>')+
-        (st==='cancelled'
-          ? '<button type="button" class="order-mark" data-order-status="unconfirmed" data-reference="'+esc(o.reference)+'">Restore</button>'
-          : '<button type="button" class="order-mark cancel" data-order-status="cancelled" data-reference="'+esc(o.reference)+'">Cancel</button>')+
-        '<button type="button" class="order-open" data-order-detail="'+esc(o.reference)+'">Items</button>'+
-        '<button type="button" class="order-del" data-order-delete="'+esc(o.reference)+'" aria-label="Delete order permanently">×</button>'+
+        /* The order log sits in one half of the operations panel, so five
+           buttons never fit beside the heading. They get their own line. */
+        '<div class="order-actions">'+
+          (st==='confirmed'?'':'<button type="button" class="order-mark confirm" data-order-status="confirmed" data-reference="'+esc(o.reference)+'">Confirm</button>')+
+          (st==='cancelled'
+            ? '<button type="button" class="order-mark" data-order-status="unconfirmed" data-reference="'+esc(o.reference)+'">Restore</button>'
+            : '<button type="button" class="order-mark cancel" data-order-status="cancelled" data-reference="'+esc(o.reference)+'">Cancel</button>')+
+          '<button type="button" class="order-open" data-order-detail="'+esc(o.reference)+'">Items</button>'+
+          '<button type="button" class="order-open" data-order-receipt="'+esc(o.reference)+'">Receipt</button>'+
+          '<button type="button" class="order-del" data-order-delete="'+esc(o.reference)+'" aria-label="Delete order permanently">×</button>'+
+        '</div>'+
         '<div class="order-items" hidden>'+o.items.map(function(i){
           var variant=[i.option,i.color,i.flavor].filter(Boolean).join(' · ');
           return '<span>'+esc(i.sku||'')+' '+esc(i.name)+(variant?' ('+esc(variant)+')':'')+
             ' × '+i.quantity+' — '+Number(i.line_total).toFixed(2)+'</span>';
         }).join('')+'</div></div>';
-    }).join('')||'<p class="viz-empty">'+(needle?'No order matches that reference.':'Nothing yet.')+'</p>';
+    }).join('')||'<p class="viz-empty">'+(needle?'No order matches that name or reference.':'Nothing yet.')+'</p>';
+  }
+
+  /* ---- receipts ----------------------------------------------------------
+   * An order is filed under the customer's name and its reference; that pair is
+   * the receipt's heading and, because it is also written into document.title
+   * while printing, the filename the browser offers for "Save as PDF".
+   * Orders placed before names were stored — and customers who left the name
+   * box empty — fall back to the reference alone. */
+  function receiptName(order){
+    var name=String((order&&order.customer)||'').trim();
+    return name?name+' · '+order.reference:String((order&&order.reference)||'');
+  }
+
+  function receiptHtml(o){
+    var st=statusOf(o),currency=String(o.currency||settings.currency||'USD').toUpperCase(),
+        amount=function(v){return currency+' '+Number(v||0).toFixed(2)},
+        terms=[settings.payment_terms,settings.delivery_terms].filter(Boolean);
+    return '<article class="receipt">'+
+      '<header class="receipt-head">'+
+        '<div><h2>DR PHONE</h2><p>'+
+          [settings.location,settings.phone].filter(Boolean).map(esc).join(' · ')+'</p></div>'+
+        '<div class="receipt-ref"><b>'+esc(o.reference)+'</b>'+
+          '<span>'+esc(new Date(o.time).toLocaleString())+'</span>'+
+          '<span class="order-status">'+esc(STATUS_LABEL[st])+'</span></div>'+
+      '</header>'+
+      '<p class="receipt-customer"><span>Customer</span><b>'+
+        esc(String(o.customer||'').trim()||'Not given')+'</b></p>'+
+      /* Four columns, not five: the SKU rides under the product name instead of
+         taking a column of its own, so the table needs no responsive reshaping
+         and the footer always lines up with the body. */
+      '<table class="receipt-table"><thead><tr><th>Product</th><th>Qty</th>'+
+        '<th>Unit</th><th>Amount</th></tr></thead><tbody>'+
+        (o.items||[]).map(function(i){
+          var under=[i.sku,i.option,i.color,i.flavor].filter(Boolean).join(' · ');
+          return '<tr><td>'+esc(i.name)+
+            (under?'<small>'+esc(under)+'</small>':'')+'</td><td>'+Number(i.quantity||0)+
+            '</td><td>'+esc(amount(i.unit_price))+'</td><td>'+esc(amount(i.line_total))+'</td></tr>';
+        }).join('')+
+      '</tbody><tfoot><tr><th>Total</th><th>'+Number(o.pieces||0)+' pcs</th>'+
+        '<th></th><th>'+esc(amount(o.total))+'</th></tr></tfoot></table>'+
+      (terms.length?'<p class="receipt-terms">'+terms.map(esc).join(' · ')+'</p>':'')+
+    '</article>';
+  }
+
+  /* The order log lives inside a modal <dialog>, which paints in the browser's
+     top layer: nothing outside it can appear above it, and printing a top-layer
+     element is unreliable across browsers. So the receipt closes that dialog
+     while it is up, and reopens it on the way out. */
+  var receiptCameFromOperations=false;
+
+  function openReceipt(reference){
+    var o=orders.find(function(x){return String(x.reference)===String(reference)});
+    if(!o)return;
+    var sheet=document.getElementById('receipt-sheet');
+    if(!sheet)return;
+    receiptCameFromOperations=operationsDialog.open;
+    if(receiptCameFromOperations)operationsDialog.close();
+    sheet.innerHTML='<div class="receipt-actions"><button type="button" id="receipt-print">Print / Save PDF</button>'+
+      '<button type="button" class="secondary" id="receipt-close">Close</button></div>'+receiptHtml(o);
+    sheet.hidden=false;
+    document.body.classList.add('showing-receipt');
+    document.getElementById('receipt-close').onclick=closeReceipt;
+    document.getElementById('receipt-print').onclick=function(){
+      var title=document.title;
+      document.title=receiptName(o);
+      window.print();
+      // Safari fires no afterprint on cancel, so restore on a timer as well.
+      setTimeout(function(){document.title=title},1000);
+    };
+    document.getElementById('receipt-print').focus();
+  }
+  function closeReceipt(){
+    var sheet=document.getElementById('receipt-sheet');
+    if(!sheet)return;
+    sheet.hidden=true;sheet.innerHTML='';
+    document.body.classList.remove('showing-receipt');
+    if(receiptCameFromOperations&&!operationsDialog.open){
+      receiptCameFromOperations=false;
+      operationsDialog.showModal();
+      renderOrders();
+    }
   }
 
   function exportOrdersCsv(){
-    var rows=[['reference','time','currency','total','sku','name','option','color','flavor','quantity','unit_price','line_total']];
+    var rows=[['reference','customer','time','currency','total','sku','name','option','color','flavor','quantity','unit_price','line_total']];
     orders.forEach(function(o){
       o.items.forEach(function(i){
-        rows.push([o.reference,o.time,o.currency||'USD',o.total,i.sku,i.name,i.option,i.color,i.flavor,i.quantity,i.unit_price,i.line_total]);
+        rows.push([o.reference,o.customer||'',o.time,o.currency||'USD',o.total,i.sku,i.name,i.option,i.color,i.flavor,i.quantity,i.unit_price,i.line_total]);
       });
     });
-    var csv=rows.map(function(r){return r.map(function(v){return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'}).join(',')}).join('\r\n');
+    /* The customer name is typed by a stranger, and a spreadsheet treats a cell
+       starting with = + - or @ as a formula. Quoting is not enough; the leading
+       character has to be neutralised. */
+    var csv=rows.map(function(r){return r.map(function(v){
+      var s=String(v==null?'':v);
+      if(/^[=+\-@\t\r]/.test(s))s="'"+s;
+      return '"'+s.replace(/"/g,'""')+'"';
+    }).join(',')}).join('\r\n');
     var url=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv'}));
     var a=document.createElement('a');a.href=url;a.download='DR-PHONE-orders-'+new Date().toISOString().slice(0,10)+'.csv';
     document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url)},1000);
@@ -803,7 +938,11 @@
 
   function renderProducts(){
     var groups=visibleProducts(),counts=filterCounts(),total=groups.reduce(function(t,g){return t+g.products.length},0);
+    /* Only the first `renderLimit` rows are laid out, so without this the answer
+       to "how many are there?" is whatever you have scrolled to. */
+    var narrowed=!!(search.value.trim()||categoryFilter||activeFilter!=='all');
     document.getElementById('summary').textContent=
+      (narrowed?total+' matching · ':'')+
       (stats.products||allProducts().length)+' products · '+(stats.categories||catalog.length)+' categories · '+
       (stats.low||0)+' low · '+(stats.out||0)+' out · '+(stats.unreviewed||0)+' stock unreviewed';
 
@@ -960,6 +1099,8 @@
     }
   });
   document.addEventListener('keydown',function(e){
+    // The receipt is an overlay rather than a <dialog>, so Escape is ours to handle.
+    if(e.key==='Escape'&&document.body.classList.contains('showing-receipt')){closeReceipt();return}
     if(e.key!=='Enter'&&e.key!==' ')return;
     var bar=e.target.closest&&e.target.closest('[data-jump-category]');
     if(bar){e.preventDefault();bar.click()}
@@ -974,7 +1115,9 @@
 
   document.addEventListener('click',function(e){
     var detail=e.target.closest&&e.target.closest('[data-order-detail]');
-    if(detail){var items=detail.parentNode.querySelector('.order-items');items.hidden=!items.hidden;return}
+    if(detail){var items=detail.closest('.order-row').querySelector('.order-items');items.hidden=!items.hidden;return}
+    var receipt=e.target.closest&&e.target.closest('[data-order-receipt]');
+    if(receipt){openReceipt(receipt.dataset.orderReceipt);return}
     var pending=e.target.closest&&e.target.closest('[data-sales-pending]');
     if(pending){
       orderStatusFilter='unconfirmed';

@@ -150,9 +150,15 @@
 }
 .orders-toolbar input:focus { border-color: var(--red); }
 .orders-toolbar button { min-height: 36px; padding: 0 12px; border-radius: 9px; font-size: 12px; }
-.order-row {
+/* `.tool-list > div { display: block }` in admin.css (0,1,1) outranks a bare
+   `.order-row` (0,1,0), so this rule has to name both: without it the whole
+   grid below is inert and every part of the row simply stacks. */
+.tool-list > .order-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto auto auto 30px;
+  /* Heading and total on the first line, the action buttons on their own. The
+     panel is half the operations dialog wide, so five buttons never fit beside
+     a customer name. */
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 9px;
   padding: 10px 12px;
@@ -175,6 +181,12 @@
 .order-del { width: 30px; padding: 0; color: #ff9a9a; font-size: 15px; }
 .order-open:hover { border-color: var(--glass-line-hi); }
 .order-del:hover { border-color: var(--red); background: var(--red-soft); }
+.order-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
 .order-items {
   grid-column: 1 / -1;
   display: grid;
@@ -188,12 +200,11 @@
    why the Items toggle never actually hid anything. */
 .order-items[hidden] { display: none; }
 .orders-note { display: block; margin-top: 10px; color: var(--text-low); font-size: 10px; line-height: 1.5; }
-@media (max-width: 700px) {
-  .order-row { grid-template-columns: minmax(0, 1fr) auto; }
-  .order-row > b { grid-column: 2; grid-row: 1; text-align: right; }
-  .order-mark, .order-open { grid-column: auto; }
-  .order-del { justify-self: end; }
-}
+/* Placed explicitly rather than left to auto-flow, which put the total on its
+   own line once the buttons became a full-width item. */
+.order-row > div:first-child { grid-column: 1; grid-row: 1; }
+.order-row > b { grid-column: 2; grid-row: 1; text-align: right; }
+.order-actions .order-del { margin-left: auto; }
 
 /* Order status. Carried by a worded pill and a left border, never colour alone. */
 .order-status {
@@ -445,3 +456,121 @@
 .restock-lead.restock-untracked { margin-top: 20px; color: var(--text-mid); }
 .restock-row.state-untracked .restock-flag,
 .restock-row.state-untracked .restock-cover { color: var(--text-low); }
+
+/* ---------- Order receipt ------------------------------------------------ *
+ * The receipt is a document, not another dashboard panel, so it is drawn on
+ * white the way it will print. Screen and paper then show the same thing, and
+ * @media print has only to remove everything around it. */
+
+.receipt-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  /* start, not stretch: a two-line receipt is two lines tall, not a full page
+     of white. */
+  align-content: start;
+  gap: 12px;
+  padding: 16px;
+  overflow: auto;
+  background: rgba(6, 6, 8, .82);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+/* display:grid above would otherwise defeat the [hidden] attribute. */
+.receipt-sheet[hidden] { display: none; }
+/* The sheet scrolls; the dashboard behind it must not. */
+body.showing-receipt { overflow: hidden; }
+
+.receipt-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  width: min(720px, 100%);
+  margin: 0 auto;
+}
+.receipt-actions button { min-height: 40px; padding: 0 16px; border-radius: 10px; font-size: 13px; }
+
+.receipt {
+  width: min(720px, 100%);
+  margin: 0 auto;
+  padding: 24px;
+  border-radius: 12px;
+  background: #fff;
+  color: #16161a;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.receipt-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 2px solid #16161a;
+}
+.receipt-head h2 { margin: 0; color: var(--red); font-size: 22px; font-weight: 900; letter-spacing: .04em; }
+.receipt-head p { margin: 2px 0 0; color: #55555f; font-size: 11px; }
+.receipt-ref { display: grid; gap: 2px; text-align: right; }
+.receipt-ref b { font-size: 14px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.receipt-ref span { color: #55555f; font-size: 11px; }
+.receipt-ref .order-status { margin-left: 0; justify-self: end; background: #ececf0; color: #16161a; }
+
+.receipt-customer {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 14px 0 0;
+}
+.receipt-customer span { color: #55555f; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+.receipt-customer b { font-size: 16px; font-weight: 800; }
+
+.receipt-table { width: 100%; margin-top: 14px; border-collapse: collapse; }
+.receipt-table th, .receipt-table td { padding: 7px 6px; text-align: left; vertical-align: top; }
+.receipt-table thead th {
+  border-bottom: 1px solid #c9c9d1;
+  color: #55555f;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.receipt-table tbody td { border-bottom: 1px solid #ececf1; }
+.receipt-table td small { display: block; color: #55555f; font-size: 11px; }
+.receipt-table th:nth-child(n+2), .receipt-table td:nth-child(n+2) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.receipt-table tfoot th { padding-top: 11px; border-top: 2px solid #16161a; font-size: 14px; font-weight: 900; }
+.receipt-terms { margin: 16px 0 0; color: #55555f; font-size: 11px; }
+
+@media (max-width: 560px) {
+  .receipt { padding: 16px; }
+  .receipt-head { flex-direction: column; }
+  .receipt-ref { text-align: left; }
+  .receipt-ref .order-status { justify-self: start; }
+  .receipt-table th, .receipt-table td { padding: 7px 4px; }
+}
+@media (pointer: coarse) {
+  .receipt-actions button { min-height: 44px; }
+}
+
+/* Printing a receipt prints the receipt: the dashboard around it is removed
+   rather than restyled, and the scrim goes with it so the sheet is the page. */
+@media print {
+  body.showing-receipt > *:not(.receipt-sheet) { display: none !important; }
+  body.showing-receipt .receipt-sheet {
+    position: static;
+    padding: 0;
+    overflow: visible;
+    background: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  body.showing-receipt .receipt-actions { display: none !important; }
+  body.showing-receipt .receipt { width: auto; padding: 0; border-radius: 0; }
+  /* admin.css's print block sets the whole page to black; the shop's name on its
+     own receipt keeps its colour. */
+  body.showing-receipt .receipt-head h2 { color: var(--red); }
+}

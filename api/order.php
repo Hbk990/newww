@@ -4,10 +4,14 @@ require_once __DIR__ . '/../inc/bootstrap.php';
 
 /* Lightweight order log.
  *
- * Records ONLY what was ordered: reference, timestamp, line items and total.
- * The customer's name, phone, business and notes are deliberately NOT stored —
- * they are collected in the browser and go into the WhatsApp message only, so no
- * personal data lands on the server.
+ * Records what was ordered — reference, timestamp, line items and total — plus
+ * the customer's NAME, and nothing else about them. The name is stored because
+ * the shop's receipt is filed under it: "Hassan Bitar · DR-20260907-4002" is how
+ * an order is found again months later.
+ *
+ * The phone number, business name and order notes are still deliberately NOT
+ * stored. They are collected in the browser and go into the WhatsApp message
+ * only, so the order log never becomes a list of contactable customers.
  *
  * Prices and totals are recomputed here from catalog.json. Everything the client
  * sends except product ids, variants and quantities is treated as untrusted; a
@@ -29,6 +33,10 @@ if (!hash_equals((string)($_SESSION['csrf'] ?? ''), (string)($payload['csrf'] ??
 
 $reference = clean_text($payload['reference'] ?? '', 60);
 if (!preg_match('/^DR-[0-9]{8}-[0-9]{4}$/', $reference)) json_response(['ok' => false, 'error' => 'Invalid reference.'], 400);
+
+// Free text typed by the customer, so it is cleaned and capped like any other.
+// It is only ever echoed back to the dashboard, which escapes it.
+$customerName = clean_text($payload['customer_name'] ?? '', 80);
 
 $lines = $payload['lines'] ?? [];
 if (!is_array($lines) || !$lines) json_response(['ok' => false, 'error' => 'No items.'], 400);
@@ -119,11 +127,13 @@ $orders = load_json(ORDERS_FILE, []);
 $owner = order_owner_fingerprint();
 
 $existingStatus = 'unconfirmed';
+$existingName = '';
 $existingIndex = null;
 foreach ($orders as $index => $existing) {
     if ((string)($existing['reference'] ?? '') !== $reference) continue;
     $existingIndex = $index;
     $existingStatus = order_status($existing);
+    $existingName = (string)($existing['customer'] ?? '');
     break;
 }
 
@@ -143,6 +153,7 @@ if ($existingIndex !== null && !hash_equals((string)($orders[$existingIndex]['ow
     }
     $existingIndex = null;
     $existingStatus = 'unconfirmed';
+    $existingName = '';
 }
 
 // One reference is one order: re-sending replaces rather than duplicates. An
@@ -154,6 +165,9 @@ array_unshift($orders, [
     'reference' => $reference,
     'time' => gmdate('c'),
     'currency' => (string)($settings['currency'] ?? 'USD'),
+    // Re-sending an order from a browser where the name box has since been
+    // cleared must not wipe the name the receipt is filed under.
+    'customer' => $customerName !== '' ? $customerName : $existingName,
     'status' => $existingStatus,
     'owner' => $owner,
     'items' => $items,
