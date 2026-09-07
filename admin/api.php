@@ -288,6 +288,13 @@ try {
     if($action==='import_csv'){
         if(empty($_FILES['csv'])||($_FILES['csv']['error']??UPLOAD_ERR_NO_FILE)!==UPLOAD_ERR_OK)throw new RuntimeException('Choose a CSV file exported from the dashboard.');
         $handle=fopen($_FILES['csv']['tmp_name'],'r'); if(!$handle)throw new RuntimeException('Could not read CSV file.');
+        /* Export CSV writes a UTF-8 BOM so Excel opens it correctly. Left on the
+           stream, the BOM sits in front of the first field's opening quote, so
+           fgetcsv treats that field as unquoted and returns "product_id" WITH the
+           quote marks. The id column was then never recognised and re-importing
+           the dashboard's own export tried to create every product again instead
+           of updating it — which the duplicate-SKU guard rejected. */
+        $bom=fread($handle,3); if($bom!=="\xEF\xBB\xBF")rewind($handle);
         $headers=fgetcsv($handle); if(!$headers)throw new RuntimeException('CSV has no header row.');
         $headers=array_map(fn($h)=>strtolower(trim((string)preg_replace('/^\xEF\xBB\xBF/','',(string)$h))), $headers);
         $count=0;$created=0;$updated=0;$max=0;
@@ -312,7 +319,13 @@ try {
             $visibility=in_array($record['visibility']??'',['published','draft','hidden'],true)?$record['visibility']:'published';
             $rawPrice=trim((string)($record['price']??''));$price=$options?null:(is_numeric($rawPrice)?max(0,(float)$rawPrice):null);
             $sku=strtoupper(clean_text($record['sku']??'',64));if($sku==='')$sku=$existing['sku']??('DR-'.str_pad((string)$id,6,'0',STR_PAD_LEFT));if(!preg_match('/^[A-Z0-9._-]{2,64}$/',$sku))throw new RuntimeException('Invalid SKU for '.$record['name'].'.');foreach($data as $category)foreach($category['products'] as $product)if(strcasecmp((string)($product['sku']??''),$sku)===0)throw new RuntimeException('Duplicate SKU in CSV: '.$sku);
-            $stockUpdatedAt=clean_text($record['stock_updated_at']??'',40)?:($existing['stock_updated_at']??null);if(!$existing||($existing['stock']??null)!==$stock||($existing['stock_quantity']??null)!==max(0,(int)($record['stock_quantity']??0))||($existing['variant_stock']??[])!==$variantStock||($existing['variant_quantity']??[])!==$variantQuantity)$stockUpdatedAt=gmdate('c');
+            $stockUpdatedAt=clean_text($record['stock_updated_at']??'',40)?:($existing['stock_updated_at']??null);
+            /* "Reviewed" is a claim that someone counted the stock, so the date is
+               stamped only when the stock really differs. The defaults matter: an
+               older product record has no stock_quantity key at all, and comparing
+               that null against the CSV's 0 read as a change — which stamped every
+               row on import and made the whole catalog look freshly reviewed. */
+            if(!$existing||($existing['stock']??'in-stock')!==$stock||(int)($existing['stock_quantity']??0)!==max(0,(int)($record['stock_quantity']??0))||((array)($existing['variant_stock']??[]))!=$variantStock||((array)($existing['variant_quantity']??[]))!=$variantQuantity)$stockUpdatedAt=gmdate('c');
             $data[$ci]['products'][]=['id'=>$id,'sku'=>$sku,'name'=>clean_text($record['name'],250),'brand'=>clean_text($record['brand']??'',100),'price'=>$price,'options'=>$options,'tiers'=>$tiers,'colors'=>$colors,'flavors'=>$flavors,'stock'=>$stock,'stock_quantity'=>max(0,(int)($record['stock_quantity']??0)),'stock_updated_at'=>$stockUpdatedAt,'visibility'=>$visibility,'variant_stock'=>$variantStock,'variant_quantity'=>$variantQuantity,'color'=>implode(' ',$colors),'type'=>clean_text($record['details']??'',300),'image'=>$image,'images'=>array_values(array_unique($images)),'added_at'=>clean_text($record['added_at']??'',40)?:($existing['added_at']??gmdate('c')),'restocked_at'=>clean_text($record['restocked_at']??'',40)?:($existing['restocked_at']??null)];
             $count++;$existing?$updated++:$created++;
         }

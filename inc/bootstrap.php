@@ -352,9 +352,23 @@ function csv_json_array(mixed $value): array {
     return is_array($decoded)&&array_is_list($decoded)?$decoded:[];
 }
 
+/* Whether the cell IS a JSON list, as opposed to holding one that happens to be
+   empty. csv_list needs the difference: "[]" means no colours, not a colour
+   named "[]". */
+function csv_is_json_list(mixed $value): bool {
+    $decoded=json_decode(trim((string)$value),true);
+    return is_array($decoded)&&array_is_list($decoded);
+}
+
 function csv_list(mixed $value,int $maxLines,int $maxLength): array {
-    $decoded=csv_json_array($value);
-    if($decoded){$result=[];foreach(array_slice($decoded,0,$maxLines) as $item){$clean=clean_text($item,$maxLength);if($clean!==''&&!in_array($clean,$result,true))$result[]=$clean;}return $result;}
+    // Testing the decoded array for truth treats an empty list as "not JSON" and
+    // falls through to the plain-text branch below, which turned the exported
+    // "[]" into a single item spelled "[]" — on every product with no flavours.
+    if(csv_is_json_list($value)){
+        $result=[];
+        foreach(array_slice(csv_json_array($value),0,$maxLines) as $item){$clean=clean_text($item,$maxLength);if($clean!==''&&!in_array($clean,$result,true))$result[]=$clean;}
+        return $result;
+    }
     return clean_lines(str_replace(';',"\n",(string)$value),$maxLines,$maxLength);
 }
 

@@ -2,7 +2,22 @@ DR PHONE WHOLESALE — INSTALLATION (v17)
 
 WHAT CHANGED IN THIS VERSION
 
-1. SEARCHING FOR MORE THAN ONE WORD NOW WORKS
+0. THE CATALOG IS THE ONE FROM YOUR SPREADSHEET OF 7 SEPTEMBER
+   1049 products in 47 categories. The 108 products you removed are gone from
+   this ZIP, and so are their 108 pictures. Two notes:
+
+   - Extracting does not delete anything already on the server, so the old
+     pictures for those 108 products stay in public_html/uploads/products until
+     you clear them. Admin Dashboard > Operations > "Delete unused pictures"
+     removes them in one click, once you are happy the site looks right.
+
+   - One product, DR-000283, uses a picture you uploaded on the server itself
+     that morning, so it is not in this ZIP. Its catalog entry points at that
+     file, which is already on your server — extract over the existing uploads
+     folder (do not delete it first) and the picture stays.
+
+
+2. SEARCHING FOR MORE THAN ONE WORD NOW WORKS
    Typing "xo fg05" used to find nothing, even though "xo" and "fg-05" each
    found things on their own. The search now looks for every word you type,
    in any order, and ignores dashes and spaces inside product codes. So all of
@@ -15,7 +30,7 @@ WHAT CHANGED IN THIS VERSION
    labelled "Retracable". Same behaviour in the dashboard and in the customer
    catalog — they now share one rule.
 
-2. ORDER RECEIPTS
+3. ORDER RECEIPTS
    Every order in the Order log now has a RECEIPT button. It opens a printable
    receipt with the customer, the reference, the date, every line with its
    quantity and price, and the total — and "Print / Save PDF" saves it under
@@ -41,9 +56,11 @@ in-place update:
   1. Upload this ZIP into public_html and extract it there, overwriting when
      asked. Nothing moves and nothing is deleted.
   2. IMPORTANT: after extracting, put back your own storage/orders.json if you
-     want to keep your order history, and your own storage/catalog.json if you
-     have added or edited products since this ZIP was built. The ZIP carries the
-     catalog as of its build date and no order history at all.
+     want to keep your order history — the ZIP contains none.
+     The catalog in this ZIP is your 1049-product spreadsheet of 7 September, so
+     it is meant to replace the one on the server. Only put your own
+     storage/catalog.json back if you have edited products SINCE exporting that
+     spreadsheet.
   3. Delete the ZIP from the server.
   4. Open the dashboard, open Operations > Order log, and check that an order
      shows a Receipt button.
@@ -155,6 +172,17 @@ NOTE ON PRICE TIERS
 A single cart line is capped at 999 pieces, so a tier whose minimum quantity is
 1000 or more can never be reached and will never apply. Keep tier minimums
 below 1000.
+
+SPREADSHEET IMPORT — TWO FIXES IN v17
+- Re-importing a CSV that the dashboard itself exported used to fail with
+  "Duplicate SKU". The export starts with a marker byte that makes Excel open
+  the file correctly, and the import was tripping over it and losing the
+  product_id column, so it tried to create every product again instead of
+  updating it. Import now reads its own export.
+- A product with no colours or flavours exported as "[]", and the import read
+  that as a flavour literally named "[]". Empty now means empty.
+- Importing no longer marks every product "stock reviewed today". The review
+  date is stamped only when the stock figure actually changes.
 
 WHAT THE ORDER LOG STORES (v17)
 - Reference, date, status, every line with SKU, variant, quantity, unit price
