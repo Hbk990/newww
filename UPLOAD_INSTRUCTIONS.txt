@@ -1,6 +1,32 @@
-DR PHONE WHOLESALE — INSTALLATION (v20)
+DR PHONE WHOLESALE — INSTALLATION (v21)
 
 WHAT CHANGED IN THIS VERSION
+
+0. THE CATALOG IS YOUR SPREADSHEET OF 8 SEPTEMBER
+   1041 products in 47 categories. The 8 products you removed are gone from this
+   ZIP, and so are their 8 pictures:
+
+       DR-000267  Jmary - FM-17RS Panel Led Light 17 Inch
+       DR-000587  Samsung - Watch Ultra Logo
+       DR-000596  Porodo - Track Fit Screenless Smart FitBand
+       DR-000940  XO - NB-R258A IP To IP Audio Converter
+       DR-000954  8 IN 1 - Type-c TO HDTV
+       DR-001008  Kingston - DT70 USB-C Flash - Original
+       DR-001012  Sandisk - Portable SSD 2TB 800MB/s
+       DR-001013  Sandisk - Portable SSD 2TB 1050MB/s
+
+   Your other edits came across too: the JBL headphone spelling ("Tour Pne" is
+   now "Tour One"), and two products moved category.
+
+   Extracting does not delete anything already on the server, so those 8 old
+   pictures stay in public_html/uploads/products until you clear them. Admin
+   Dashboard > Operations > "Delete unused pictures" removes them in one click.
+
+   The counts on the public landing page follow this automatically — 1041 now,
+   and whatever it is after your next change.
+
+EVERYTHING BELOW IS UNCHANGED FROM v20, WHICH YOU MAY NOT HAVE INSTALLED YET.
+
 
 1. SEND A CUSTOMER A LINK TO ONE BRAND
    Search for a brand and the address bar now names that search, so you can copy
@@ -54,8 +80,9 @@ INSTALLING THIS UPDATE
   1. Upload this ZIP into public_html and extract it there, overwriting when
      asked. Nothing moves and nothing is deleted.
   2. Put back your own storage/orders.json — the ZIP contains no order history.
-     The catalog in this ZIP is your 1049-product spreadsheet; only put your own
-     storage/catalog.json back if you have edited products since exporting it.
+     The catalog in this ZIP is your 1041-product spreadsheet of 8 September and
+     is meant to replace the one on the server. Only put your own
+     storage/catalog.json back if you have edited products SINCE exporting it.
   3. Delete the ZIP from the server.
   4. Check: open the site logged out and scroll past the passcode box. Then sign
      in, search for "xo", and press Share.
@@ -63,7 +90,7 @@ INSTALLING THIS UPDATE
 You do not have to sign in again, and no addresses change.
 
 PICTURES
-This ZIP carries 1048 pictures for 1049 products. One product, DR-000283, uses a
+This ZIP carries 1040 pictures for 1041 products. One product, DR-000283, uses a
 picture uploaded on the server itself, so it is not in the ZIP — extract OVER the
 existing uploads folder (do not delete it first) and that picture stays.
 Pictures for deleted products are not removed by extracting; clear them with
