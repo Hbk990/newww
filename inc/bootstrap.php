@@ -13,6 +13,7 @@ define('ACTIVITY_FILE', STORAGE_DIR . '/activity.json');
 define('IMAGE_AUDIT_CACHE_FILE', STORAGE_DIR . '/image-audit-cache.json');
 define('ORDERS_FILE', STORAGE_DIR . '/orders.json');
 define('INSTALL_LOCK_FILE', STORAGE_DIR . '/installation.lock');
+define('CATALOG_SUMMARY_FILE', STORAGE_DIR . '/catalog-summary.json');
 const UPLOAD_DIR = ROOT_DIR . '/uploads/products';
 
 define('CSP_NONCE', base64_encode(random_bytes(18)));
@@ -83,7 +84,37 @@ function backup_catalog(): void {
     foreach (array_slice($files, BACKUP_LIMIT) as $old) @unlink($old);
 }
 
-function save_catalog(array $data): void { backup_catalog(); save_json(CATALOG_FILE, $data); }
+/* The public landing page states how many products and categories there are, and
+ * the size of each group. Those figures have to stay true as the catalog is
+ * edited, but the passcode page deliberately loads no catalog at all — a 968 KB
+ * parse on every public hit is what would make it slow. So the totals are
+ * written out once, here, at the single point every catalog change passes
+ * through, and the gate reads a file of a few hundred bytes. */
+function write_catalog_summary(array $data): void {
+    $groups = []; $products = 0;
+    foreach ($data as $category) {
+        $count = count($category['products'] ?? []);
+        $products += $count;
+        $group = (string)($category['group'] ?? 'Other');
+        $groups[$group] = ($groups[$group] ?? 0) + $count;
+    }
+    arsort($groups);
+    save_json(CATALOG_SUMMARY_FILE, [
+        'products' => $products,
+        'categories' => count($data),
+        'groups' => $groups,
+        'built' => gmdate('c'),
+    ]);
+}
+
+/* Returns [] when the file has never been written, and the landing page then
+ * omits the figures entirely rather than printing stale ones. */
+function catalog_summary(): array {
+    $summary = load_json(CATALOG_SUMMARY_FILE, []);
+    return isset($summary['products'], $summary['categories']) ? $summary : [];
+}
+
+function save_catalog(array $data): void { backup_catalog(); save_json(CATALOG_FILE, $data); write_catalog_summary($data); }
 function log_activity(string $action, string $detail=''): void {
     $items=load_json(ACTIVITY_FILE,[]);
     array_unshift($items,['time'=>gmdate('c'),'admin'=>(string)(settings()['admin_username']??'admin'),'ip'=>clean_text(client_ip(),64),'action'=>$action,'detail'=>clean_text($detail,300)]);

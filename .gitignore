@@ -10,6 +10,7 @@
 # Live catalog data and store settings. settings.json holds the admin
 # password hash and the customer passcode hash.
 /storage/*.json
+/storage/*.lock
 /storage/backups/
 
 # Install token + customer password hash.

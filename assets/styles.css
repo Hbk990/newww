@@ -416,6 +416,19 @@ html[data-motion='lite'] .header-rule { animation: none; }
   .gate-headline { font-size: clamp(2.25rem, 11vw, 3.6rem); }
 }
 
+/* On a 320x568 phone the brand panel's 46vh left the form what remained, which
+   put the Open catalog button — and the "see what we stock" hook below it —
+   past the fold. On a short screen the brand panel gives up some of its air so
+   the whole form lands on the first screen. */
+@media (max-height: 700px) and (max-width: 860px) {
+  .gate-brand { min-height: 0; padding: 18px 20px; }
+  .gate-form { padding: 18px 20px; }
+  .gate-logo { width: clamp(84px, 13vw, 112px); margin-bottom: 14px; }
+  .gate-headline { font-size: clamp(1.9rem, 8.4vw, 2.6rem); }
+  .gate-tagline { margin-top: 14px; padding-top: 12px; }
+  .gate-form-inner h2 { margin-bottom: 6px; }
+}
+
 /* ---------- 05  Header --------------------------------------------------- */
 
 #header-sentinel { position: absolute; top: 0; height: 1px; width: 1px; }
@@ -1050,6 +1063,28 @@ html[data-motion='off'] .hero-rule { animation: none; }
 .filter-toggle:hover, .filter-clear:hover { border-color: var(--ink); }
 .filter-toggle.active { border-color: var(--red); background: var(--red); color: #fff; }
 .filter-clear { margin-left: auto; color: var(--red-deep); }
+
+/* Share the current view. Sits in the results toolbar beside the view toggle
+   and matches its height and pill shape. */
+.share-view {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 15px;
+  border: 2px solid var(--grey-100);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--grey-600);
+  font: inherit;
+  font-size: var(--step--1);
+  font-weight: 800;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) linear, color var(--dur-fast) linear;
+}
+.share-view svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.share-view:hover { border-color: var(--ink); color: var(--ink); }
+@media (pointer: coarse) { .share-view { height: 44px; } }
 
 .view-toggle { display: inline-flex; border: 2px solid var(--grey-100); border-radius: 999px; overflow: hidden; }
 .view-toggle button {
@@ -2415,4 +2450,121 @@ html[data-motion='off'] .order-confirm { transition: none; }
 @media (pointer: coarse) and (max-width: 360px) {
   .product-grid { grid-template-columns: minmax(0, 1fr); }
   .qty-input { min-width: 56px; }
+}
+
+/* ---------- Landing sections (public, below the passcode gate) -------------
+   Same tokens as the rest of the site: Outfit, --red, --ink, --paper, the
+   fluid --step scale. Everything here is prefixed .lp- so it cannot collide
+   with the catalog that loads on the same stylesheet. */
+
+.lp-shell { width: min(var(--shell), 92vw); margin: 0 auto; }
+
+/* The hook inside the gate. Without it the page below is never discovered. */
+.lp-cue {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin-top: 26px; padding: 10px 0;
+  color: var(--grey-600); font-size: var(--step-0); font-weight: 700;
+  text-decoration: none; border-bottom: 2px solid transparent;
+}
+.lp-cue svg { width: 18px; height: 18px; fill: none; stroke: var(--red); stroke-width: 2.4; }
+.lp-cue:hover { color: var(--ink); border-bottom-color: var(--red); }
+@media (prefers-reduced-motion: no-preference) {
+  .lp-cue svg { animation: lp-nudge 2.4s var(--ease-out) infinite; }
+}
+/* Declared here rather than with the other short-screen gate rules: the landing
+   block is appended after them, so a rule up there would lose on source order. */
+@media (max-height: 700px) and (max-width: 860px) {
+  .lp-cue { margin-top: 8px; padding: 6px 0; }
+}
+@keyframes lp-nudge { 0%,70%,100% { transform: translateY(0); } 82% { transform: translateY(4px); } }
+
+/* Proof strip */
+.lp-strip { background: var(--ink); color: var(--paper); padding: clamp(22px, 3vw, 34px) 0; }
+.lp-strip-inner { display: flex; flex-wrap: wrap; gap: clamp(24px, 6vw, 90px); }
+.lp-strip div { display: flex; align-items: baseline; gap: 10px; }
+.lp-strip b { font-size: var(--step-4); font-weight: 900; letter-spacing: -0.02em; }
+.lp-strip span { color: #b6b6b6; font-size: var(--step-0); font-weight: 600; }
+
+.lp-section { padding: clamp(52px, 8vw, 112px) 0; }
+.lp-h2 {
+  margin: 10px 0 0;
+  font-size: var(--step-5); font-weight: 900; line-height: .96; letter-spacing: -0.03em;
+  text-transform: uppercase;
+}
+.lp-lead { max-width: 56ch; margin: 20px 0 0; color: var(--grey-800); font-size: var(--step-2); line-height: 1.5; }
+.lp-note { margin: 26px 0 0; color: #9a9a9a; font-size: var(--step-0); }
+
+/* Eight aisles */
+.lp-groups {
+  display: grid; gap: 2px; margin-top: clamp(34px, 5vw, 56px);
+  grid-template-columns: repeat(auto-fit, minmax(248px, 1fr));
+  background: var(--grey-100); border: 2px solid var(--grey-100); border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.lp-group { padding: clamp(20px, 2.4vw, 30px); background: var(--paper); }
+.lp-group b { display: block; color: var(--red); font-size: var(--step-4); font-weight: 900; letter-spacing: -0.02em; }
+.lp-group h3 { margin: 4px 0 6px; font-size: var(--step-1); font-weight: 800; }
+.lp-group p { margin: 0; color: var(--grey-600); font-size: var(--step-0); line-height: 1.5; }
+
+/* Brands */
+.lp-dark { background: var(--ink); color: var(--paper); }
+.lp-eyebrow-light { color: #ff6b6b; }
+.lp-dark .lp-h2 { color: var(--paper); }
+.lp-brands {
+  display: flex; flex-wrap: wrap; gap: 10px;
+  margin: clamp(30px, 4vw, 46px) 0 0; padding: 0; list-style: none;
+}
+.lp-brands li {
+  padding: 11px 20px; border: 2px solid #2b2b2b; border-radius: 999px;
+  font-size: var(--step-1); font-weight: 800; letter-spacing: -0.01em;
+}
+
+/* Three steps */
+.lp-steps {
+  display: grid; gap: clamp(22px, 3vw, 40px); margin: clamp(34px, 5vw, 56px) 0 0; padding: 0;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); list-style: none; counter-reset: none;
+}
+.lp-steps li { padding-top: 20px; border-top: 3px solid var(--ink); }
+/* --red-deep, not --red: at 16px this is small text, and #ff0000 on white is 4.0:1. */
+.lp-steps b { color: var(--red-deep); font-size: var(--step-1); font-weight: 900; letter-spacing: .1em; }
+.lp-steps h3 { margin: 10px 0 8px; font-size: var(--step-3); font-weight: 900; letter-spacing: -0.02em; }
+.lp-steps p { margin: 0; color: var(--grey-800); font-size: var(--step-1); line-height: 1.55; }
+
+/* Request access.
+   --red-deep, not --red: white body text on #ff0000 measures 4.0:1 and fails AA,
+   which is the same reason --red-deep exists for small text elsewhere. On
+   #ce0606 the same text is 5.75:1. */
+.lp-cta { background: var(--red-deep); color: var(--paper); }
+.lp-cta .eyebrow { color: var(--paper); opacity: .85; }
+.lp-cta .lp-h2, .lp-cta .lp-lead { color: var(--paper); }
+.lp-cta-inner { display: grid; gap: clamp(30px, 5vw, 64px); grid-template-columns: 1.2fr .8fr; align-items: center; }
+.lp-cta-actions { display: grid; gap: 12px; justify-items: stretch; }
+.lp-wa {
+  display: inline-flex; align-items: center; justify-content: center; gap: 12px;
+  min-height: 60px; padding: 0 26px; border-radius: var(--radius);
+  background: var(--paper); color: var(--ink);
+  font-size: var(--step-2); font-weight: 900; letter-spacing: -0.01em; text-decoration: none;
+  transition: transform var(--dur-base) var(--ease-out);
+}
+.lp-wa svg { width: 26px; height: 26px; fill: var(--whatsapp); }
+.lp-wa:hover { transform: translateY(-2px); }
+.lp-map {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 52px; padding: 0 22px; border: 2px solid rgba(255,255,255,.55); border-radius: var(--radius);
+  color: var(--paper); font-size: var(--step-1); font-weight: 800; text-decoration: none;
+}
+.lp-map:hover { border-color: var(--paper); background: rgba(255,255,255,.1); }
+
+.lp-foot { padding: 30px 0; background: var(--ink); color: #8f8f8f; }
+.lp-foot-inner { display: flex; flex-wrap: wrap; gap: 12px 30px; justify-content: space-between; font-size: var(--step-0); }
+.lp-foot strong { color: var(--paper); }
+
+@media (max-width: 860px) {
+  .lp-cta-inner { grid-template-columns: 1fr; }
+  .lp-strip-inner { gap: 18px 34px; }
+  .lp-strip b { font-size: var(--step-3); }
+}
+@media (pointer: coarse) {
+  .lp-cue { min-height: 44px; }
+  .lp-map { min-height: 52px; }
 }

@@ -40,7 +40,7 @@
       NOTES_KEY = 'dr-phone-line-notes';
 
   var MAX_QTY = 999;
-  var staleDismissed = false, hashBeforeProduct = '';
+  var staleDismissed = false, hashBeforeProduct = '', appliedHash = '';
 
   /* ------------------------------------------------------------- helpers */
 
@@ -961,6 +961,7 @@
       syncSearchClear();
       sortMode = 'original';
       history.replaceState(null, '', selected ? '#' + selected : location.pathname);
+      appliedHash = location.hash;
       closePanels();
       render();
       scrollTo({ top: 0, behavior: 'smooth' });
@@ -1078,6 +1079,7 @@
       selected = b.dataset.slug;
       search.value = '';
       syncSearchClear();
+      appliedHash = '#' + selected;      // set before the assignment below fires hashchange
       location.hash = selected;
       render();
       scrollTo({ top: 0, behavior: 'smooth' });
@@ -1271,6 +1273,12 @@
         '<div class="result-title"><h2>' + esc(category ? category.name : 'Results for “' + q + '”') + '</h2></div>' +
         '<div class="result-tools"><span class="result-count">' + products.length + ' items' +
             (filtersActive() && pool.length !== products.length ? ' <i>of ' + pool.length + '</i>' : '') + '</span>' +
+          /* Copying an address bar on a phone is fiddly enough that the link
+             would go unused without this. On a phone it opens the share sheet
+             straight into WhatsApp; elsewhere it copies. */
+          '<button type="button" class="share-view" id="share-view">' +
+            '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 15V3M8 7l4-4 4 4"/></svg>' +
+            '<span>Share</span></button>' +
           '<div class="view-toggle" role="group" aria-label="View">' +
             '<button type="button" data-view="grid" class="' + (viewMode === 'grid' ? 'active' : '') + '"' +
               ' aria-pressed="' + (viewMode === 'grid' ? 'true' : 'false') + '">Cards</button>' +
@@ -1295,6 +1303,9 @@
             (filtersActive() ? 'No product matches these filters. Try clearing them.' : 'Try a different search term or category.') +
           '</p></div>');
 
+    var shareButton = document.getElementById('share-view');
+    if (shareButton) shareButton.onclick = function () { shareCurrentView(shareButton); };
+
     var sortSelect = document.getElementById('sort');
     sortSelect.value = sortMode;
     sortSelect.onchange = function (e) { sortMode = e.target.value; renderResults(); };
@@ -1305,6 +1316,7 @@
       sortMode = 'original';
       filters = { brand: '', inStock: false, min: '', max: '' };
       history.replaceState(null, '', location.pathname);
+      appliedHash = '';
       render();
     };
 
@@ -1402,6 +1414,7 @@
       var current = decodeURIComponent(location.hash.slice(1));
       hashBeforeProduct = current.indexOf('p/') === 0 ? (selected || '') : current;
       history.replaceState(null, '', '#' + hash);
+      appliedHash = location.hash;
     }
     recent = [Number(p.id)].concat(recent.filter(function (x) { return x !== Number(p.id); })).slice(0, 12);
     try { localStorage.setItem(RECENT_KEY, JSON.stringify(recent)); } catch (e) {}
@@ -1753,6 +1766,7 @@
     if (!open.length) return;
     if (document.getElementById('product-panel').classList.contains('open')) {
       history.replaceState(null, '', hashBeforeProduct ? '#' + hashBeforeProduct : location.pathname);
+      appliedHash = location.hash;
       hashBeforeProduct = '';
     }
     Array.prototype.forEach.call(open, function (p) {
@@ -1768,6 +1782,79 @@
   function syncSearchClear() {
     var clear = document.getElementById('search-clear');
     if (clear) clear.hidden = !search.value;
+  }
+
+  /* ---- the address bar names the view ------------------------------------
+   * A search had no address, so "here are our Anker cables" could not be sent
+   * to a customer — they got the whole catalog and had to find it themselves.
+   * #s/<query> joins the two link forms that already exist, #p/<sku> for one
+   * product and #<category-slug> for a category, and the address updates as
+   * the search box is typed in, so it is always ready to copy. */
+  function searchHash() {
+    var q = search.value.trim();
+    return q ? '#s/' + encodeURIComponent(q) : '';
+  }
+  function syncAddress() {
+    var want = searchHash() || (selected ? '#' + encodeURIComponent(selected) : location.pathname);
+    // replaceState, not pushState: typing a word should not bury the page the
+    // customer came from under one history entry per keystroke.
+    if (location.hash !== want && !(want === location.pathname && !location.hash)) {
+      history.replaceState(null, '', want);
+    }
+    appliedHash = location.hash;
+  }
+  function shareLink() {
+    return location.origin + location.pathname + (searchHash() || (selected ? '#' + encodeURIComponent(selected) : ''));
+  }
+
+  /* Reads the view out of the address. Returns the product to open, if the
+     address names one, so the caller can open it after the first render. */
+  function applyAddress() {
+    appliedHash = location.hash;
+    var hash = decodeURIComponent(location.hash.slice(1));
+    if (hash.indexOf('p/') === 0) return findProductBySku(hash.slice(2));
+    if (hash.indexOf('s/') === 0) { selected = null; search.value = hash.slice(2); syncSearchClear(); return null; }
+    if (catalog.some(function (c) { return c.slug === hash; })) { selected = hash; search.value = ''; syncSearchClear(); return null; }
+    if (!hash) { selected = null; search.value = ''; syncSearchClear(); }
+    return null;
+  }
+
+  /* Without this, a customer already looking at the catalog who taps a second
+     brand link — the whole point of these links — would see nothing happen,
+     because the address changes without the page reloading.
+     `appliedHash` is the address the view on screen already corresponds to, so
+     the changes the app makes itself do not bounce back through here and
+     re-render what is already drawn. */
+  window.addEventListener('hashchange', function () {
+    if (location.hash === appliedHash) return;
+    var product = applyAddress();
+    closePanels();
+    render();
+    if (product) openProduct(product.product);
+    else scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  function shareCurrentView(button) {
+    var url = shareLink(),
+        title = search.value.trim() ? 'DR PHONE — ' + search.value.trim()
+                                    : (activeCategory() ? 'DR PHONE — ' + activeCategory().name : 'DR PHONE'),
+        say = function (text) {
+          var label = button.querySelector('span');
+          if (!label) return;
+          var was = label.textContent;
+          label.textContent = text;
+          setTimeout(function () { label.textContent = was; }, 1800);
+        };
+    if (navigator.share) {
+      navigator.share({ title: title, url: url }).catch(function () {});
+      return;
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function () { say('Copied'); },
+                                             function () { say(url); });
+      return;
+    }
+    say(url);   // no clipboard: show it so it can at least be read off
   }
 
   /* --------------------------------------------------------------- boot */
@@ -1789,10 +1876,10 @@
     orderReference = 'DR-' + new Date().toISOString().slice(0, 10).replace(/-/g, '');
   }
 
-  search.addEventListener('input', function () { syncSearchClear(); render(); });
+  search.addEventListener('input', function () { syncSearchClear(); syncAddress(); render(); });
   var searchClear = document.getElementById('search-clear');
   if (searchClear) {
-    searchClear.onclick = function () { search.value = ''; syncSearchClear(); search.focus(); render(); };
+    searchClear.onclick = function () { search.value = ''; syncSearchClear(); syncAddress(); search.focus(); render(); };
   }
 
   document.getElementById('menu-open').onclick = function () { openPanel('category-menu'); };
@@ -1850,9 +1937,7 @@
       window.DR_PHONE.store = data.store || {};
       window.DR_PHONE.csrf = data.csrf || '';
       normalizeCart();
-      var hash = decodeURIComponent(location.hash.slice(1));
-      var deepLink = hash.indexOf('p/') === 0 ? findProductBySku(hash.slice(2)) : null;
-      if (!deepLink && catalog.some(function (c) { return c.slug === hash; })) selected = hash;
+      var deepLink = applyAddress();
       renderMenu();
       render();
       // A shared link opens straight on the product; an unknown SKU just falls
