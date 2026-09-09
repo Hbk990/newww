@@ -1,80 +1,74 @@
 /**
  * Loads car makes and models into MySQL so the brand/model search works with
- * no internet.
+ * no internet afterwards.
  *
- *   npm run seed:vpic          -> full official list from NHTSA vPIC
- *   npm run seed:vpic -- --offline  -> bundled fallback list only
+ *   npm run seed:vpic              cars, pickups and SUVs from NHTSA (recommended)
+ *   npm run seed:vpic -- --all     every manufacturer vPIC knows, trailers included
+ *   npm run seed:vpic -- --offline the bundled list, no internet needed
  *
- * NHTSA vPIC is the US government's vehicle database: free, no API key, and it
- * covers every make and model sold in the USA and Canada. If it cannot be
- * reached the bundled list is used instead, so the system is never blocked —
- * and a model that is in neither can always be typed in by hand.
+ * NHTSA vPIC is the US government's vehicle database: free, no API key, no
+ * account. If it cannot be reached the bundled list is used instead, so the
+ * system is never blocked — and a model in neither can always be typed by hand.
+ *
+ * Safe to run again at any time: it only adds what is missing.
  */
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { prisma } from '../src/lib/db.js';
+import { fetchAllMakes, fetchMakes, fetchModels, sleep } from './vpic.js';
 
-const VPIC = 'https://vpic.nhtsa.dot.gov/api/vehicles';
-const TIMEOUT_MS = 20000;
 const here = dirname(fileURLToPath(import.meta.url));
-
 const offlineOnly = process.argv.includes('--offline');
+const everything = process.argv.includes('--all');
 
-interface VpicRow {
-  Make_ID?: number;
-  Make_Name?: string;
-  Model_ID?: number;
-  Model_Name?: string;
-}
+async function seedFromVpic() {
+  console.log('Asking NHTSA vPIC for the makes...');
 
-async function vpicGet(path: string): Promise<VpicRow[]> {
-  const response = await fetch(`${VPIC}/${path}?format=json`, {
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
-  if (!response.ok) throw new Error(`vPIC responded ${response.status}`);
-  const body = (await response.json()) as { Results?: VpicRow[] };
-  return body.Results ?? [];
-}
+  const makes = everything
+    ? await fetchAllMakes({ onProgress: (m) => console.log(m) })
+    : await fetchMakes({ onProgress: (m) => console.log(m) });
 
-async function seedFromVpic(): Promise<boolean> {
-  console.log('Fetching the make list from NHTSA vPIC...');
-  const makes = await vpicGet('getallmakes');
   if (makes.length === 0) throw new Error('vPIC returned no makes');
-  console.log(`  ${makes.length} makes.`);
+  console.log(`\n${makes.length} makes. Fetching their models — this takes a few minutes.\n`);
 
   let modelCount = 0;
-  for (const [index, make] of makes.entries()) {
-    const name = titleCase(make.Make_Name ?? '');
-    if (!name) continue;
+  let failed = 0;
 
+  for (const [index, make] of makes.entries()) {
     const record = await prisma.carMake.upsert({
-      where: { name },
-      create: { name, vpicId: make.Make_ID ?? null },
-      update: { vpicId: make.Make_ID ?? null },
+      where: { name: make.name },
+      create: { name: make.name, vpicId: make.vpicId },
+      update: { vpicId: make.vpicId },
     });
 
     try {
-      const models = await vpicGet(`getmodelsformakeid/${make.Make_ID}`);
+      const models = await fetchModels(make.vpicId);
       for (const model of models) {
-        const modelName = (model.Model_Name ?? '').trim();
-        if (!modelName) continue;
         await prisma.carModel.upsert({
-          where: { makeId_name: { makeId: record.id, name: modelName } },
-          create: { makeId: record.id, name: modelName, vpicId: model.Model_ID ?? null },
+          where: { makeId_name: { makeId: record.id, name: model.name } },
+          create: { makeId: record.id, name: model.name, vpicId: model.vpicId },
           update: {},
         });
         modelCount++;
       }
     } catch {
-      console.warn(`  Could not fetch models for ${name} — skipping that brand's models.`);
+      // One brand failing is not worth losing the whole run over — the brand
+      // is still saved, and its models can be typed in by hand.
+      failed++;
+      console.warn(`  could not fetch models for ${make.name}`);
     }
 
-    if ((index + 1) % 25 === 0) console.log(`  ${index + 1}/${makes.length} makes done...`);
+    const done = index + 1;
+    if (done % 10 === 0 || done === makes.length) {
+      const percent = Math.round((done / makes.length) * 100);
+      console.log(`  ${done}/${makes.length} makes (${percent}%) — ${modelCount} models so far`);
+    }
+    await sleep(60); // gentle on a free public service
   }
 
-  console.log(`Done: ${makes.length} makes, ${modelCount} models from vPIC.`);
-  return true;
+  console.log(`\nDone: ${makes.length} makes, ${modelCount} models from NHTSA vPIC.`);
+  if (failed > 0) console.log(`${failed} make(s) had no models — run this again to retry them.`);
 }
 
 async function seedFromFallback() {
@@ -99,16 +93,8 @@ async function seedFromFallback() {
   }
 
   console.log(`Done: ${Object.keys(data.makes).length} makes, ${models} models from the bundled list.`);
-  console.log('Run this again from a machine with internet to load the full official list.');
+  console.log('Run this again from a machine with internet for the full official list.');
 }
-
-const titleCase = (s: string) =>
-  s
-    .trim()
-    .toLowerCase()
-    .split(/[\s-]+/)
-    .map((w) => (w.length > 2 ? w[0].toUpperCase() + w.slice(1) : w.toUpperCase()))
-    .join(' ');
 
 try {
   if (offlineOnly) {
@@ -117,11 +103,15 @@ try {
     try {
       await seedFromVpic();
     } catch (error) {
-      console.warn(`Could not reach NHTSA vPIC (${(error as Error).message}).`);
-      console.warn('Falling back to the bundled list so the system still works.');
+      console.warn(`\nCould not reach NHTSA vPIC (${(error as Error).message}).`);
+      console.warn('Check https://vpic.nhtsa.dot.gov/api/ opens in your browser.');
+      console.warn('Using the bundled list for now so the system still works.\n');
       await seedFromFallback();
     }
   }
+
+  const [makes, models] = await Promise.all([prisma.carMake.count(), prisma.carModel.count()]);
+  console.log(`\nThe database now holds ${makes} makes and ${models} models.`);
 } finally {
   await prisma.$disconnect();
 }

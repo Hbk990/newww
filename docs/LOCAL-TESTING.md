@@ -234,6 +234,70 @@ calculator before clicking.
 
 ---
 
+## Loading the full car brand list
+
+Two features use one free service — **NHTSA vPIC**, the US government's vehicle
+database:
+
+- the full list of brands and models for the search boxes
+- decoding a VIN into make, model and year when you paste one
+
+**There is nothing to sign up for and no key to get.** It is open to anyone.
+
+`npm run setup` already tried to load it. If your internet was working, you have
+the full list and there is nothing more to do. If it printed *"Could not reach
+NHTSA vPIC"*, it fell back to a bundled list of 35 common brands so you were not
+blocked — everything works, there are just fewer brands in the dropdown.
+
+### Load it now
+
+```powershell
+npm run db:seed:vpic
+```
+
+It fetches a couple of hundred brands and then their models, printing progress
+as it goes. **It takes a few minutes.** Run it again any time — it only adds
+what is missing, and never touches your cars.
+
+### Check it worked
+
+```powershell
+npm run db:seed:vpic -- --offline
+```
+
+The last line prints how many makes and models are in your database. Under 40
+makes means you are still on the bundled list; several hundred means the real
+one loaded.
+
+Or just open **Buy a car** and type `m` in the brand box — the full list gives
+you far more than Mercedes-Benz, Mazda and Mitsubishi.
+
+### If it will not load
+
+First check the service itself is reachable — paste this into your browser:
+
+<https://vpic.nhtsa.dot.gov/api/vehicles/GetMakesForVehicleType/car?format=json>
+
+- **You see a wall of text** — the service is fine, so something local is
+  blocking Node: usually antivirus, a VPN, or a company firewall. Turn the VPN
+  off and try again.
+- **It does not load** — you are offline, or the service is down. Try later.
+
+Nothing here is urgent. You can always type a brand or model that is not in the
+list, and VIN checking (the 17 characters, the check digit, duplicate detection,
+the year) works offline regardless. Only the *decoding* of a VIN into make and
+model needs the internet.
+
+### Options
+
+| | |
+|---|---|
+| `npm run db:seed:vpic` | cars, pickups and SUVs — what you want |
+| `npm run db:seed:vpic -- --all` | every manufacturer, trailer and bus builders included. Slow, and clutters the dropdown |
+| `npm run db:seed:vpic -- --offline` | the bundled list only, no internet needed |
+
+---
+
 ## Starting over
 
 ```powershell
