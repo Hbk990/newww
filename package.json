@@ -3,15 +3,27 @@
   "private": true,
   "version": "0.1.0",
   "description": "Car import, garage and showroom management system",
-  "workspaces": ["server", "web"],
+  "workspaces": [
+    "server",
+    "web"
+  ],
   "scripts": {
-    "dev": "npm run dev --workspace=server & npm run dev --workspace=web",
+    "setup": "node scripts/setup-local.mjs",
+    "dev": "concurrently -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "npm run dev --workspace=server",
+    "dev:web": "npm run dev --workspace=web",
     "build": "npm run build --workspace=web && npm run build --workspace=server",
     "start": "npm run start --workspace=server",
     "test": "npm run test --workspace=server",
-    "db:migrate": "npm run db:migrate --workspace=server",
+    "db:migrate": "npm run db:deploy --workspace=server",
     "db:seed:vpic": "npm run seed:vpic --workspace=server",
-    "db:seed:demo": "npm run seed:demo --workspace=server"
+    "db:seed:demo": "npm run seed:demo --workspace=server",
+    "create:user": "npm run create:user --workspace=server"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
 }

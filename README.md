@@ -30,20 +30,16 @@ read that first if a number ever surprises you.
 See **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**: a small VPS, MySQL, HTTPS,
 two-factor authentication and nightly backups, step by step.
 
-## Working on it locally
+## Trying it on your own computer
 
 ```bash
 npm install
-
-# Point server/.env at a MySQL database, then:
-cd server
-npx prisma migrate deploy
-npm run seed:vpic -- --offline   # or without --offline for the full NHTSA list
-npm run seed:demo                # loads the worked example
-npm run create:user -- owner 'a-long-password-12-chars+'
-
-cd .. && npm run dev             # API on :4000, interface on :5173
+npm run setup     # asks where MySQL is, then does everything else
+npm run dev       # open http://localhost:5173
 ```
+
+Step by step, including how to get MySQL and what to check first:
+**[docs/LOCAL-TESTING.md](docs/LOCAL-TESTING.md)**.
 
 ## Tests
 
