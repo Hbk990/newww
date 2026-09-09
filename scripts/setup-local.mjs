@@ -43,6 +43,9 @@ const fail = (message) => {
   process.exit(1);
 };
 
+/** Never print a database password to the screen or a log. */
+const redact = (url) => url.replace(/\/\/([^:]+):[^@]*@/, '//$1:****@');
+
 const run = (command, args, cwd = serverDir, env = {}) =>
   execFileSync(command, args, {
     cwd,
@@ -99,7 +102,23 @@ if (!existsSync(envPath)) {
   );
   ok('Created server/.env with a fresh session secret');
 } else {
-  ok('server/.env already exists — leaving it alone');
+  // A run that failed at the database step still wrote this file. If you are
+  // now pointing at a different database — a different port, say, because
+  // something else was already using 3306 — the file has to follow, or setup
+  // would succeed here and the app would fail to connect afterwards.
+  const existing = readFileSync(envPath, 'utf8');
+  const current = existing.match(/^DATABASE_URL="?([^"\n]+)"?/m)?.[1];
+  if (current && current !== databaseUrl) {
+    writeFileSync(
+      envPath,
+      existing.replace(/^DATABASE_URL=.*$/m, `DATABASE_URL="${databaseUrl}"`),
+    );
+    warn('server/.env pointed at a different database — updated it to the one you gave.');
+    say(`    was: ${redact(current)}`);
+    say(`    now: ${redact(databaseUrl)}`);
+  } else {
+    ok('server/.env already exists — leaving it alone');
+  }
 }
 
 // --- 2. The database --------------------------------------------------------

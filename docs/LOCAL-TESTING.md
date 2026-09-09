@@ -321,6 +321,23 @@ driven through the real API and database.
 **"Could not reach MySQL"** — MySQL is not running, or the password is wrong.
 With Docker: `docker start showroom-db`. Then run `npm run setup` again.
 
+**"ports are not available ... 3306 ... Only one usage of each socket address"** —
+something on your PC is already using port 3306, usually a MySQL you installed
+before. Either use that one instead of Docker, or put the container on a free
+port:
+
+```powershell
+docker rm showroom-db
+docker run --name showroom-db -e MYSQL_ROOT_PASSWORD=devpassword -p 3307:3306 -d mysql:8
+npm run setup -- --db "mysql://root:devpassword@127.0.0.1:3307/carshowroom"
+```
+
+To see what is holding 3306:
+
+```powershell
+Get-Process -Id (Get-NetTCPConnection -LocalPort 3306 -State Listen).OwningProcess
+```
+
 **"Port 4000 (or 5173) is already in use"** — something else is using it, or an
 old copy is still running. Close the other terminal, or restart your computer.
 
