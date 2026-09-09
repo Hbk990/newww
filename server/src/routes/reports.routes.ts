@@ -30,7 +30,7 @@ export async function reportRoutes(app: FastifyInstance) {
         supplier: { select: { name: true } },
         originExpenses: true,
         repairJobs: true,
-        repairParts: true,
+        repairParts: true, costAdjustments: true,
       },
       orderBy: [{ status: 'asc' }, { purchaseDate: 'asc' }],
     });
@@ -61,7 +61,7 @@ export async function reportRoutes(app: FastifyInstance) {
     const sales = await prisma.sale.findMany({
       where: from || to ? { saleDate: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {},
       include: {
-        car: { include: { originExpenses: true, repairJobs: true, repairParts: true, supplier: true } },
+        car: { include: { originExpenses: true, repairJobs: true, repairParts: true, costAdjustments: true, supplier: true } },
         payments: true,
       },
       orderBy: { saleDate: 'desc' },
@@ -124,7 +124,7 @@ export async function reportRoutes(app: FastifyInstance) {
   app.get('/api/reports/export/inventory', async (_request, reply) => {
     const cars = await prisma.car.findMany({
       where: { active: true, status: { notIn: [CarStatus.SOLD, CarStatus.SOLD_IN_ORIGIN] } },
-      include: { supplier: true, originExpenses: true, repairJobs: true, repairParts: true },
+      include: { supplier: true, originExpenses: true, repairJobs: true, repairParts: true, costAdjustments: true },
     });
     const code = await cfaCode();
 

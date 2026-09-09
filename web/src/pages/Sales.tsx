@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader, useApp } from '../App';
-import { api, fmt, fmtDate, fmtUsd, todayIso, type Car } from '../lib/api';
+import { api, fmt, fmtDate, fmtUsd, todayIso, type Car, type Party } from '../lib/api';
 import { Alert, Card, Empty, Field, Modal, Spinner, useSubmit } from '../components/ui';
 
 interface Sale {
   id: number;
+  settled: boolean;
   carId: number;
   label: string;
   channel: 'LOCAL' | 'ORIGIN';
@@ -24,6 +25,7 @@ export default function Sales() {
   const [paying, setPaying] = useState<Sale | null>(null);
   const [sellingAbroad, setSellingAbroad] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [list, setList] = useState<'owing' | 'paid'>('owing');
 
   const load = () =>
     api
@@ -35,21 +37,57 @@ export default function Sales() {
     void load();
   }, []);
 
+  // A sale sits in one list or the other by how much is still owed — it moves
+  // across by itself when the last payment arrives.
+  const owing = (sales ?? []).filter((sale) => !sale.settled);
+  const paid = (sales ?? []).filter((sale) => sale.settled);
+  const shown = list === 'owing' ? owing : paid;
+  const owedTotal = owing.reduce((sum, sale) => sum + Number(sale.remaining), 0);
+
   return (
     <>
       <PageHeader
         title="Sales"
-        sub="Every car sold, what it cost, and what is still owed"
+        sub={
+          owing.length > 0
+            ? `${owing.length} buyer${owing.length > 1 ? 's owe' : ' owes'} you ${fmt(owedTotal.toFixed(0))} in total`
+            : 'Every car sold, what it cost, and what is still owed'
+        }
         action={<button className="secondary" onClick={() => setSellingAbroad(true)}>Sell a car abroad</button>}
       />
 
       <Alert kind="error">{error}</Alert>
 
+      {sales && (
+        <div className="row" style={{ marginBottom: 12 }}>
+          <button
+            className={list === 'owing' ? '' : 'secondary'}
+            style={{ flex: '0 0 auto' }}
+            onClick={() => setList('owing')}
+          >
+            Still owing ({owing.length})
+          </button>
+          <button
+            className={list === 'paid' ? '' : 'secondary'}
+            style={{ flex: '0 0 auto' }}
+            onClick={() => setList('paid')}
+          >
+            Paid in full ({paid.length})
+          </button>
+        </div>
+      )}
+
       {!sales ? (
         <Spinner />
-      ) : sales.length === 0 ? (
+      ) : shown.length === 0 ? (
         <Card>
-          <Empty>No sales yet.</Empty>
+          <Empty>
+            {sales.length === 0
+              ? 'No sales yet.'
+              : list === 'owing'
+                ? 'Nobody owes you anything. Every car sold has been paid for in full.'
+                : 'No sale has been paid off yet.'}
+          </Empty>
         </Card>
       ) : (
         <Card>
@@ -68,7 +106,7 @@ export default function Sales() {
                 </tr>
               </thead>
               <tbody>
-                {sales.map((sale) => (
+                {shown.map((sale) => (
                   <tr key={sale.id}>
                     <td className="strong">
                       <Link to={`/cars/${sale.carId}`}>{sale.label}</Link>
@@ -118,9 +156,20 @@ function PaymentModal({ sale, onClose, onSaved }: { sale: Sale; onClose: () => v
   const [amount, setAmount] = useState(sale.remaining);
   const [date, setDate] = useState(todayIso());
   const [method, setMethod] = useState('cash');
+  const [accounts, setAccounts] = useState<Party[]>([]);
+  const [destinationAccountId, setDestination] = useState('');
+
+  useEffect(() => {
+    void api.get<Party[]>('/api/parties?type=TRANSFER_COMPANY').then(setAccounts);
+  }, []);
 
   const { busy, error, run } = useSubmit(async () => {
-    await api.post(`/api/sales/${sale.id}/payments`, { amount: Number(amount), date, method });
+    await api.post(`/api/sales/${sale.id}/payments`, {
+      amount: Number(amount),
+      date,
+      method,
+      destinationAccountId: destinationAccountId ? Number(destinationAccountId) : null,
+    });
     onSaved();
     return true;
   });
@@ -144,6 +193,20 @@ function PaymentModal({ sale, onClose, onSaved }: { sale: Sale; onClose: () => v
           <input value={method} onChange={(e) => setMethod(e.target.value)} />
         </Field>
       </div>
+
+      <Field
+        label="Where did the money go?"
+        help="Recording it here puts it straight into that account. Do not enter it again on the Payments screen as a deposit."
+      >
+        <select value={destinationAccountId} onChange={(e) => setDestination(e.target.value)}>
+          <option value="">Cash box (default)</option>
+          {accounts.map((account) => (
+            <option key={account.id} value={account.id}>
+              {account.name}
+            </option>
+          ))}
+        </select>
+      </Field>
 
       <div className="modal-actions">
         <button className="secondary" onClick={onClose}>Cancel</button>

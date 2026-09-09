@@ -17,6 +17,8 @@ export default function SettingsPage() {
   const [cfaCode, setCfaCode] = useState(settings.cfaCode);
   const [threshold, setThreshold] = useState(settings.taxThresholdUsd);
   const [businessName, setBusinessName] = useState(settings.businessName);
+  const [cashAccountId, setCashAccountId] = useState(settings.defaultCashAccountId ?? '');
+  const [cashAccounts, setCashAccounts] = useState<{ id: number; name: string }[]>([]);
   const [saved, setSaved] = useState(false);
   const [audit, setAudit] = useState<AuditRow[]>([]);
   const [catalog, setCatalog] = useState<{ makes: number; models: number; complete: boolean; importedAt: string | null } | null>(null);
@@ -24,6 +26,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     void api.get<AuditRow[]>('/api/audit?limit=40').then(setAudit);
+    void api.get<{ id: number; name: string }[]>('/api/parties?type=TRANSFER_COMPANY').then(setCashAccounts);
     void api.get<NonNullable<typeof catalog>>('/api/vehicles/catalog-status').then(setCatalog).catch(e => setCatalogError(e.message));
   }, []);
 
@@ -32,6 +35,7 @@ export default function SettingsPage() {
       cfaCode,
       taxThresholdUsd: Number(threshold),
       businessName,
+      defaultCashAccountId: cashAccountId === '' ? '' : Number(cashAccountId),
     });
     await refresh();
     setSaved(true);
@@ -64,6 +68,20 @@ export default function SettingsPage() {
               help="Tax up to this amount stays in the car's cost. Anything above it is refundable to you. Changing this only affects cars bought from now on."
             >
               <input type="number" value={threshold} onChange={(e) => setThreshold(e.target.value)} />
+            </Field>
+
+            <Field
+              label="Where does money from a car sale go?"
+              help="When you record a customer's payment it lands in this account straight away, so you never enter it twice. Moving it onwards is a transfer, not a new deposit."
+            >
+              <select value={cashAccountId} onChange={(e) => setCashAccountId(e.target.value)}>
+                <option value="">Not chosen — sales will be refused</option>
+                {cashAccounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name}
+                  </option>
+                ))}
+              </select>
             </Field>
 
             <button onClick={() => void run()} disabled={busy}>

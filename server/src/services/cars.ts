@@ -1,4 +1,4 @@
-import { CarStatus, type Car, type OriginExpense, type RepairJob, type RepairPart } from '@prisma/client';
+import { CarStatus, type Car, type CostAdjustment, type OriginExpense, type RepairJob, type RepairPart } from '@prisma/client';
 import { prisma, Prisma, type Tx } from '../lib/db.js';
 import { notFound } from '../lib/errors.js';
 import { carCostUsd, landedCost, roundCfa, roundUsd, sum, D } from '../lib/money.js';
@@ -7,6 +7,8 @@ export type CarWithCosts = Car & {
   originExpenses: OriginExpense[];
   repairJobs: RepairJob[];
   repairParts: RepairPart[];
+  /** After-the-fact corrections. Older callers may not load them. */
+  costAdjustments?: CostAdjustment[];
 };
 
 /**
@@ -36,6 +38,10 @@ export function costBreakdown(car: CarWithCosts) {
 
   const labour = car.repairJobs.map((j) => j.labourCostCfa);
   const parts = car.repairParts.map((p) => p.costCfa);
+  // Corrections made after the fact. They never rewrite the lines above — they
+  // sit beside them, so the mistake and the fix are both visible.
+  const adjustments = (car.costAdjustments ?? []).map((a) => a.amountCfa);
+  const adjustmentsCfa = roundCfa(sum(adjustments));
 
   // No rate yet: the car has not arrived, so it has no CFA cost at all.
   if (car.arrivalCostCfa === null) {
@@ -44,6 +50,7 @@ export function costBreakdown(car: CarWithCosts) {
       arrived: false,
       cfa: null,
       repairsCfa: roundCfa(sum([...labour, ...parts])),
+      adjustmentsCfa,
       landedCostCfa: null,
     };
   }
@@ -53,6 +60,7 @@ export function costBreakdown(car: CarWithCosts) {
     labourCfa: labour,
     partsCfa: parts,
   });
+  const landedCostCfa = lc.landedCostCfa.plus(adjustmentsCfa);
 
   return {
     usd,
@@ -68,7 +76,8 @@ export function costBreakdown(car: CarWithCosts) {
     repairsCfa: lc.repairsCfa,
     labourCfa: lc.labourCfa,
     partsCfa: lc.partsCfa,
-    landedCostCfa: lc.landedCostCfa,
+    adjustmentsCfa,
+    landedCostCfa,
   };
 }
 
@@ -79,6 +88,7 @@ export async function getCarWithCosts(id: number, db: Tx = prisma): Promise<CarW
       originExpenses: { orderBy: { date: 'asc' } },
       repairJobs: { orderBy: { date: 'asc' } },
       repairParts: { orderBy: { date: 'asc' } },
+      costAdjustments: { orderBy: { date: 'asc' } },
     },
   });
   if (!car) throw notFound('Car not found');
@@ -97,7 +107,7 @@ export async function landedCostOf(carIds: number[]): Promise<Map<number, Prisma
   if (carIds.length === 0) return new Map();
   const cars = await prisma.car.findMany({
     where: { id: { in: carIds } },
-    include: { originExpenses: true, repairJobs: true, repairParts: true },
+    include: { originExpenses: true, repairJobs: true, repairParts: true, costAdjustments: true },
   });
   return new Map(
     cars.map((car) => {

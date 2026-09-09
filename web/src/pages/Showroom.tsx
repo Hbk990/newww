@@ -115,10 +115,13 @@ function SellModal({
   const [buyerMobile, setBuyerMobile] = useState('');
   const [initialPayment, setInitialPayment] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [accounts, setAccounts] = useState<Party[]>([]);
+  const [destinationAccountId, setDestination] = useState('');
   const [customerId, setCustomerId] = useState('');
 
   useEffect(() => {
     void api.get<Party[]>('/api/parties?type=CUSTOMER').then(setCustomers);
+    void api.get<Party[]>('/api/parties?type=TRANSFER_COMPANY').then(setAccounts);
   }, []);
 
   const { busy, error, run } = useSubmit(async () => {
@@ -131,6 +134,7 @@ function SellModal({
       customerId: customerId ? Number(customerId) : null,
       initialPayment: initialPayment ? Number(initialPayment) : undefined,
       paymentMethod,
+      destinationAccountId: destinationAccountId ? Number(destinationAccountId) : null,
     });
     onSold(result.profit.profit);
     return result;
@@ -180,8 +184,27 @@ function SellModal({
         </Field>
       </div>
 
+      {Number(initialPayment) > 0 && (
+        <Field
+          label="Where did the money go?"
+          help="It goes straight into that account. Never record it again as a deposit."
+        >
+          <select value={destinationAccountId} onChange={(e) => setDestination(e.target.value)}>
+            <option value="">Cash box (default)</option>
+            {accounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
+
       {Number(initialPayment) > 0 && remaining > 0 && (
-        <Alert kind="warn">{fmt(remaining)} {cfa} will still be owed on this sale.</Alert>
+        <Alert kind="warn">
+          {fmt(remaining)} {cfa} will still be owed. This sale goes on the “Still owing” list until it
+          is paid off, then moves to “Paid in full” by itself.
+        </Alert>
       )}
       {remaining < 0 && <Alert kind="error">The initial payment cannot exceed the sale price.</Alert>}
 

@@ -131,7 +131,7 @@ export async function monthlyReport(year: number, month: number) {
   // reported separately rather than mixed into the CFA result.
   const originSales = await prisma.sale.findMany({
     where: { saleDate: { gte: from, lte: to }, channel: SaleChannel.ORIGIN },
-    include: { car: { include: { originExpenses: true, repairJobs: true, repairParts: true } } },
+    include: { car: { include: { originExpenses: true, repairJobs: true, repairParts: true, costAdjustments: true } } },
   });
 
   return {
@@ -166,7 +166,7 @@ export async function dashboard() {
   const [cars, balances, parties, refunds] = await Promise.all([
     prisma.car.findMany({
       where: { active: true, status: { notIn: [CarStatus.SOLD, CarStatus.SOLD_IN_ORIGIN] } },
-      include: { originExpenses: true, repairJobs: true, repairParts: true },
+      include: { originExpenses: true, repairJobs: true, repairParts: true, costAdjustments: true },
     }),
     balancesByParty(),
     prisma.party.findMany({ where: { active: true } }),

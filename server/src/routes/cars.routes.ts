@@ -80,7 +80,7 @@ export async function carRoutes(app: FastifyInstance) {
         shipment: { select: { id: true, reference: true, status: true } },
         originExpenses: true,
         repairJobs: true,
-        repairParts: true,
+        repairParts: true, costAdjustments: true,
         sale: { select: { id: true, price: true, currency: true, saleDate: true } },
       },
       orderBy: { purchaseDate: 'desc' },

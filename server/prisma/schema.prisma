@@ -134,6 +134,8 @@ model Party {
   transfersFrom     Transaction[]      @relation("TransferCompany")
   transfersTo       Transaction[]      @relation("Counterparty")
   sales             Sale[]
+  saleReceipts      SalePayment[]      @relation("SaleReceipts")
+  costAdjustments   CostAdjustment[]   @relation("CostAdjustments")
 
   @@index([type, active])
 }
@@ -152,6 +154,9 @@ enum LedgerKind {
   SALE_PAYMENT
   ORIGIN_SALE_PROCEEDS
   DEPOSIT
+  SALE_RECEIPT
+  TRANSFER_IN
+  TRANSFER_OUT
   WIRE_OUT
   PAYMENT
   FEE
@@ -285,8 +290,9 @@ model Car {
   originExpenses OriginExpense[]
   repairJobs     RepairJob[]
   repairParts    RepairPart[]
-  sale           Sale?
-  ledger         LedgerEntry[]
+  sale            Sale?
+  ledger          LedgerEntry[]
+  costAdjustments CostAdjustment[]
 
   @@index([status])
   @@index([supplierId])
@@ -417,9 +423,44 @@ model SalePayment {
   method    String? // cash, transfer company, ...
   note      String?  @db.Text
   createdAt DateTime @default(now())
-  sale      Sale     @relation(fields: [saleId], references: [id])
+  /// Which of my accounts the money landed in — normally the cash box.
+  /// Null only on payments recorded before this was tracked.
+  destinationAccountId Int?
+  /// The credit posted to that account, so the two can never drift apart.
+  ledgerEntryId        Int? @unique
+
+  sale               Sale   @relation(fields: [saleId], references: [id])
+  destinationAccount Party? @relation("SaleReceipts", fields: [destinationAccountId], references: [id])
 
   @@index([saleId])
+  @@index([destinationAccountId])
+}
+
+/// A correction to a car's cost made AFTER the fact — including after it was
+/// sold, which is exactly when mistakes are noticed.
+///
+/// Nothing is ever edited or deleted to make a correction. The original repair,
+/// part or expense stays exactly as it was recorded, and this row sits beside
+/// it carrying the difference and the reason. The car's landed cost, and so its
+/// profit, is the original plus these adjustments — and the history shows both
+/// the mistake and the fix.
+model CostAdjustment {
+  id        Int      @id @default(autoincrement())
+  carId     Int
+  /// Signed: negative removes cost from the car, positive adds cost.
+  amountCfa Decimal  @db.Decimal(18, 4)
+  reason    String   @db.Text
+  date      DateTime
+  /// Whose account this also corrects, when the mistake changed a balance too.
+  partyId       Int?
+  ledgerEntryId Int? @unique
+  createdBy     Int?
+  createdAt     DateTime @default(now())
+
+  car   Car    @relation(fields: [carId], references: [id])
+  party Party? @relation("CostAdjustments", fields: [partyId], references: [id])
+
+  @@index([carId])
 }
 
 // ---------------------------------------------------------------------------
@@ -434,6 +475,8 @@ enum TransactionType {
   PAY_WORKER // CFA
   PAY_PARTS_SUPPLIER // CFA
   PAY_OVERHEAD // CFA — rent, salary, misc
+  SALE_RECEIPT // a customer's payment arriving in the cash box
+  ACCOUNT_TRANSFER // moving my own money between my own accounts
 }
 
 model Transaction {

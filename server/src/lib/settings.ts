@@ -10,6 +10,8 @@ export const SETTING_DEFAULTS = {
   /** Canada: tax up to this amount enters the car's cost; the excess is refundable. */
   taxThresholdUsd: '500',
   businessName: 'Car Showroom',
+  /** Where money from a car sale lands. Empty until an account is chosen. */
+  defaultCashAccountId: '',
 } as const;
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;

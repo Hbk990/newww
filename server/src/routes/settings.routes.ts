@@ -13,6 +13,7 @@ export async function settingsRoutes(app: FastifyInstance) {
         cfaCode: z.enum(['XOF', 'XAF']).optional(),
         taxThresholdUsd: z.coerce.number().nonnegative().optional(),
         businessName: z.string().min(1).optional(),
+        defaultCashAccountId: z.union([z.coerce.number(), z.literal('')]).optional(),
       })
       .parse(request.body);
 

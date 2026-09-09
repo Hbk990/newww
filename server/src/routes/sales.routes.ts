@@ -9,6 +9,7 @@ import { cfaCode } from '../lib/settings.js';
 import { D, profitOf, roundCfa, roundUsd, sum } from '../lib/money.js';
 import { post, type PostableEntry } from '../services/ledger.js';
 import { carLabel, costBreakdown, getCarWithCosts } from '../services/cars.js';
+import { postSaleReceipt, resolveReceiptAccount } from '../services/receipts.js';
 
 const money = z.coerce.number().positive('The amount must be more than zero');
 
@@ -21,7 +22,7 @@ export async function saleRoutes(app: FastifyInstance) {
         supplier: { select: { id: true, name: true } },
         originExpenses: true,
         repairJobs: true,
-        repairParts: true,
+        repairParts: true, costAdjustments: true,
       },
       orderBy: { showroomAt: 'asc' },
     });
@@ -55,7 +56,7 @@ export async function saleRoutes(app: FastifyInstance) {
       include: {
         payments: { orderBy: { date: 'asc' } },
         customer: { select: { id: true, name: true } },
-        car: { include: { originExpenses: true, repairJobs: true, repairParts: true } },
+        car: { include: { originExpenses: true, repairJobs: true, repairParts: true, costAdjustments: true } },
       },
       orderBy: { saleDate: 'desc' },
     });
@@ -74,6 +75,12 @@ export async function saleRoutes(app: FastifyInstance) {
         costs,
         paid,
         remaining: D(sale.price.toString()).minus(paid),
+        // Which of the two lists this sale belongs on. A sale moves from
+        // "still owing" to "paid in full" by itself the moment the last franc
+        // arrives — there is nothing to tick.
+        settled:
+          sale.channel === SaleChannel.ORIGIN ||
+          D(sale.price.toString()).minus(paid).lte(0),
         profit: profitOf(
           sale.price.toString(),
           cost,
@@ -105,6 +112,8 @@ export async function saleRoutes(app: FastifyInstance) {
         /** Optional first payment taken at the same time. */
         initialPayment: z.coerce.number().nonnegative().optional(),
         paymentMethod: z.string().optional().nullable(),
+        /** Which of my accounts the money went into. Defaults to the cash box. */
+        destinationAccountId: z.coerce.number().optional().nullable(),
       })
       .parse(request.body);
 
@@ -227,6 +236,26 @@ export async function saleRoutes(app: FastifyInstance) {
         await post(tx, entries, request.user?.id);
       }
 
+      // The money is in your hands the moment the car leaves, so it is credited
+      // to an account here. Do NOT also record it on the Deposit screen.
+      if (input.channel === SaleChannel.LOCAL && input.initialPayment && input.initialPayment > 0) {
+        const accountId = await resolveReceiptAccount(tx, input.destinationAccountId);
+        if (accountId === null)
+          throw new AppError(
+            'There is nowhere to put the money. Add a transfer-company account called "Cash box" under Accounts, then choose it in Settings.',
+          );
+        await postSaleReceipt(tx, {
+          saleId: created.id,
+          carId: id,
+          paymentId: created.payments[0].id,
+          accountId,
+          amountCfa: input.initialPayment,
+          date: input.saleDate,
+          description: `Car sold to ${input.buyerName.trim()} — ${carLabel(car)}`,
+          userId: request.user?.id,
+        });
+      }
+
       return created;
     })();
 
@@ -257,6 +286,8 @@ export async function saleRoutes(app: FastifyInstance) {
         date: z.coerce.date(),
         method: z.string().optional().nullable(),
         note: z.string().optional().nullable(),
+        /** Which of my accounts the money went into. Defaults to the cash box. */
+        destinationAccountId: z.coerce.number().optional().nullable(),
       })
       .parse(request.body);
 
@@ -300,6 +331,25 @@ export async function saleRoutes(app: FastifyInstance) {
           request.user?.id,
         );
       }
+
+      // Same rule as the sale itself: the money lands in an account now, so it
+      // is never entered again as a deposit.
+      const accountId = await resolveReceiptAccount(tx, input.destinationAccountId);
+      if (accountId === null)
+        throw new AppError(
+          'There is nowhere to put the money. Add a transfer-company account called "Cash box" under Accounts, then choose it in Settings.',
+        );
+      await postSaleReceipt(tx, {
+        saleId: id,
+        carId: sale.carId,
+        paymentId: created.id,
+        accountId,
+        amountCfa: input.amount,
+        date: input.date,
+        description: `Payment from ${sale.buyerName}${input.method ? ` (${input.method})` : ''} — ${carLabel(sale.car)}`,
+        userId: request.user?.id,
+      });
+
       return created;
     })();
 

@@ -31,9 +31,11 @@ const TYPE_LABELS: Record<string, string> = {
   PAY_WORKER: 'Worker paid',
   PAY_PARTS_SUPPLIER: 'Parts supplier paid',
   PAY_OVERHEAD: 'Expense paid',
+  SALE_RECEIPT: 'Car sale received',
+  ACCOUNT_TRANSFER: 'Moved between your accounts',
 };
 
-type Action = 'deposit' | 'wire' | 'shipping' | 'local' | null;
+type Action = 'deposit' | 'transfer' | 'wire' | 'shipping' | 'local' | null;
 
 export default function Money() {
   const { cfa } = useApp();
@@ -63,6 +65,7 @@ export default function Money() {
         action={
           <div className="row">
             <button onClick={() => setAction('deposit')}>Deposit</button>
+            <button className="secondary" onClick={() => setAction('transfer')}>Move between accounts</button>
             <button className="secondary" onClick={() => setAction('wire')}>Wire to supplier</button>
             <button className="secondary" onClick={() => setAction('shipping')}>Pay freight</button>
             <button className="secondary" onClick={() => setAction('local')}>Pay worker / parts</button>
@@ -179,6 +182,7 @@ function PaymentModal({ action, onClose, onDone }: { action: Exclude<Action, nul
 
   useEffect(() => {
     void api.get<Party[]>('/api/parties?type=TRANSFER_COMPANY').then(setTransferCompanies);
+    if (action === 'transfer') void api.get<Party[]>('/api/parties?type=TRANSFER_COMPANY').then(setCounterparties);
     if (action === 'wire') void api.get<Party[]>('/api/parties?type=CAR_SUPPLIER').then(setCounterparties);
     if (action === 'shipping') void api.get<Party[]>('/api/parties?type=SHIPPING_COMPANY').then(setCounterparties);
     if (action === 'local') {
@@ -193,6 +197,15 @@ function PaymentModal({ action, onClose, onDone }: { action: Exclude<Action, nul
     const common = { transferCompanyId: Number(transferCompanyId), date, note: note || null };
     if (action === 'deposit') {
       await api.post('/api/treasury/deposit', { ...common, amountCfa: Number(amount) });
+    } else if (action === 'transfer') {
+      await api.post('/api/treasury/transfer', {
+        fromAccountId: Number(transferCompanyId),
+        toAccountId: Number(counterpartyId),
+        amountCfa: Number(amount),
+        feeCfa: Number(feeCfa || 0),
+        date,
+        note: note || null,
+      });
     } else if (action === 'wire') {
       await api.post('/api/treasury/wire', {
         ...common,
@@ -223,6 +236,7 @@ function PaymentModal({ action, onClose, onDone }: { action: Exclude<Action, nul
 
   const titles: Record<Exclude<Action, null>, string> = {
     deposit: 'Deposit money with a transfer company',
+    transfer: 'Move money between your own accounts',
     wire: 'Wire USD to a car supplier',
     shipping: 'Pay a shipping company',
     local: 'Pay a worker or a parts supplier',
@@ -231,7 +245,9 @@ function PaymentModal({ action, onClose, onDone }: { action: Exclude<Action, nul
   const needsCounterparty = action !== 'deposit';
   const needsRate = action === 'wire' || action === 'shipping';
   const cfaOut =
-    action === 'wire'
+    action === 'transfer'
+      ? Number(amount || 0) + Number(feeCfa || 0)
+      : action === 'wire'
       ? Number(amount || 0) * Number(rate || 0) + Number(feeCfa || 0)
       : action === 'shipping' && payCurrency === 'USD'
         ? Number(amount || 0) * Number(rate || 0) + Number(feeCfa || 0)
@@ -241,7 +257,25 @@ function PaymentModal({ action, onClose, onDone }: { action: Exclude<Action, nul
     <Modal title={titles[action]} onClose={onClose}>
       <Alert kind="error">{error}</Alert>
 
-      <Field label="Which transfer company?" help="Where the money comes from.">
+      {action === 'deposit' && (
+        <Alert kind="warn">
+          Only for money coming in from outside the business. Money from a car sale is already
+          recorded on the sale itself — entering it here as well would show cash you do not have.
+          To move money you already hold, use <strong>Move between accounts</strong>.
+        </Alert>
+      )}
+
+      {action === 'transfer' && (
+        <Alert kind="info">
+          This only changes which account is holding money you already have. Your total does not go
+          up — that is the difference between this and a deposit.
+        </Alert>
+      )}
+
+      <Field
+        label={action === 'transfer' ? 'Take it out of which account?' : 'Which transfer company?'}
+        help="Where the money comes from."
+      >
         <select value={transferCompanyId} onChange={(e) => setTransferCompanyId(e.target.value)}>
           <option value="">Choose…</option>
           {transferCompanies.map((company) => (
@@ -253,7 +287,17 @@ function PaymentModal({ action, onClose, onDone }: { action: Exclude<Action, nul
       </Field>
 
       {needsCounterparty && (
-        <Field label={action === 'wire' ? 'Which supplier?' : action === 'shipping' ? 'Which shipping company?' : 'Who is being paid?'}>
+        <Field
+          label={
+            action === 'wire'
+              ? 'Which supplier?'
+              : action === 'shipping'
+                ? 'Which shipping company?'
+                : action === 'transfer'
+                  ? 'Move it to which account?'
+                  : 'Who is being paid?'
+          }
+        >
           <select value={counterpartyId} onChange={(e) => setCounterpartyId(e.target.value)}>
             <option value="">Choose…</option>
             {counterparties.map((party) => (
@@ -294,7 +338,7 @@ function PaymentModal({ action, onClose, onDone }: { action: Exclude<Action, nul
         )}
       </div>
 
-      {needsRate && (
+      {(needsRate || action === 'transfer') && (
         <Field label={`Commission (${cfa})`} help="Leave empty when the company does not charge a visible fee.">
           <input type="number" value={feeCfa} onChange={(e) => setFeeCfa(e.target.value)} />
         </Field>

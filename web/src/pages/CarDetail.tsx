@@ -4,7 +4,16 @@ import { PageHeader, useApp } from '../App';
 import { api, fmt, fmtDate, fmtUsd, todayIso, type Car, type CarStatus } from '../lib/api';
 import { Alert, Card, Field, Spinner, StatusBadge, useSubmit } from '../components/ui';
 
+interface Adjustment {
+  id: number;
+  amountCfa: string;
+  reason: string;
+  date: string;
+  party: { id: number; name: string } | null;
+}
+
 interface CarDetailData extends Car {
+  costAdjustments?: Adjustment[];
   originExpenses: { id: number; amountUsd: string; note: string | null; date: string }[];
   repairJobs: { id: number; serviceType: string; labourCostCfa: string; description: string | null; worker: { name: string } }[];
   repairParts: { id: number; description: string; costCfa: string; partsSupplier: { name: string } }[];
@@ -21,13 +30,16 @@ export default function CarDetail() {
   const { id } = useParams();
   const { cfa } = useApp();
   const [car, setCar] = useState<CarDetailData | null>(null);
+  const [adjustments, setAdjustments] = useState<Adjustment[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const load = () =>
-    api
+  const load = () => {
+    void api.get<Adjustment[]>(`/api/cars/${id}/cost-adjustments`).then(setAdjustments).catch(() => undefined);
+    return api
       .get<CarDetailData>(`/api/cars/${id}`)
       .then(setCar)
       .catch((e) => setError(e.message));
+  };
 
   useEffect(() => {
     void load();
@@ -132,6 +144,18 @@ export default function CarDetail() {
                       <span className="amount">{fmt(costs.repairsCfa)}</span>
                     </div>
                   )}
+                  {adjustments.map((adjustment) => (
+                    <div className="line" key={adjustment.id}>
+                      <span>
+                        Correction
+                        <div className="small muted">
+                          {fmtDate(adjustment.date)} — {adjustment.reason}
+                          {adjustment.party && ` (also corrected on ${adjustment.party.name}'s account)`}
+                        </div>
+                      </span>
+                      <span className="amount">{fmt(adjustment.amountCfa)}</span>
+                    </div>
+                  ))}
                   <div className="line total">
                     <span>Landed cost</span>
                     <span className="amount">{fmt(costs.landedCostCfa)} {cfa}</span>
@@ -148,6 +172,8 @@ export default function CarDetail() {
         </div>
 
         <div>
+          {costs.arrived && <CorrectCost car={car} onDone={load} />}
+
           {Number(car.taxRefundableUsd) > 0 && (
             <Card title="Tax refund">
               <p className="small" style={{ marginTop: 0 }}>
@@ -346,6 +372,109 @@ function ArrivalCard({ car, onChanged }: { car: CarDetailData; onChanged: () => 
       <button onClick={() => void run()} disabled={!arrived || busy}>
         {busy ? 'Saving…' : damaged ? 'Send to the garage' : 'Send to the showroom'}
       </button>
+    </Card>
+  );
+}
+
+/**
+ * Fixing a cost that was recorded wrongly — including on a car already sold,
+ * which is usually when the mistake is spotted. The wrong line is never
+ * deleted: deleting a 100,000 repair would quietly raise that car's profit by
+ * 100,000 with nothing left to explain it. The original stays, this correction
+ * sits beside it, and both remain visible.
+ */
+function CorrectCost({ car, onDone }: { car: CarDetailData; onDone: () => void }) {
+  const { cfa } = useApp();
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState('');
+  const [reason, setReason] = useState('');
+  const [partyId, setPartyId] = useState('');
+  const [parties, setParties] = useState<{ id: number; name: string }[]>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    void Promise.all([
+      api.get<{ id: number; name: string }[]>('/api/parties?type=WORKER'),
+      api.get<{ id: number; name: string }[]>('/api/parties?type=PARTS_SUPPLIER'),
+    ]).then(([workers, suppliers]) => setParties([...workers, ...suppliers]));
+  }, [open]);
+
+  const { busy, error, run } = useSubmit(async () => {
+    await api.post(`/api/cars/${car.id}/cost-adjustments`, {
+      amountCfa: Number(amount),
+      reason,
+      partyId: partyId ? Number(partyId) : null,
+    });
+    setOpen(false);
+    setAmount('');
+    setReason('');
+    setPartyId('');
+    onDone();
+    return true;
+  });
+
+  if (!open)
+    return (
+      <Card title="Correct this car's cost">
+        <p className="small muted" style={{ marginTop: 0 }}>
+          Something recorded wrongly? Correct it here. The original line stays exactly as it is and
+          the correction is recorded beside it with your reason — so the profit is right and the
+          history still shows what happened.
+        </p>
+        <button className="secondary" onClick={() => setOpen(true)}>
+          Make a correction
+        </button>
+      </Card>
+    );
+
+  return (
+    <Card title="Correct this car's cost">
+      <Alert kind="error">{error}</Alert>
+
+      <Field
+        label={`Amount (${cfa})`}
+        help="Negative to take cost off this car, positive to add. A repair entered twice at 100,000 is −100,000."
+      >
+        <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="-100000" autoFocus />
+      </Field>
+
+      <Field label="Why?" help="This stays on the record permanently.">
+        <textarea
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="The repaint was entered twice on 1 March"
+        />
+      </Field>
+
+      <Field
+        label="Does this change what someone is owed?"
+        help="If the wrong amount was charged to a worker or parts supplier, their balance is corrected too."
+      >
+        <select value={partyId} onChange={(e) => setPartyId(e.target.value)}>
+          <option value="">No — only this car's cost</option>
+          {parties.map((party) => (
+            <option key={party.id} value={party.id}>
+              {party.name}
+            </option>
+          ))}
+        </select>
+      </Field>
+
+      {Number(amount) !== 0 && car.costs.landedCostCfa && (
+        <Alert kind="info">
+          Cost becomes {fmt(Number(car.costs.landedCostCfa) + Number(amount))} {cfa}
+          {car.sale && ', and the profit on this sale changes to match'}.
+        </Alert>
+      )}
+
+      <div className="row">
+        <button onClick={() => void run()} disabled={busy || !Number(amount) || reason.trim().length < 5}>
+          {busy ? 'Saving…' : 'Record the correction'}
+        </button>
+        <button className="secondary" onClick={() => setOpen(false)}>
+          Cancel
+        </button>
+      </div>
     </Card>
   );
 }

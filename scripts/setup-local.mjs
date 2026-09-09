@@ -164,10 +164,15 @@ try {
   run('npx', ['tsx', 'prisma/seed-vpic.ts', '--offline']);
 }
 
+// --- 4b. Somewhere for sale money to land -----------------------------------
+
+step('5. Cash box');
+run('npx', ['tsx', 'scripts/ensure-cash-box.ts']);
+
 // --- 5. Practice data -------------------------------------------------------
 
 if (!has('no-demo')) {
-  step('5. Practice data');
+  step('6. Practice data');
   // Never overwrite data that is already there — it might be real.
   const [[{ cars }]] = await db.query(`SELECT COUNT(*) AS cars FROM \`${dbName}\`.Car`);
   const existing = Number(cars);
@@ -183,7 +188,7 @@ await db.end();
 
 // --- 6. Login ---------------------------------------------------------------
 
-step('6. Your login');
+step('7. Your login');
 
 const username = flag('user') ?? 'owner';
 const password = flag('password') ?? 'Showroom-Test-2026';

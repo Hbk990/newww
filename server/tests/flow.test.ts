@@ -92,7 +92,7 @@ describe('security', () => {
 describe('the business, end to end', () => {
   const ids = {
     supplier: 0, usaSupplier: 0, shipper: 0, transfer: 0, painter: 0, partsSupplier: 0,
-    cla: 0, camry: 0, rav4: 0, shipment: 0,
+    cla: 0, camry: 0, rav4: 0, shipment: 0, cashBox: 0,
   };
 
   it('sets up the accounts', async () => {
@@ -122,6 +122,11 @@ describe('the business, end to end', () => {
     ids.transfer = (
       await api('POST', '/api/parties', { type: 'TRANSFER_COMPANY', name: 'Western Transfer' })
     ).id;
+    // Money from a sale has to land somewhere, so the business has a cash box.
+    ids.cashBox = (
+      await api('POST', '/api/parties', { type: 'TRANSFER_COMPANY', name: 'Cash box' })
+    ).id;
+    await api('PATCH', '/api/settings', { defaultCashAccountId: ids.cashBox });
     ids.painter = (
       await api('POST', '/api/parties', { type: 'WORKER', name: 'Ibrahim', workerRole: 'GARAGE' })
     ).id;
@@ -369,7 +374,8 @@ describe('the business, end to end', () => {
 
 describe('treasury and the monthly report', () => {
   it('a deposit moves money without touching profit', async () => {
-    const [transfer] = await api('GET', '/api/parties?type=TRANSFER_COMPANY');
+    const transfer = (await api('GET', '/api/parties?type=TRANSFER_COMPANY'))
+      .find((a: { name: string }) => a.name === 'Western Transfer');
     await api('POST', '/api/treasury/deposit', {
       transferCompanyId: transfer.id,
       amountCfa: 30000000,
@@ -378,7 +384,9 @@ describe('treasury and the monthly report', () => {
     });
 
     const overview = await api('GET', '/api/treasury/overview');
-    expect(overview.totalAvailableCfa).toBe('30000000');
+    // 30,000,000 deposited + 9,000,000 taken for the CLA, which the sale itself
+    // put into the cash box without a separate deposit being recorded.
+    expect(overview.totalAvailableCfa).toBe('39000000');
 
     // February: nothing was sold yet at deposit time, but the deposit itself
     // must not appear anywhere in the profit calculation.
@@ -389,7 +397,8 @@ describe('treasury and the monthly report', () => {
   });
 
   it('wires USD to the supplier and clears his balance', async () => {
-    const [transfer] = await api('GET', '/api/parties?type=TRANSFER_COMPANY');
+    const transfer = (await api('GET', '/api/parties?type=TRANSFER_COMPANY'))
+      .find((a: { name: string }) => a.name === 'Western Transfer');
     const suppliers = await api('GET', '/api/parties?type=CAR_SUPPLIER');
     const canadian = suppliers.find((s: { country: string }) => s.country === 'CANADA');
 
@@ -414,7 +423,7 @@ describe('treasury and the monthly report', () => {
 
     // 30,000,000 - 6,588,000 - 25,000
     expect(await api('GET', '/api/treasury/overview')).toMatchObject({
-      totalAvailableCfa: '23387000',
+      totalAvailableCfa: '32387000', // 39,000,000 - 6,588,000 wired - 25,000 fee
     });
   });
 
@@ -579,7 +588,8 @@ describe('guards found while reviewing the code', () => {
   });
 
   it('debits the treasury exactly what was handed over when freight is paid in CFA', async () => {
-    const [transfer] = await api('GET', '/api/parties?type=TRANSFER_COMPANY');
+    const transfer = (await api('GET', '/api/parties?type=TRANSFER_COMPANY'))
+      .find((a: { name: string }) => a.name === 'Western Transfer');
     const before = await api('GET', `/api/parties/${transfer.id}/statement`);
 
     // A rate that does not divide evenly: 1,000,000 / 613 is not a round number

@@ -194,4 +194,6 @@ export interface Settings {
   cfaCode: string;
   taxThresholdUsd: string;
   businessName: string;
+  /** The account a customer's payment lands in. Empty until chosen. */
+  defaultCashAccountId: string;
 }

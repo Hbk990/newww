@@ -19,6 +19,7 @@ import { saleRoutes } from './routes/sales.routes.js';
 import { treasuryRoutes } from './routes/treasury.routes.js';
 import { reportRoutes } from './routes/reports.routes.js';
 import { settingsRoutes } from './routes/settings.routes.js';
+import { adjustmentRoutes } from './routes/adjustments.routes.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -95,6 +96,7 @@ export async function buildApp() {
   await app.register(treasuryRoutes);
   await app.register(reportRoutes);
   await app.register(settingsRoutes);
+  await app.register(adjustmentRoutes);
 
   // In production the API also serves the built interface, so the whole system
   // is one process behind one certificate — no CORS, no second deployment.

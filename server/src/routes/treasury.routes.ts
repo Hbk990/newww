@@ -395,6 +395,87 @@ export async function treasuryRoutes(app: FastifyInstance) {
     return transaction;
   });
 
+
+  /**
+   * MOVING YOUR OWN MONEY between two of your own accounts — typically the cash
+   * box out to a transfer company so you can pay suppliers from it.
+   *
+   * This is deliberately NOT a deposit. A deposit adds money that came from
+   * outside the business; a transfer only changes which account is holding
+   * money you already had. Recording a move as a deposit would inflate your
+   * total treasury by the amount moved, every single time.
+   */
+  app.post('/api/treasury/transfer', async (request) => {
+    const input = z
+      .object({
+        fromAccountId: z.coerce.number(),
+        toAccountId: z.coerce.number(),
+        amountCfa: money,
+        feeCfa: fee,
+        date: z.coerce.date(),
+        note: z.string().optional().nullable(),
+      })
+      .parse(request.body);
+
+    if (input.fromAccountId === input.toAccountId)
+      throw new AppError('Choose two different accounts');
+
+    const from = await requireTransferCompany(input.fromAccountId);
+    const to = await requireTransferCompany(input.toAccountId);
+    const amount = new Prisma.Decimal(input.amountCfa);
+    const feeAmount = new Prisma.Decimal(input.feeCfa);
+
+    const transaction = await prisma.$transaction(async (tx) => {
+      const created = await tx.transaction.create({
+        data: {
+          type: TransactionType.ACCOUNT_TRANSFER,
+          date: input.date,
+          transferCompanyId: from.id,
+          counterpartyId: to.id,
+          amountCfa: amount,
+          feeCfa: feeAmount,
+          note: input.note || null,
+          createdBy: request.user?.id ?? null,
+        },
+      });
+
+      const entries: PostableEntry[] = [
+        {
+          partyId: from.id,
+          date: input.date,
+          kind: LedgerKind.TRANSFER_OUT,
+          amount: amount.negated(),
+          description: `Moved to ${to.name}${input.note ? ` — ${input.note}` : ''}`,
+          transactionId: created.id,
+        },
+        {
+          partyId: to.id,
+          date: input.date,
+          kind: LedgerKind.TRANSFER_IN,
+          amount,
+          description: `Moved from ${from.name}${input.note ? ` — ${input.note}` : ''}`,
+          transactionId: created.id,
+        },
+      ];
+      // A charge for moving it is a real cost, and comes out of the sending side.
+      if (feeAmount.gt(0)) {
+        entries.push({
+          partyId: from.id,
+          date: input.date,
+          kind: LedgerKind.FEE,
+          amount: feeAmount.negated(),
+          description: 'Transfer commission',
+          transactionId: created.id,
+        });
+      }
+      await post(tx, entries, request.user?.id);
+      return created;
+    });
+
+    await auditTx(request, transaction);
+    return transaction;
+  });
+
   // -------------------------------------------------------------------------
   // Monthly overhead — deliberately kept out of every car's cost
   // -------------------------------------------------------------------------

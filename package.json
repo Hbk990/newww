@@ -20,7 +20,8 @@
     "db:seed:demo": "npm run seed:demo --workspace=server",
     "create:user": "npm run create:user --workspace=server",
     "catalog:download": "node --import tsx server/prisma/download-vpic.ts",
-    "catalog:import": "node --import tsx server/prisma/seed-vpic.ts"
+    "catalog:import": "node --import tsx server/prisma/seed-vpic.ts",
+    "ensure:cashbox": "npm run ensure:cashbox --workspace=server"
   },
   "engines": {
     "node": ">=20"

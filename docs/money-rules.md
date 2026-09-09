@@ -139,6 +139,56 @@ his balance flips and he owes you.
 These sales are reported separately from the local CFA profit, because mixing
 two currencies in one profit figure produces a number that means nothing.
 
+## Rule 9 — A customer's payment lands in an account immediately
+
+You sell a car and the money goes into the cash box that moment. So recording
+the payment **is** recording the money arriving — the system credits the account
+you choose (normally the cash box) in the same action.
+
+This means one thing you must not do: **never enter money from a car sale on the
+Deposit screen as well.** It is already in. Entering it twice would show cash you
+do not have.
+
+Moving that money onwards to a transfer company is a **transfer between two of
+your own accounts**, not a new deposit. Use *Move between accounts*. Your total
+treasury does not change — only which account holds it. Recording a move as a
+deposit would inflate your total by the amount moved, every time you did it.
+
+The Deposit screen is only for money coming in from **outside** the business:
+your own capital, or a loan.
+
+### The two lists
+
+Every sale sits on one of two lists:
+
+- **Still owing** — the buyer has not paid in full
+- **Paid in full** — nothing left to collect
+
+A sale moves from the first to the second **by itself**, the moment the last
+franc arrives. There is nothing to tick and nothing to remember.
+
+## Rule 10 — Costs are corrected, never deleted
+
+A car was sold and you notice a 100,000 repair was recorded twice. Deleting the
+wrong line would raise that car's reported profit by 100,000 and leave nothing
+to say why — a year later, nobody could explain the change.
+
+So a mistake is fixed by **adding a correction**, not removing a line:
+
+- the original repair, part or expense stays **exactly as it was recorded**
+- a correction sits beside it carrying the difference and **your reason**
+- the car's cost becomes the original plus the corrections, so the profit is
+  right everywhere it is reported
+- both the mistake and the fix stay visible for as long as the car exists
+
+If the mistake also changed what you owe someone — an amount charged to the
+wrong worker — naming that account corrects their balance in the same action.
+
+This is the same principle as Rule 4, applied to costs instead of balances:
+history is added to, never rewritten.
+
+---
+
 ---
 
 ## Rounding
