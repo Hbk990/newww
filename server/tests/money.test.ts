@@ -285,3 +285,26 @@ describe('monthly report (Rule 3)', () => {
     expect(r.netProfitCfa.toString()).toBe('-500000'); // only the real overhead
   });
 });
+
+describe('settlements that involve no exchange', () => {
+  it('lets a tax credit clear part of the debt without creating a gain or loss', () => {
+    // $11,000 charged at rate 600; $200 credited back as tax, then $10,800 wired at 610.
+    const fx = exchangeDifference(
+      [{ amountUsd: 11000, bookedRate: 600 }],
+      [
+        { amountUsd: 200, rate: null }, // tax credit — no currency bought
+        { amountUsd: 10800, rate: 610 },
+      ],
+    );
+    expect(fx.differenceCfa.toString()).toBe('108000'); // 10,800 x 10
+    expect(fx.advanceUsd.toString()).toBe('0');
+  });
+
+  it('treats proceeds of a car sold abroad the same way', () => {
+    const fx = exchangeDifference(
+      [{ amountUsd: 10000, bookedRate: 600 }],
+      [{ amountUsd: 10000, rate: null }],
+    );
+    expect(fx.differenceCfa.toString()).toBe('0');
+  });
+});

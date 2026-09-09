@@ -256,10 +256,15 @@ export interface FxCharge {
   bookedRate: Num | null;
 }
 
-export interface FxWire {
+export interface FxSettlement {
   amountUsd: Num;
-  /** The rate actually paid on the day of the wire. */
-  rate: Num;
+  /**
+   * The rate actually paid on the day of the wire, or null for a settlement
+   * that involved no currency exchange at all — a tax credit, or the proceeds
+   * of a car sold abroad. Those reduce the balance without any rate risk, so
+   * they consume the debt but produce no gain or loss.
+   */
+  rate: Num | null;
 }
 
 export interface FxResult {
@@ -277,10 +282,10 @@ export interface FxResult {
  * must NOT go back and change the car's cost.
  *
  * Because supplier accounts are running accounts (you never pay "for car X"),
- * wires are applied to charges oldest-first, which is how a current account is
- * settled in practice. Both lists must already be in date order.
+ * settlements are applied to charges oldest-first, which is how a current
+ * account is settled in practice. Both lists must already be in date order.
  */
-export function exchangeDifference(charges: FxCharge[], wires: FxWire[]): FxResult {
+export function exchangeDifference(charges: FxCharge[], settlements: FxSettlement[]): FxResult {
   const queue = charges.map((c) => ({
     remaining: roundUsd(c.amountUsd),
     bookedRate: c.bookedRate === null ? null : roundRate(c.bookedRate),
@@ -291,14 +296,14 @@ export function exchangeDifference(charges: FxCharge[], wires: FxWire[]): FxResu
   let advanceUsd = D(0);
   let cursor = 0;
 
-  for (const wire of wires) {
-    let left = roundUsd(wire.amountUsd);
-    const wireRate = roundRate(wire.rate);
+  for (const settlement of settlements) {
+    let left = roundUsd(settlement.amountUsd);
+    const settlementRate = settlement.rate === null ? null : roundRate(settlement.rate);
 
     while (left.gt(0)) {
       while (cursor < queue.length && queue[cursor].remaining.lte(0)) cursor++;
       if (cursor >= queue.length) {
-        advanceUsd = advanceUsd.plus(left); // wired more than is owed
+        advanceUsd = advanceUsd.plus(left); // settled more than is owed
         left = D(0);
         break;
       }
@@ -306,8 +311,8 @@ export function exchangeDifference(charges: FxCharge[], wires: FxWire[]): FxResu
       const applied = Decimal.min(left, charge.remaining);
       if (charge.bookedRate === null) {
         unmatchedUsd = unmatchedUsd.plus(applied);
-      } else {
-        differenceCfa = differenceCfa.plus(applied.times(wireRate.minus(charge.bookedRate)));
+      } else if (settlementRate !== null) {
+        differenceCfa = differenceCfa.plus(applied.times(settlementRate.minus(charge.bookedRate)));
       }
       charge.remaining = charge.remaining.minus(applied);
       left = left.minus(applied);

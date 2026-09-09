@@ -1,0 +1,295 @@
+import type { FastifyInstance } from 'fastify';
+import { CarStatus, LedgerKind, PartyType, SaleChannel } from '@prisma/client';
+import { z } from 'zod';
+import { prisma, Prisma } from '../lib/db.js';
+import { audit } from '../lib/audit.js';
+import { AppError, notFound } from '../lib/errors.js';
+import { cfaCode } from '../lib/settings.js';
+import { D, profitOf, roundCfa, roundUsd, sum } from '../lib/money.js';
+import { post, type PostableEntry } from '../services/ledger.js';
+import { carLabel, costBreakdown, getCarWithCosts } from '../services/cars.js';
+
+const money = z.coerce.number().positive('The amount must be more than zero');
+
+export async function saleRoutes(app: FastifyInstance) {
+  /** Everything ready to sell, with what it actually cost to get it there. */
+  app.get('/api/showroom', async () => {
+    const cars = await prisma.car.findMany({
+      where: { status: CarStatus.SHOWROOM, active: true },
+      include: {
+        supplier: { select: { id: true, name: true } },
+        originExpenses: true,
+        repairJobs: true,
+        repairParts: true,
+      },
+      orderBy: { showroomAt: 'asc' },
+    });
+
+    return cars.map((car) => {
+      const costs = costBreakdown(car);
+      const asking = car.askingPriceCfa;
+      return {
+        ...car,
+        label: carLabel(car),
+        costs,
+        daysInStock: car.showroomAt
+          ? Math.floor((Date.now() - car.showroomAt.getTime()) / 86400000)
+          : null,
+        potentialProfitCfa:
+          asking && costs.landedCostCfa ? roundCfa(D(asking.toString()).minus(costs.landedCostCfa)) : null,
+      };
+    });
+  });
+
+  app.get('/api/sales', async (request) => {
+    const { from, to } = z
+      .object({ from: z.coerce.date().optional(), to: z.coerce.date().optional() })
+      .parse(request.query);
+
+    const sales = await prisma.sale.findMany({
+      where:
+        from || to
+          ? { saleDate: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } }
+          : {},
+      include: {
+        payments: { orderBy: { date: 'asc' } },
+        customer: { select: { id: true, name: true } },
+        car: { include: { originExpenses: true, repairJobs: true, repairParts: true } },
+      },
+      orderBy: { saleDate: 'desc' },
+    });
+
+    return sales.map((sale) => {
+      const costs = costBreakdown(sale.car);
+      const paid = roundCfa(sum(sale.payments.map((p) => p.amount.toString())));
+      const cost =
+        sale.channel === SaleChannel.ORIGIN ? costs.usd.totalCostUsd : costs.landedCostCfa ?? D(0);
+      return {
+        ...sale,
+        label: carLabel(sale.car),
+        costs,
+        paid,
+        remaining: D(sale.price.toString()).minus(paid),
+        profit: profitOf(
+          sale.price.toString(),
+          cost,
+          sale.channel === SaleChannel.ORIGIN ? 'USD' : 'CFA',
+        ),
+      };
+    });
+  });
+
+  /**
+   * Selling a car.
+   *
+   * LOCAL  — from the showroom, in CFA. Profit = price - landed cost.
+   * ORIGIN — sold in the USA/Canada and never shipped. The proceeds go straight
+   *          into the supplier's USD account: they cancel part of what I owe
+   *          him, and if they exceed it, the balance flips and he owes me.
+   */
+  app.post('/api/cars/:id/sell', async (request) => {
+    const { id } = z.object({ id: z.coerce.number() }).parse(request.params);
+    const input = z
+      .object({
+        channel: z.nativeEnum(SaleChannel).default(SaleChannel.LOCAL),
+        price: money,
+        saleDate: z.coerce.date(),
+        buyerName: z.string().min(1, 'Who bought it?'),
+        buyerMobile: z.string().optional().nullable(),
+        customerId: z.coerce.number().optional().nullable(),
+        note: z.string().optional().nullable(),
+        /** Optional first payment taken at the same time. */
+        initialPayment: z.coerce.number().nonnegative().optional(),
+        paymentMethod: z.string().optional().nullable(),
+      })
+      .parse(request.body);
+
+    const car = await getCarWithCosts(id);
+    const existingSale = await prisma.sale.findUnique({ where: { carId: id } });
+    if (existingSale) throw new AppError('This car has already been sold');
+
+    if (input.channel === SaleChannel.LOCAL) {
+      if (car.status !== CarStatus.SHOWROOM)
+        throw new AppError(
+          'Only a car in the showroom can be sold locally. Finish its repairs, or mark its arrival condition first.',
+        );
+    } else if (car.status !== CarStatus.PURCHASED) {
+      throw new AppError(
+        'A car sold in the origin country must still be there — it cannot already be shipped or arrived.',
+      );
+    }
+
+    if (input.customerId) {
+      const customer = await prisma.party.findUnique({ where: { id: input.customerId } });
+      if (!customer || customer.type !== PartyType.CUSTOMER) throw notFound('Customer not found');
+      if (input.channel === SaleChannel.ORIGIN)
+        throw new AppError('A sale in the origin country settles in the supplier account, not a customer account');
+    }
+
+    const currency = input.channel === SaleChannel.ORIGIN ? 'USD' : await cfaCode();
+
+    const sale = await prisma.$transaction(async (tx) => {
+      const created = await tx.sale.create({
+        data: {
+          carId: id,
+          channel: input.channel,
+          currency,
+          price: new Prisma.Decimal(input.price),
+          saleDate: input.saleDate,
+          buyerName: input.buyerName.trim(),
+          buyerMobile: input.buyerMobile || null,
+          customerId: input.customerId ?? null,
+          note: input.note || null,
+          ...(input.initialPayment && input.initialPayment > 0
+            ? {
+                payments: {
+                  create: {
+                    amount: new Prisma.Decimal(input.initialPayment),
+                    date: input.saleDate,
+                    method: input.paymentMethod || null,
+                  },
+                },
+              }
+            : {}),
+        },
+        include: { payments: true },
+      });
+
+      await tx.car.update({
+        where: { id },
+        data: {
+          status:
+            input.channel === SaleChannel.ORIGIN ? CarStatus.SOLD_IN_ORIGIN : CarStatus.SOLD,
+        },
+      });
+
+      if (input.channel === SaleChannel.ORIGIN) {
+        // Negative: the proceeds reduce what I owe this supplier.
+        await post(
+          tx,
+          [
+            {
+              partyId: car.supplierId,
+              date: input.saleDate,
+              kind: LedgerKind.ORIGIN_SALE_PROCEEDS,
+              amount: new Prisma.Decimal(input.price).negated(),
+              description: `Sold in origin country to ${input.buyerName.trim()} — ${carLabel(car)}`,
+              carId: id,
+              saleId: created.id,
+            },
+          ],
+          request.user?.id,
+        );
+      } else if (input.customerId) {
+        // A customer who pays over time gets a running account of his own.
+        const entries: PostableEntry[] = [
+          {
+            partyId: input.customerId,
+            date: input.saleDate,
+            kind: LedgerKind.SALE_CHARGE,
+            amount: new Prisma.Decimal(input.price),
+            description: `Car sold — ${carLabel(car)}`,
+            carId: id,
+            saleId: created.id,
+          },
+        ];
+        if (input.initialPayment && input.initialPayment > 0) {
+          entries.push({
+            partyId: input.customerId,
+            date: input.saleDate,
+            kind: LedgerKind.SALE_PAYMENT,
+            amount: new Prisma.Decimal(input.initialPayment).negated(),
+            description: `Payment received${input.paymentMethod ? ` (${input.paymentMethod})` : ''}`,
+            carId: id,
+            saleId: created.id,
+          });
+        }
+        await post(tx, entries, request.user?.id);
+      }
+
+      return created;
+    });
+
+    await audit(prisma, {
+      userId: request.user?.id,
+      action: 'SELL',
+      entity: 'Sale',
+      entityId: sale.id,
+      after: sale,
+      ip: request.ip,
+    });
+
+    const costs = costBreakdown(car);
+    const cost =
+      input.channel === SaleChannel.ORIGIN ? costs.usd.totalCostUsd : costs.landedCostCfa ?? D(0);
+    return {
+      sale,
+      profit: profitOf(input.price, cost, input.channel === SaleChannel.ORIGIN ? 'USD' : 'CFA'),
+    };
+  });
+
+  /** A later instalment. */
+  app.post('/api/sales/:id/payments', async (request) => {
+    const { id } = z.object({ id: z.coerce.number() }).parse(request.params);
+    const input = z
+      .object({
+        amount: money,
+        date: z.coerce.date(),
+        method: z.string().optional().nullable(),
+        note: z.string().optional().nullable(),
+      })
+      .parse(request.body);
+
+    const sale = await prisma.sale.findUnique({ where: { id }, include: { payments: true, car: true } });
+    if (!sale) throw notFound('Sale not found');
+
+    const alreadyPaid = sum(sale.payments.map((p) => p.amount.toString()));
+    const remaining = D(sale.price.toString()).minus(alreadyPaid);
+    if (D(input.amount).gt(remaining))
+      throw new AppError(
+        `That is more than the ${remaining.toString()} ${sale.currency} still outstanding on this sale.`,
+      );
+
+    const payment = await prisma.$transaction(async (tx) => {
+      const created = await tx.salePayment.create({
+        data: {
+          saleId: id,
+          amount: new Prisma.Decimal(input.amount),
+          date: input.date,
+          method: input.method || null,
+          note: input.note || null,
+        },
+      });
+      if (sale.customerId) {
+        await post(
+          tx,
+          [
+            {
+              partyId: sale.customerId,
+              date: input.date,
+              kind: LedgerKind.SALE_PAYMENT,
+              amount: new Prisma.Decimal(input.amount).negated(),
+              description: `Payment received${input.method ? ` (${input.method})` : ''} — ${carLabel(sale.car)}`,
+              carId: sale.carId,
+              saleId: id,
+            },
+          ],
+          request.user?.id,
+        );
+      }
+      return created;
+    });
+
+    await audit(prisma, {
+      userId: request.user?.id,
+      action: 'SALE_PAYMENT',
+      entity: 'SalePayment',
+      entityId: payment.id,
+      after: payment,
+      ip: request.ip,
+    });
+
+    const paid = roundUsd(sum([...sale.payments.map((p) => p.amount.toString()), input.amount]));
+    return { payment, paid, remaining: D(sale.price.toString()).minus(paid) };
+  });
+}
