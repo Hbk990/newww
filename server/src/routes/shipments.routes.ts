@@ -1,3 +1,4 @@
+import { atomic } from '../lib/atomic.js';
 import type { FastifyInstance } from 'fastify';
 import { CarStatus, LedgerKind, PartyType, ShipmentStatus } from '@prisma/client';
 import { z } from 'zod';
@@ -65,7 +66,7 @@ export async function shipmentRoutes(app: FastifyInstance) {
     return shipment;
   });
 
-  app.post('/api/shipments', async (request) => {
+  app.post('/api/shipments', async (request) => atomic(async (tx) => {
     const input = z
       .object({
         reference: z.string().min(1, 'Give the container or booking a reference'),
@@ -77,11 +78,11 @@ export async function shipmentRoutes(app: FastifyInstance) {
       })
       .parse(request.body);
 
-    const company = await prisma.party.findUnique({ where: { id: input.shippingCompanyId } });
+    const company = await tx.party.findUnique({ where: { id: input.shippingCompanyId } });
     if (!company || company.type !== PartyType.SHIPPING_COMPANY)
       throw notFound('Shipping company not found');
 
-    const shipment = await prisma.$transaction(async (tx) => {
+    const shipment = await (async () => {
       const created = await tx.shipment.create({
         data: {
           reference: input.reference.trim(),
@@ -93,9 +94,9 @@ export async function shipmentRoutes(app: FastifyInstance) {
       });
       if (input.carIds.length > 0) await assignCars(tx, created.id, input.carIds);
       return created;
-    });
+    })();
 
-    await audit(prisma, {
+    await audit(tx, {
       userId: request.user?.id,
       action: 'CREATE',
       entity: 'Shipment',
@@ -104,11 +105,11 @@ export async function shipmentRoutes(app: FastifyInstance) {
       ip: request.ip,
     });
     return shipment;
-  });
+  }));
 
-  app.patch('/api/shipments/:id', async (request) => {
+  app.patch('/api/shipments/:id', async (request) => atomic(async (tx) => {
     const { id } = z.object({ id: z.coerce.number() }).parse(request.params);
-    const before = await prisma.shipment.findUnique({ where: { id } });
+    const before = await tx.shipment.findUnique({ where: { id } });
     if (!before) throw notFound('Shipment not found');
     if (before.status === ShipmentStatus.ARRIVED)
       throw new AppError('This shipment has arrived and its costs are locked');
@@ -123,7 +124,13 @@ export async function shipmentRoutes(app: FastifyInstance) {
       })
       .parse(request.body);
 
-    const shipment = await prisma.$transaction(async (tx) => {
+    if (input.shippingCompanyId !== undefined) {
+      const company = await tx.party.findUnique({ where: { id: input.shippingCompanyId } });
+      if (!company || !company.active || company.type !== PartyType.SHIPPING_COMPANY)
+        throw new AppError('Choose an active shipping company');
+    }
+
+    const shipment = await (async () => {
       const updated = await tx.shipment.update({
         where: { id },
         data: {
@@ -139,9 +146,9 @@ export async function shipmentRoutes(app: FastifyInstance) {
       // Freight changed -> the per-car shares must follow, or they stop adding up.
       if (input.freightCostUsd !== undefined) await resplitEqually(tx, id);
       return updated;
-    });
+    })();
 
-    await audit(prisma, {
+    await audit(tx, {
       userId: request.user?.id,
       action: 'UPDATE',
       entity: 'Shipment',
@@ -151,20 +158,20 @@ export async function shipmentRoutes(app: FastifyInstance) {
       ip: request.ip,
     });
     return shipment;
-  });
+  }));
 
   /** Add cars. Freight is re-split equally each time the load changes. */
-  app.post('/api/shipments/:id/cars', async (request) => {
+  app.post('/api/shipments/:id/cars', async (request) => atomic(async (tx) => {
     const { id } = z.object({ id: z.coerce.number() }).parse(request.params);
     const { carIds } = z.object({ carIds: z.array(z.coerce.number()).min(1) }).parse(request.body);
 
-    const shipment = await prisma.shipment.findUnique({ where: { id } });
+    const shipment = await tx.shipment.findUnique({ where: { id } });
     if (!shipment) throw notFound('Shipment not found');
     if (shipment.status === ShipmentStatus.ARRIVED)
       throw new AppError('This shipment has already arrived');
 
-    await prisma.$transaction((tx) => assignCars(tx, id, carIds));
-    await audit(prisma, {
+    await assignCars(tx, id, carIds);
+    await audit(tx, {
       userId: request.user?.id,
       action: 'ASSIGN_CARS',
       entity: 'Shipment',
@@ -172,41 +179,48 @@ export async function shipmentRoutes(app: FastifyInstance) {
       after: { carIds },
       ip: request.ip,
     });
-    return prisma.shipment.findUnique({ where: { id }, include: { cars: true } });
-  });
+    return tx.shipment.findUnique({ where: { id }, include: { cars: true } });
+  }));
 
-  app.delete('/api/shipments/:id/cars/:carId', async (request) => {
+  app.delete('/api/shipments/:id/cars/:carId', async (request) => atomic(async (tx) => {
     const { id, carId } = z
       .object({ id: z.coerce.number(), carId: z.coerce.number() })
       .parse(request.params);
 
-    const shipment = await prisma.shipment.findUnique({ where: { id } });
+    const shipment = await tx.shipment.findUnique({ where: { id } });
     if (!shipment) throw notFound('Shipment not found');
     if (shipment.status === ShipmentStatus.ARRIVED)
       throw new AppError('This shipment has already arrived');
 
-    await prisma.$transaction(async (tx) => {
+    const car = await tx.car.findUnique({ where: { id: carId } });
+    if (!car || car.shipmentId !== id) throw new AppError('This car is not on this shipment');
+    if (car.arrivalCostCfa !== null || (car.status !== CarStatus.PURCHASED && car.status !== CarStatus.SHIPPED))
+      throw new AppError('An arrived or sold car cannot be removed from a shipment');
+
+    await (async () => {
       await tx.car.update({
         where: { id: carId },
         data: { shipmentId: null, freightShareUsd: null, status: CarStatus.PURCHASED },
       });
       await resplitEqually(tx, id);
-    });
-    return prisma.shipment.findUnique({ where: { id }, include: { cars: true } });
-  });
+    })();
+    await audit(tx, { userId: request.user?.id, action: 'REMOVE_CAR', entity: 'Shipment', entityId: id,
+      before: { carId }, ip: request.ip });
+    return tx.shipment.findUnique({ where: { id }, include: { cars: true } });
+  }));
 
   /**
    * Manual freight shares — for the container where one big SUV really did take
    * more space. The shares must still add up to the freight invoice exactly,
    * or a few dollars would quietly vanish from the cars' costs.
    */
-  app.post('/api/shipments/:id/shares', async (request) => {
+  app.post('/api/shipments/:id/shares', async (request) => atomic(async (tx) => {
     const { id } = z.object({ id: z.coerce.number() }).parse(request.params);
     const { shares } = z
       .object({ shares: z.array(z.object({ carId: z.coerce.number(), amountUsd: money })).min(1) })
       .parse(request.body);
 
-    const shipment = await prisma.shipment.findUnique({ where: { id }, include: { cars: true } });
+    const shipment = await tx.shipment.findUnique({ where: { id }, include: { cars: true } });
     if (!shipment) throw notFound('Shipment not found');
     if (shipment.status === ShipmentStatus.ARRIVED)
       throw new AppError('This shipment has arrived and its costs are locked');
@@ -215,6 +229,7 @@ export async function shipmentRoutes(app: FastifyInstance) {
     // that were left out carrying stale amounts.
     const onShipment = new Set(shipment.cars.map((car) => car.id));
     const given = new Set(shares.map((share) => share.carId));
+    if (given.size !== shares.length) throw new AppError('Give each car exactly one freight share; duplicate cars are not allowed');
     const foreign = shares.filter((share) => !onShipment.has(share.carId));
     if (foreign.length > 0)
       throw new AppError('One of those cars is not on this shipment');
@@ -232,39 +247,39 @@ export async function shipmentRoutes(app: FastifyInstance) {
         `The shares add up to $${check.totalOfShares} but the freight is $${shipment.freightCostUsd}. That is $${check.difference.abs()} ${check.difference.gt(0) ? 'too much' : 'missing'}.`,
       );
 
-    await prisma.$transaction(async (tx) => {
+    await (async () => {
       for (const share of shares) {
         await tx.car.update({
           where: { id: share.carId },
           data: { freightShareUsd: new Prisma.Decimal(share.amountUsd) },
         });
       }
-    });
-    return prisma.shipment.findUnique({ where: { id }, include: { cars: true } });
-  });
+    })();
+    return tx.shipment.findUnique({ where: { id }, include: { cars: true } });
+  }));
 
   /** The shipment sails. */
-  app.post('/api/shipments/:id/ship', async (request) => {
+  app.post('/api/shipments/:id/ship', async (request) => atomic(async (tx) => {
     const { id } = z.object({ id: z.coerce.number() }).parse(request.params);
     const { departureDate } = z
       .object({ departureDate: z.coerce.date().optional() })
       .parse(request.body ?? {});
 
-    const shipment = await prisma.shipment.findUnique({ where: { id }, include: { cars: true } });
+    const shipment = await tx.shipment.findUnique({ where: { id }, include: { cars: true } });
     if (!shipment) throw notFound('Shipment not found');
     if (shipment.status !== ShipmentStatus.DRAFT)
       throw new AppError('This shipment has already sailed');
     if (shipment.cars.length === 0) throw new AppError('Add at least one car before shipping');
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const updated = await (async () => {
       await tx.car.updateMany({ where: { shipmentId: id }, data: { status: CarStatus.SHIPPED } });
       return tx.shipment.update({
         where: { id },
         data: { status: ShipmentStatus.SHIPPED, departureDate: departureDate ?? new Date() },
       });
-    });
+    })();
 
-    await audit(prisma, {
+    await audit(tx, {
       userId: request.user?.id,
       action: 'SHIP',
       entity: 'Shipment',
@@ -273,7 +288,7 @@ export async function shipmentRoutes(app: FastifyInstance) {
       ip: request.ip,
     });
     return updated;
-  });
+  }));
 
   /**
    * ARRIVAL — the single most important operation in the system.
@@ -287,7 +302,7 @@ export async function shipmentRoutes(app: FastifyInstance) {
    * The freight invoice is posted to the shipping company's USD account in the
    * same transaction.
    */
-  app.post('/api/shipments/:id/arrive', async (request) => {
+  app.post('/api/shipments/:id/arrive', async (request) => atomic(async (tx) => {
     const { id } = z.object({ id: z.coerce.number() }).parse(request.params);
     const input = z
       .object({
@@ -296,7 +311,7 @@ export async function shipmentRoutes(app: FastifyInstance) {
       })
       .parse(request.body);
 
-    const shipment = await prisma.shipment.findUnique({
+    const shipment = await tx.shipment.findUnique({
       where: { id },
       include: { cars: { include: { originExpenses: true } } },
     });
@@ -321,7 +336,7 @@ export async function shipmentRoutes(app: FastifyInstance) {
 
     const arrivalDate = input.arrivalDate ?? new Date();
 
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await (async () => {
       for (const [index, car] of shipment.cars.entries()) {
         const snapshot = arrivalCostSnapshot({
           purchasePriceUsd: car.purchasePriceUsd.toString(),
@@ -372,9 +387,9 @@ export async function shipmentRoutes(app: FastifyInstance) {
         },
         include: { cars: true },
       });
-    });
+    })();
 
-    await audit(prisma, {
+    await audit(tx, {
       userId: request.user?.id,
       action: 'ARRIVE',
       entity: 'Shipment',
@@ -383,14 +398,14 @@ export async function shipmentRoutes(app: FastifyInstance) {
       ip: request.ip,
     });
     return result;
-  });
+  }));
 
   /**
    * Arrival condition, per car. These are the checkboxes that stay disabled
    * until the car has actually arrived — ticking "damaged" on a car still in
    * Texas would put it in a garage queue it cannot be in.
    */
-  app.post('/api/cars/:id/arrival-condition', async (request) => {
+  app.post('/api/cars/:id/arrival-condition', async (request) => atomic(async (tx) => {
     const { id } = z.object({ id: z.coerce.number() }).parse(request.params);
     const input = z
       .object({
@@ -400,14 +415,14 @@ export async function shipmentRoutes(app: FastifyInstance) {
       })
       .parse(request.body);
 
-    const car = await prisma.car.findUnique({ where: { id } });
+    const car = await tx.car.findUnique({ where: { id } });
     if (!car) throw notFound('Car not found');
     if (car.status !== CarStatus.ARRIVED)
       throw new AppError('This car has not been marked as arrived yet');
 
     // Damaged goes to the garage; sound cars go straight to the showroom.
     const nextStatus = input.damaged ? CarStatus.IN_GARAGE : CarStatus.SHOWROOM;
-    const updated = await prisma.car.update({
+    const updated = await tx.car.update({
       where: { id },
       data: {
         damaged: input.damaged,
@@ -418,7 +433,7 @@ export async function shipmentRoutes(app: FastifyInstance) {
       },
     });
 
-    await audit(prisma, {
+    await audit(tx, {
       userId: request.user?.id,
       action: 'ARRIVAL_CONDITION',
       entity: 'Car',
@@ -428,20 +443,27 @@ export async function shipmentRoutes(app: FastifyInstance) {
       ip: request.ip,
     });
     return updated;
-  });
+  }));
 }
 
 // ---------------------------------------------------------------------------
 
 async function assignCars(tx: Tx, shipmentId: number, carIds: number[]) {
+  if (new Set(carIds).size !== carIds.length) throw new AppError('Choose each car only once');
+  const shipment = await tx.shipment.findUniqueOrThrow({ where: { id: shipmentId } });
+  if (shipment.status === ShipmentStatus.ARRIVED) throw new AppError('This shipment has already arrived');
   const cars = await tx.car.findMany({ where: { id: { in: carIds } } });
+  if (cars.length !== carIds.length) throw notFound('One or more cars were not found');
   for (const car of cars) {
+    if (!car.active || car.arrivalCostCfa !== null) throw new AppError('An archived or arrived car cannot be shipped');
     if (car.shipmentId && car.shipmentId !== shipmentId)
       throw new AppError(`${carLabel(car)} is already on another shipment`);
     if (car.status !== CarStatus.PURCHASED && car.status !== CarStatus.SHIPPED)
       throw new AppError(`${carLabel(car)} cannot be shipped — it is ${car.status.toLowerCase()}`);
   }
-  await tx.car.updateMany({ where: { id: { in: carIds } }, data: { shipmentId } });
+  await tx.car.updateMany({ where: { id: { in: carIds } }, data: {
+    shipmentId, status: shipment.status === ShipmentStatus.SHIPPED ? CarStatus.SHIPPED : CarStatus.PURCHASED,
+  } });
   await resplitEqually(tx, shipmentId);
 }
 

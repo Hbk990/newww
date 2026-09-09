@@ -173,7 +173,7 @@ function SellModal({
 
       <div className="row">
         <Field label="Paid now" help="Leave empty if nothing has been paid yet.">
-          <input type="number" value={initialPayment} onChange={(e) => setInitialPayment(e.target.value)} />
+          <input type="number" min="0" max={price || undefined} step="1" value={initialPayment} onChange={(e) => setInitialPayment(e.target.value)} />
         </Field>
         <Field label="How?">
           <input value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} placeholder="cash" />
@@ -183,6 +183,7 @@ function SellModal({
       {Number(initialPayment) > 0 && remaining > 0 && (
         <Alert kind="warn">{fmt(remaining)} {cfa} will still be owed on this sale.</Alert>
       )}
+      {remaining < 0 && <Alert kind="error">The initial payment cannot exceed the sale price.</Alert>}
 
       {customers.length > 0 && (
         <Field
@@ -204,7 +205,7 @@ function SellModal({
         <button className="secondary" onClick={onClose}>
           Cancel
         </button>
-        <button onClick={() => void run()} disabled={busy || !Number(price) || !buyerName}>
+        <button onClick={() => void run()} disabled={busy || Number(price) <= 0 || !buyerName.trim() || remaining < 0 || Number(initialPayment) < 0}>
           {busy ? 'Saving…' : 'Record the sale'}
         </button>
       </div>

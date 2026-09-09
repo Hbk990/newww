@@ -25,6 +25,10 @@ shipment arrives, and never changes afterwards.**
 Every figure is explained in **[docs/money-rules.md](docs/money-rules.md)** —
 read that first if a number ever surprises you.
 
+## This update
+
+See [docs/UPDATE-2026-09-09.md](docs/UPDATE-2026-09-09.md) for upgrade steps, fixes, and the bundled offline vehicle catalog (406 makes / 4,790 models).
+
 ## Running it for real
 
 See **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**: a small VPS, MySQL, HTTPS,

@@ -74,10 +74,10 @@ export async function buildApp() {
     }
     // Prisma unique-constraint violation — usually a duplicate VIN.
     if ((error as { code?: string }).code === 'P2002') {
-      const target = (error as unknown as { meta?: { target?: string[] } }).meta?.target;
+      const target = (error as unknown as { meta?: { target?: string[] | string } }).meta?.target;
       return reply
         .status(409)
-        .send({ error: `That ${target?.join(', ') ?? 'value'} already exists in the system` });
+        .send({ error: `That ${Array.isArray(target) ? target.join(', ') : target ?? 'value'} already exists in the system` });
     }
     request.log.error({ err: error }, 'Unhandled error');
     return reply.status(500).send({ error: 'Something went wrong. The error has been logged.' });

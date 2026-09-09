@@ -1,3 +1,4 @@
+import { atomic } from '../lib/atomic.js';
 import type { FastifyInstance } from 'fastify';
 import { CarStatus, LedgerKind, PartyType, SaleChannel } from '@prisma/client';
 import { z } from 'zod';
@@ -61,7 +62,10 @@ export async function saleRoutes(app: FastifyInstance) {
 
     return sales.map((sale) => {
       const costs = costBreakdown(sale.car);
-      const paid = roundCfa(sum(sale.payments.map((p) => p.amount.toString())));
+      // Origin proceeds are already settled in the supplier ledger, not collected again.
+      const paid = sale.channel === SaleChannel.ORIGIN
+        ? roundUsd(sale.price.toString())
+        : roundCfa(sum(sale.payments.map((p) => p.amount.toString())));
       const cost =
         sale.channel === SaleChannel.ORIGIN ? costs.usd.totalCostUsd : costs.landedCostCfa ?? D(0);
       return {
@@ -87,7 +91,7 @@ export async function saleRoutes(app: FastifyInstance) {
    *          into the supplier's USD account: they cancel part of what I owe
    *          him, and if they exceed it, the balance flips and he owes me.
    */
-  app.post('/api/cars/:id/sell', async (request) => {
+  app.post('/api/cars/:id/sell', async (request) => atomic(async (tx) => {
     const { id } = z.object({ id: z.coerce.number() }).parse(request.params);
     const input = z
       .object({
@@ -104,8 +108,18 @@ export async function saleRoutes(app: FastifyInstance) {
       })
       .parse(request.body);
 
-    const car = await getCarWithCosts(id);
-    const existingSale = await prisma.sale.findUnique({ where: { carId: id } });
+    const roundedPrice = input.channel === SaleChannel.ORIGIN ? roundUsd(input.price) : roundCfa(input.price);
+    if (!roundedPrice.eq(input.price)) throw new AppError(input.channel === SaleChannel.ORIGIN
+      ? 'USD prices can have at most two decimal places' : 'Enter the price in whole CFA francs');
+    if (D(input.initialPayment ?? 0).gt(input.price))
+      throw new AppError('The initial payment cannot exceed the sale price');
+    if (input.channel === SaleChannel.ORIGIN && (input.initialPayment ?? 0) > 0)
+      throw new AppError('Sales abroad settle in the supplier account. Do not enter a separate customer payment.');
+    if (input.initialPayment !== undefined && !roundCfa(input.initialPayment).eq(input.initialPayment))
+      throw new AppError('Enter payments in whole CFA francs');
+
+    const car = await getCarWithCosts(id, tx);
+    const existingSale = await tx.sale.findUnique({ where: { carId: id } });
     if (existingSale) throw new AppError('This car has already been sold');
 
     if (input.channel === SaleChannel.LOCAL) {
@@ -126,7 +140,7 @@ export async function saleRoutes(app: FastifyInstance) {
     }
 
     if (input.customerId) {
-      const customer = await prisma.party.findUnique({ where: { id: input.customerId } });
+      const customer = await tx.party.findUnique({ where: { id: input.customerId } });
       if (!customer || customer.type !== PartyType.CUSTOMER) throw notFound('Customer not found');
       if (input.channel === SaleChannel.ORIGIN)
         throw new AppError('A sale in the origin country settles in the supplier account, not a customer account');
@@ -134,7 +148,7 @@ export async function saleRoutes(app: FastifyInstance) {
 
     const currency = input.channel === SaleChannel.ORIGIN ? 'USD' : await cfaCode();
 
-    const sale = await prisma.$transaction(async (tx) => {
+    const sale = await (async () => {
       const created = await tx.sale.create({
         data: {
           carId: id,
@@ -214,9 +228,9 @@ export async function saleRoutes(app: FastifyInstance) {
       }
 
       return created;
-    });
+    })();
 
-    await audit(prisma, {
+    await audit(tx, {
       userId: request.user?.id,
       action: 'SELL',
       entity: 'Sale',
@@ -232,10 +246,10 @@ export async function saleRoutes(app: FastifyInstance) {
       sale,
       profit: profitOf(input.price, cost, input.channel === SaleChannel.ORIGIN ? 'USD' : 'CFA'),
     };
-  });
+  }));
 
   /** A later instalment. */
-  app.post('/api/sales/:id/payments', async (request) => {
+  app.post('/api/sales/:id/payments', async (request) => atomic(async (tx) => {
     const { id } = z.object({ id: z.coerce.number() }).parse(request.params);
     const input = z
       .object({
@@ -246,8 +260,11 @@ export async function saleRoutes(app: FastifyInstance) {
       })
       .parse(request.body);
 
-    const sale = await prisma.sale.findUnique({ where: { id }, include: { payments: true, car: true } });
+    const sale = await tx.sale.findUnique({ where: { id }, include: { payments: true, car: true } });
     if (!sale) throw notFound('Sale not found');
+    if (sale.channel === SaleChannel.ORIGIN)
+      throw new AppError('This sale is already settled in the supplier account; no customer payment is due.');
+    if (!roundCfa(input.amount).eq(input.amount)) throw new AppError('Enter payments in whole CFA francs');
 
     const alreadyPaid = sum(sale.payments.map((p) => p.amount.toString()));
     const remaining = D(sale.price.toString()).minus(alreadyPaid);
@@ -256,7 +273,7 @@ export async function saleRoutes(app: FastifyInstance) {
         `That is more than the ${remaining.toString()} ${sale.currency} still outstanding on this sale.`,
       );
 
-    const payment = await prisma.$transaction(async (tx) => {
+    const payment = await (async () => {
       const created = await tx.salePayment.create({
         data: {
           saleId: id,
@@ -284,9 +301,9 @@ export async function saleRoutes(app: FastifyInstance) {
         );
       }
       return created;
-    });
+    })();
 
-    await audit(prisma, {
+    await audit(tx, {
       userId: request.user?.id,
       action: 'SALE_PAYMENT',
       entity: 'SalePayment',
@@ -295,7 +312,7 @@ export async function saleRoutes(app: FastifyInstance) {
       ip: request.ip,
     });
 
-    const paid = roundUsd(sum([...sale.payments.map((p) => p.amount.toString()), input.amount]));
+    const paid = roundCfa(sum([...sale.payments.map((p) => p.amount.toString()), input.amount]));
     return { payment, paid, remaining: D(sale.price.toString()).minus(paid) };
-  });
+  }));
 }

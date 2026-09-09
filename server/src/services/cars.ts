@@ -1,5 +1,5 @@
 import { CarStatus, type Car, type OriginExpense, type RepairJob, type RepairPart } from '@prisma/client';
-import { prisma, Prisma } from '../lib/db.js';
+import { prisma, Prisma, type Tx } from '../lib/db.js';
 import { notFound } from '../lib/errors.js';
 import { carCostUsd, landedCost, roundCfa, roundUsd, sum, D } from '../lib/money.js';
 
@@ -72,8 +72,8 @@ export function costBreakdown(car: CarWithCosts) {
   };
 }
 
-export async function getCarWithCosts(id: number): Promise<CarWithCosts> {
-  const car = await prisma.car.findUnique({
+export async function getCarWithCosts(id: number, db: Tx = prisma): Promise<CarWithCosts> {
+  const car = await db.car.findUnique({
     where: { id },
     include: {
       originExpenses: { orderBy: { date: 'asc' } },

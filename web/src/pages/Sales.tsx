@@ -90,9 +90,9 @@ export default function Sales() {
                       {sale.currency === 'USD' ? fmtUsd(sale.profit.profit) : fmt(sale.profit.profit)}
                       {sale.profit.marginPct && <div className="small muted">{sale.profit.marginPct}%</div>}
                     </td>
-                    <td className="num">{Number(sale.remaining) > 0 ? fmt(sale.remaining) : '—'}</td>
+                    <td className="num">{sale.channel === 'ORIGIN' ? 'Settled with supplier' : Number(sale.remaining) > 0 ? fmt(sale.remaining) : '—'}</td>
                     <td className="num">
-                      {Number(sale.remaining) > 0 && (
+                      {sale.channel === 'LOCAL' && Number(sale.remaining) > 0 && (
                         <button className="small" onClick={() => setPaying(sale)}>
                           Payment
                         </button>

@@ -1,8 +1,9 @@
 /**
  * Talking to NHTSA vPIC — the US government's vehicle database.
  *
- * Free, no API key, no account, no limits published. It covers every make and
- * model sold in the USA and Canada, which is exactly where you buy.
+ * Free, no API key. Manufacturer-reported data for vehicles intended for sale
+ * or import into the USA; not a complete worldwide catalog. NHTSA rate-limits
+ * traffic. Make/model searches use our saved database, never this service.
  *
  * The fetching logic lives here, apart from the database writing, so it can be
  * tested against recorded responses without touching the network.
@@ -67,7 +68,8 @@ export async function vpicGet(path: string, options: FetchOptions = {}): Promise
       });
       if (!response.ok) throw new Error(`vPIC responded ${response.status}`);
       const body = (await response.json()) as { Results?: VpicRow[] };
-      return body.Results ?? [];
+      if (!Array.isArray(body.Results)) throw new Error('vPIC returned an invalid Results payload');
+      return body.Results;
     } catch (error) {
       lastError = error as Error;
       // A blocked or unreachable service fails the same way every time, so

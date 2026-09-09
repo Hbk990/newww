@@ -132,8 +132,12 @@ describe('when the service misbehaves', () => {
     );
   });
 
-  it('treats an empty Results array as no data rather than crashing', async () => {
-    const fetchImpl = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) }) as Response) as unknown as typeof fetch;
+  it('accepts an explicit empty Results array', async () => {
+    const fetchImpl = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({ Results: [] }) }) as Response) as unknown as typeof fetch;
     expect(await vpicGet('GetAllMakes', { fetchImpl })).toEqual([]);
+  });
+  it('does not save a malformed response as a successfully imported empty brand', async () => {
+    const fetchImpl = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) }) as Response) as unknown as typeof fetch;
+    await expect(vpicGet('GetAllMakes', { fetchImpl, retries: 0 })).rejects.toThrow(/invalid Results/);
   });
 });

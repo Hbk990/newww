@@ -10,36 +10,42 @@ import { checkVin, yearFromVin } from '../lib/vin.js';
  * is optional — you can always type the details in by hand.
  */
 export async function vehicleRoutes(app: FastifyInstance) {
+  app.get('/api/vehicles/catalog-status', async () => {
+    const [makes, models, row] = await Promise.all([
+      prisma.carMake.count(), prisma.carModel.count(),
+      prisma.setting.findUnique({ where: { key: 'vehicleCatalogStatus' } }),
+    ]);
+    const status = row ? JSON.parse(row.value) : null;
+    return { makes, models, complete: status?.complete ?? false,
+      importedAt: status?.importedAt ?? null, fetchedAt: status?.fetchedAt ?? null };
+  });
   /** Type "m" -> every make containing m, best matches (prefix) first. */
   app.get('/api/vehicles/makes', async (request) => {
     const { q, limit } = z
-      .object({ q: z.string().optional(), limit: z.coerce.number().max(100).default(30) })
+      .object({ q: z.string().trim().optional(), limit: z.coerce.number().int().min(1).max(100).default(30) })
       .parse(request.query);
 
     const makes = await prisma.carMake.findMany({
-      where: q ? { name: { contains: q } } : {},
+      where: q ? { name: { startsWith: q } } : {},
       orderBy: { name: 'asc' },
-      take: 300,
+      take: limit,
     });
 
-    if (!q) return makes.slice(0, limit);
-    const needle = q.toLowerCase();
-    return makes
-      .sort((a, b) => {
-        const aStarts = a.name.toLowerCase().startsWith(needle) ? 0 : 1;
-        const bStarts = b.name.toLowerCase().startsWith(needle) ? 0 : 1;
-        return aStarts - bStarts || a.name.localeCompare(b.name);
-      })
-      .slice(0, limit);
+    if (!q || makes.length === limit) return makes;
+    const others = await prisma.carMake.findMany({
+      where: { name: { contains: q }, NOT: { name: { startsWith: q } } },
+      orderBy: { name: 'asc' }, take: limit - makes.length,
+    });
+    return [...makes, ...others];
   });
 
   app.get('/api/vehicles/models', async (request) => {
     const { makeId, makeName, q, limit } = z
       .object({
-        makeId: z.coerce.number().optional(),
+        makeId: z.coerce.number().int().positive().optional(),
         makeName: z.string().optional(),
         q: z.string().optional(),
-        limit: z.coerce.number().max(200).default(50),
+        limit: z.coerce.number().int().min(1).max(200).default(50),
       })
       .parse(request.query);
 

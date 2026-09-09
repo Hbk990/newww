@@ -1,0 +1,112 @@
+CAR SHOWROOM SYSTEM — START HERE
+=================================
+
+WHAT TO INSTALL FIRST
+---------------------
+1. Node.js (LTS)   https://nodejs.org
+2. Docker Desktop  https://www.docker.com/products/docker-desktop/
+   - Tick "Use WSL 2", restart your PC when asked
+   - Open Docker Desktop and wait for the whale icon to turn GREEN
+
+   (No Docker? Install MySQL instead:
+    https://dev.mysql.com/downloads/installer/ -> "Server only")
+
+After installing Node, CLOSE PowerShell and OPEN IT AGAIN,
+or it will not find the new commands.
+
+
+THEN RUN THESE
+--------------
+Open PowerShell (Start menu -> type "powershell" -> Enter).
+
+Go to this folder. If you extracted it to C:\showroom, type:
+
+    cd C:\showroom
+
+Start the database (Docker only, first time):
+
+    docker run --name showroom-db -e MYSQL_ROOT_PASSWORD=devpassword -p 3306:3306 -d mysql:8
+
+Install and set up (takes a few minutes):
+
+    npm install
+    npm run setup
+
+When it asks about MySQL, press Enter for everything
+EXCEPT the password, where you type:   devpassword
+
+Start it:
+
+    npm run dev
+
+Open your browser at:   http://localhost:5173
+
+    username:  owner
+    password:  Showroom-Test-2026
+
+Press Ctrl+C in PowerShell to stop it.
+
+
+NEXT TIME YOU WANT TO USE IT
+----------------------------
+1. Open Docker Desktop, wait for the green whale
+2. In PowerShell:   cd C:\showroom
+3.                  docker start showroom-db
+4.                  npm run dev
+
+
+WHAT TO CHECK FIRST
+-------------------
+The practice data has three cars mid-journey.
+
+- Garage: the Mercedes shows a cost of 7,550,000.
+  Finish the repair, sell it at 9,000,000 in the Showroom.
+  The profit should be exactly 1,450,000.
+
+- Accounts -> Pierre Tremblay: his statement runs
+  10,000 -> 10,700 -> 10,500 -> 10,800 -> 0 and says "Settled".
+
+- Reports -> February 2026: the exchange loss of 108,000
+  appears on its own line, and the car's cost was NOT changed.
+
+
+CAR BRAND LIST
+--------------
+The brand and model list comes from a free US government
+service (NHTSA vPIC). No signup, no key needed.
+
+"npm run setup" already tried to load it. If your internet
+was working you have the full list already.
+
+If it said "Could not reach NHTSA vPIC", it used a smaller
+bundled list of 35 brands so you were not blocked. To load
+the full one later:
+
+    npm run db:seed:vpic
+
+That takes a few minutes. Run it again any time - it only
+adds what is missing and never touches your cars.
+
+The same service decodes a VIN into make/model/year when
+you paste one. Everything else about VINs (the 17 characters,
+the check digit, spotting a duplicate) works without internet.
+
+
+FULL GUIDES (in the docs folder)
+--------------------------------
+docs/LOCAL-TESTING.md   testing on your own PC, step by step
+docs/money-rules.md     why every number is what it is  <- READ THIS
+docs/DEPLOYMENT.md      putting it on a real server later
+
+
+IF SOMETHING GOES WRONG
+-----------------------
+"Could not reach MySQL"
+    Docker Desktop is not running, or the database is stopped.
+    Open Docker Desktop, then:  docker start showroom-db
+
+"'npm' is not recognized"
+    Node.js is not installed, or you did not reopen PowerShell.
+
+Anything else: the PowerShell window prints the real reason.
+That message is what to go on.

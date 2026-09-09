@@ -178,7 +178,7 @@ export default function CarDetail() {
 
           <Card
             title="Expenses abroad"
-            action={<AddExpense carId={car.id} disabled={costs.arrived} onAdded={load} />}
+            action={<AddExpense carId={car.id} disabled={costs.arrived || car.status === 'SOLD_IN_ORIGIN' || car.status === 'SOLD'} onAdded={load} />}
           >
             {car.originExpenses.length === 0 ? (
               <p className="muted small" style={{ margin: 0 }}>None recorded.</p>

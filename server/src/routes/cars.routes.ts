@@ -1,3 +1,4 @@
+import { atomic } from '../lib/atomic.js';
 import type { FastifyInstance } from 'fastify';
 import {
   CarStatus,
@@ -112,10 +113,10 @@ export async function carRoutes(app: FastifyInstance) {
    * database transaction as the car itself — so a car can never exist without
    * its debt, or a debt without its car.
    */
-  app.post('/api/cars', async (request) => {
+  app.post('/api/cars', async (request) => atomic(async (tx) => {
     const input = purchaseInput.parse(request.body);
 
-    const supplier = await prisma.party.findUnique({ where: { id: input.supplierId } });
+    const supplier = await tx.party.findUnique({ where: { id: input.supplierId } });
     if (!supplier || supplier.type !== PartyType.CAR_SUPPLIER) throw notFound('Supplier not found');
     if (!supplier.active) throw new AppError('That supplier has been archived');
 
@@ -145,7 +146,7 @@ export async function carRoutes(app: FastifyInstance) {
               })())
         : TaxRefundMode.NONE;
 
-    const car = await prisma.$transaction(async (tx) => {
+    const car = await (async () => {
       const created = await tx.car.create({
         data: {
           supplierId: supplier.id,
@@ -223,9 +224,9 @@ export async function carRoutes(app: FastifyInstance) {
 
       await post(tx, entries, request.user?.id);
       return created;
-    });
+    })();
 
-    await audit(prisma, {
+    await audit(tx, {
       userId: request.user?.id,
       action: 'CREATE',
       entity: 'Car',
@@ -241,12 +242,12 @@ export async function carRoutes(app: FastifyInstance) {
         ? `$${tax.capitalizedUsd} added to this car's cost, $${tax.refundableUsd} refundable`
         : null,
     };
-  });
+  }));
 
   /** Details can be corrected while the car is abroad; money cannot, once frozen. */
-  app.patch('/api/cars/:id', async (request) => {
+  app.patch('/api/cars/:id', async (request) => atomic(async (tx) => {
     const { id } = z.object({ id: z.coerce.number() }).parse(request.params);
-    const before = await prisma.car.findUnique({ where: { id } });
+    const before = await tx.car.findUnique({ where: { id } });
     if (!before) throw notFound('Car not found');
 
     const input = purchaseInput
@@ -264,7 +265,7 @@ export async function carRoutes(app: FastifyInstance) {
       input.purchasePriceUsd !== undefined &&
       !before.purchasePriceUsd.equals(new Prisma.Decimal(input.purchasePriceUsd));
 
-    const car = await prisma.$transaction(async (tx) => {
+    const car = await (async () => {
       const updated = await tx.car.update({
         where: { id },
         data: {
@@ -305,9 +306,9 @@ export async function carRoutes(app: FastifyInstance) {
       }
 
       return updated;
-    });
+    })();
 
-    await audit(prisma, {
+    await audit(tx, {
       userId: request.user?.id,
       action: 'UPDATE',
       entity: 'Car',
@@ -317,21 +318,21 @@ export async function carRoutes(app: FastifyInstance) {
       ip: request.ip,
     });
     return car;
-  });
+  }));
 
   /** An extra expense that turned up later — still charged to the supplier. */
-  app.post('/api/cars/:id/origin-expenses', async (request) => {
+  app.post('/api/cars/:id/origin-expenses', async (request) => atomic(async (tx) => {
     const { id } = z.object({ id: z.coerce.number() }).parse(request.params);
     const input = originExpenseInput.parse(request.body);
-    const car = await prisma.car.findUnique({ where: { id }, include: { supplier: true } });
+    const car = await tx.car.findUnique({ where: { id }, include: { supplier: true } });
     if (!car) throw notFound('Car not found');
 
-    if (car.arrivalCostCfa !== null)
+    if (car.arrivalCostCfa !== null || !isEditableCost(car.status))
       throw new AppError(
         'This car has arrived and its cost is frozen, so an expense can no longer be added to it. Record it against the supplier from the Money screen instead.',
       );
 
-    const expense = await prisma.$transaction(async (tx) => {
+    const expense = await (async () => {
       const created = await tx.originExpense.create({
         data: {
           carId: id,
@@ -355,9 +356,9 @@ export async function carRoutes(app: FastifyInstance) {
         request.user?.id,
       );
       return created;
-    });
+    })();
 
-    await audit(prisma, {
+    await audit(tx, {
       userId: request.user?.id,
       action: 'CREATE',
       entity: 'OriginExpense',
@@ -366,21 +367,21 @@ export async function carRoutes(app: FastifyInstance) {
       ip: request.ip,
     });
     return expense;
-  });
+  }));
 
   /** Marks a separately-refunded tax as actually received, so it stops chasing you. */
-  app.post('/api/cars/:id/tax-refund/settle', async (request) => {
+  app.post('/api/cars/:id/tax-refund/settle', async (request) => atomic(async (tx) => {
     const { id } = z.object({ id: z.coerce.number() }).parse(request.params);
-    const car = await prisma.car.findUnique({ where: { id } });
+    const car = await tx.car.findUnique({ where: { id } });
     if (!car) throw notFound('Car not found');
     if (car.taxRefundableUsd.lte(0)) throw new AppError('This car has no refundable tax');
     if (car.taxRefundSettled) throw new AppError('That refund is already marked as received');
 
-    const updated = await prisma.car.update({
+    const updated = await tx.car.update({
       where: { id },
       data: { taxRefundSettled: true, taxRefundSettledAt: new Date() },
     });
-    await audit(prisma, {
+    await audit(tx, {
       userId: request.user?.id,
       action: 'TAX_REFUND_SETTLED',
       entity: 'Car',
@@ -390,5 +391,5 @@ export async function carRoutes(app: FastifyInstance) {
       ip: request.ip,
     });
     return updated;
-  });
+  }));
 }

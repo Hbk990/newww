@@ -355,6 +355,7 @@ model RepairJob {
   description   String?     @db.Text
   date          DateTime
   createdAt     DateTime    @default(now())
+  ledgerEntryId Int?       @unique // exact charge; null only for legacy repairs
 
   car    Car   @relation(fields: [carId], references: [id])
   worker Party @relation(fields: [workerId], references: [id])
@@ -370,6 +371,7 @@ model RepairPart {
   partsSupplierId Int
   date            DateTime
   createdAt       DateTime @default(now())
+  ledgerEntryId   Int?     @unique // exact charge; null only for legacy parts
 
   car           Car   @relation(fields: [carId], references: [id])
   partsSupplier Party @relation(fields: [partsSupplierId], references: [id])

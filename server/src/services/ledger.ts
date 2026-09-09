@@ -1,6 +1,7 @@
 import { LedgerKind, PartyType, type Prisma as PrismaTypes } from '@prisma/client';
 import { prisma, Prisma, type Tx } from '../lib/db.js';
 import { AppError, notFound } from '../lib/errors.js';
+import { atomic } from '../lib/atomic.js';
 
 /**
  * THE ONLY PLACE LEDGER ENTRIES ARE WRITTEN.
@@ -68,22 +69,25 @@ export interface PostableEntry {
 
 /** Writes ledger lines. Always call inside a transaction with the business row. */
 export async function post(tx: Tx, entries: PostableEntry[], userId?: number | null) {
-  if (entries.length === 0) return;
-  await tx.ledgerEntry.createMany({
-    data: entries.map((e) => ({
-      partyId: e.partyId,
-      date: e.date,
-      kind: e.kind,
-      amount: new Prisma.Decimal(e.amount as never),
-      description: e.description,
-      carId: e.carId ?? null,
-      shipmentId: e.shipmentId ?? null,
-      saleId: e.saleId ?? null,
-      transactionId: e.transactionId ?? null,
-      reversesId: e.reversesId ?? null,
-      createdBy: userId ?? null,
-    })),
-  });
+  const created = [];
+  for (const e of entries) {
+    created.push(await tx.ledgerEntry.create({
+      data: {
+        partyId: e.partyId,
+        date: e.date,
+        kind: e.kind,
+        amount: new Prisma.Decimal(e.amount as never),
+        description: e.description,
+        carId: e.carId ?? null,
+        shipmentId: e.shipmentId ?? null,
+        saleId: e.saleId ?? null,
+        transactionId: e.transactionId ?? null,
+        reversesId: e.reversesId ?? null,
+        createdBy: userId ?? null,
+      },
+    }));
+  }
+  return created;
 }
 
 /** A balance is always the sum of the lines — it is never stored anywhere. */
@@ -152,27 +156,29 @@ export async function statement(partyId: number, from?: Date, to?: Date) {
  * which is the point — you can see that a correction happened.
  */
 export async function reverseEntry(entryId: number, reason: string, userId?: number | null) {
-  return prisma.$transaction(async (tx) => {
-    const original = await tx.ledgerEntry.findUnique({ where: { id: entryId } });
-    if (!original) throw notFound('Ledger entry not found');
-    const already = await tx.ledgerEntry.findFirst({ where: { reversesId: entryId } });
-    if (already) throw new AppError('That entry has already been reversed', 409);
+  return atomic((tx) => reverseEntryInTransaction(tx, entryId, reason, userId));
+}
 
-    const created = await tx.ledgerEntry.create({
-      data: {
-        partyId: original.partyId,
-        date: new Date(),
-        kind: LedgerKind.REVERSAL,
-        amount: original.amount.negated(),
-        description: `Reversal of #${original.id}: ${reason}`,
-        carId: original.carId,
-        shipmentId: original.shipmentId,
-        saleId: original.saleId,
-        transactionId: original.transactionId,
-        reversesId: original.id,
-        createdBy: userId ?? null,
-      },
-    });
-    return created;
+export async function reverseEntryInTransaction(tx: Tx, entryId: number, reason: string, userId?: number | null) {
+  const original = await tx.ledgerEntry.findUnique({ where: { id: entryId } });
+  if (!original) throw notFound('Ledger entry not found');
+  const already = await tx.ledgerEntry.findFirst({ where: { reversesId: entryId } });
+  if (already) throw new AppError('That entry has already been reversed', 409);
+
+  const created = await tx.ledgerEntry.create({
+    data: {
+      partyId: original.partyId,
+      date: new Date(),
+      kind: LedgerKind.REVERSAL,
+      amount: original.amount.negated(),
+      description: `Reversal of #${original.id}: ${reason}`,
+      carId: original.carId,
+      shipmentId: original.shipmentId,
+      saleId: original.saleId,
+      transactionId: original.transactionId,
+      reversesId: original.id,
+      createdBy: userId ?? null,
+    },
   });
+  return created;
 }

@@ -137,11 +137,11 @@ export async function consumeRecoveryCode(userId: number, code: string): Promise
   const candidates = await prisma.recoveryCode.findMany({ where: { userId, usedAt: null } });
   for (const candidate of candidates) {
     if (await argon2.verify(candidate.codeHash, code.trim().toUpperCase()).catch(() => false)) {
-      await prisma.recoveryCode.update({
-        where: { id: candidate.id },
+      const consumed = await prisma.recoveryCode.updateMany({
+        where: { id: candidate.id, userId, usedAt: null },
         data: { usedAt: new Date() },
       });
-      return true;
+      return consumed.count === 1;
     }
   }
   return false;

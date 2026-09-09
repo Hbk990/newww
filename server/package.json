@@ -15,7 +15,8 @@
     "generate": "prisma generate",
     "seed:vpic": "tsx prisma/seed-vpic.ts",
     "seed:demo": "tsx prisma/seed-demo.ts",
-    "create:user": "tsx scripts/create-user.ts"
+    "create:user": "tsx scripts/create-user.ts",
+    "test:unit": "vitest run --config vitest.unit.config.ts"
   },
   "dependencies": {
     "@fastify/cookie": "^11.0.2",

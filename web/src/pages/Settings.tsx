@@ -19,9 +19,12 @@ export default function SettingsPage() {
   const [businessName, setBusinessName] = useState(settings.businessName);
   const [saved, setSaved] = useState(false);
   const [audit, setAudit] = useState<AuditRow[]>([]);
+  const [catalog, setCatalog] = useState<{ makes: number; models: number; complete: boolean; importedAt: string | null } | null>(null);
+  const [catalogError, setCatalogError] = useState('');
 
   useEffect(() => {
     void api.get<AuditRow[]>('/api/audit?limit=40').then(setAudit);
+    void api.get<NonNullable<typeof catalog>>('/api/vehicles/catalog-status').then(setCatalog).catch(e => setCatalogError(e.message));
   }, []);
 
   const { busy, error, run } = useSubmit(async () => {
@@ -70,6 +73,14 @@ export default function SettingsPage() {
 
           <TwoFactor />
           <ChangePassword />
+          <Card title="Vehicle catalog">
+            <Alert kind="error">{catalogError}</Alert>
+            {catalog && <>
+              <p>{catalog.makes} makes · {catalog.models} models saved</p>
+              <p className="small muted">Brand and model searches use your saved catalog. Only VIN decoding needs the external service. Missing models can still be entered manually.</p>
+              <p className="small muted">{catalog.complete ? 'Catalog imported' : 'Full catalog import not completed'}{catalog.importedAt ? ` · ${fmtDate(catalog.importedAt)}` : ''}</p>
+            </>}
+          </Card>
         </div>
 
         <div>
