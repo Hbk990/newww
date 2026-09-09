@@ -116,6 +116,10 @@ $lpGroupBlurbs=[
   'Cameras, Security & Projection'=>'IP cameras, action cameras, tripods, gimbals, projectors',
   'Storage, Network & TV'=>'Memory, storage, network gear, TV boxes',
   'Car Electronics'=>'Car chargers, FM transmitters, mounts',
+  /* Every category whose group is left as "Other" lands on this card. Reword the
+     line to suit whatever ends up there; a group with no line here still renders,
+     just without a description. */
+  'Other'=>'Tablets and other devices',
 ];
 $lpBrands=['XO','Green Lion','Porodo','Razer','Powerology','HyperX','Jmary','Apple',
            'Samsung','JBL','Anker','HP','Sony','Xiaomi','MeeTion','SanDisk'];
