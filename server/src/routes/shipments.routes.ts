@@ -82,10 +82,11 @@ export async function shipmentRoutes(app: FastifyInstance) {
   app.post('/api/shipments', async (request) => atomic(async (tx) => {
     const input = z
       .object({
-        /** Optional: the shipping line's own paperwork number, if you use it. */
-        reference: z.string().optional().nullable(),
+        /** What you call this shipment — how you recognise the group later. */
+        reference: z.string().min(1, 'Give this shipment a name so you can recognise it'),
         shippingCompanyId: z.coerce.number(),
-        freightCostUsd: money,
+        /** Usually left until arrival, when the invoice is known. */
+        freightCostUsd: money.optional().default(0),
         departureDate: z.coerce.date().optional().nullable(),
         note: z.string().optional().nullable(),
         carIds: z.array(z.coerce.number()).optional().default([]),
@@ -99,7 +100,7 @@ export async function shipmentRoutes(app: FastifyInstance) {
     const shipment = await (async () => {
       const created = await tx.shipment.create({
         data: {
-          reference: input.reference?.trim() || autoReference(),
+          reference: input.reference.trim(),
           shippingCompanyId: input.shippingCompanyId,
           freightCostUsd: new Prisma.Decimal(input.freightCostUsd),
           departureDate: input.departureDate ?? null,
@@ -322,6 +323,10 @@ export async function shipmentRoutes(app: FastifyInstance) {
       .object({
         cfaRate: z.coerce.number().positive('Enter the CFA rate used for this shipment'),
         arrivalDate: z.coerce.date().optional(),
+        /** The freight invoice, which is normally only known now. */
+        freightCostUsd: money.optional(),
+        /** Optional uneven split; otherwise the freight is divided equally. */
+        shares: z.array(z.object({ carId: z.coerce.number(), amountUsd: money })).optional(),
       })
       .parse(request.body);
 
@@ -334,19 +339,36 @@ export async function shipmentRoutes(app: FastifyInstance) {
       throw new AppError('This shipment has already been marked as arrived');
     if (shipment.cars.length === 0) throw new AppError('This shipment has no cars');
 
-    // Every car must carry a share, and the shares must equal the invoice.
-    const missingShare = shipment.cars.some((c) => c.freightShareUsd === null);
-    const shares = missingShare
-      ? splitFreightEqually(shipment.freightCostUsd.toString(), shipment.cars.length)
-      : shipment.cars.map((c) => c.freightShareUsd!);
-    const check = checkFreightShares(
-      shares.map((s) => s.toString()),
-      shipment.freightCostUsd.toString(),
-    );
-    if (!check.ok)
-      throw new AppError(
-        `The freight shares add up to $${check.totalOfShares} but the invoice is $${shipment.freightCostUsd}. Fix the shares before marking this arrived.`,
-      );
+    // The freight invoice arrives with the cars, so it is entered here. An
+    // amount given now replaces whatever was recorded when they sailed.
+    const freight =
+      input.freightCostUsd === undefined
+        ? shipment.freightCostUsd
+        : new Prisma.Decimal(input.freightCostUsd);
+    if (freight.lte(0))
+      throw new AppError('Enter the freight invoice for this shipment before marking it arrived');
+
+    // Shares given by hand must cover every car and add up to the invoice;
+    // otherwise the freight is divided equally.
+    let shares: { toString(): string }[];
+    if (input.shares && input.shares.length > 0) {
+      const onShipment = new Set(shipment.cars.map((car) => car.id));
+      const given = new Map(input.shares.map((share) => [share.carId, share.amountUsd]));
+      if (input.shares.some((share) => !onShipment.has(share.carId)))
+        throw new AppError('One of those cars is not on this shipment');
+      if (given.size !== onShipment.size)
+        throw new AppError(
+          `Give a freight share for every car on this shipment — ${onShipment.size} car(s), ${given.size} given.`,
+        );
+      const check = checkFreightShares([...given.values()], freight.toString());
+      if (!check.ok)
+        throw new AppError(
+          `The shares add up to $${check.totalOfShares} but the freight is $${freight}. That is $${check.difference.abs()} ${check.difference.gt(0) ? 'too much' : 'missing'}.`,
+        );
+      shares = shipment.cars.map((car) => given.get(car.id)!);
+    } else {
+      shares = splitFreightEqually(freight.toString(), shipment.cars.length);
+    }
 
     const arrivalDate = input.arrivalDate ?? new Date();
 
@@ -384,7 +406,7 @@ export async function shipmentRoutes(app: FastifyInstance) {
             partyId: shipment.shippingCompanyId,
             date: arrivalDate,
             kind: LedgerKind.FREIGHT_INVOICE,
-            amount: shipment.freightCostUsd,
+            amount: freight,
             description: `Freight — ${shipment.cars.length} car${shipment.cars.length > 1 ? 's' : ''}: ${shipment.cars
               .map((c) => `${c.year} ${c.makeName} ${c.modelName}`)
               .join(', ')}`,
@@ -399,6 +421,7 @@ export async function shipmentRoutes(app: FastifyInstance) {
         data: {
           status: ShipmentStatus.ARRIVED,
           arrivalDate,
+          freightCostUsd: freight,
           cfaRate: new Prisma.Decimal(input.cfaRate),
         },
         include: { cars: true },
@@ -427,16 +450,29 @@ export async function shipmentRoutes(app: FastifyInstance) {
    * Other cars still waiting in the origin country can travel with it, which is
    * the normal case for a container.
    */
+  /**
+   * SHIP A CAR STRAIGHT FROM THE CAR LIST.
+   *
+   * Eight cars rarely leave at once — they are bought over weeks and loaded as
+   * they are ready. So shipping a car either starts a new shipment or adds it
+   * to one that has not arrived yet, and the shipment carries a name you chose
+   * so you can recognise the group when the next car is ready to join it.
+   *
+   * Freight is not asked for here. The invoice is normally only known when the
+   * cars land, and it is entered then.
+   */
   app.post('/api/cars/:id/ship', async (request) => atomic(async (tx) => {
     const { id } = z.object({ id: z.coerce.number() }).parse(request.params);
     const input = z
       .object({
-        shippingCompanyId: z.coerce.number(),
-        freightCostUsd: money,
+        /** Join this shipment... */
+        shipmentId: z.coerce.number().optional(),
+        /** ...or start a new one with this name and company. */
+        reference: z.string().optional(),
+        shippingCompanyId: z.coerce.number().optional(),
         departureDate: z.coerce.date().optional().nullable(),
-        /** Other cars loaded with it. The car in the URL is always included. */
+        /** Other cars loaded at the same time. */
         alsoCarIds: z.array(z.coerce.number()).optional().default([]),
-        reference: z.string().optional().nullable(),
         note: z.string().optional().nullable(),
       })
       .parse(request.body);
@@ -448,41 +484,69 @@ export async function shipmentRoutes(app: FastifyInstance) {
     if (car.status !== CarStatus.PURCHASED)
       throw new AppError(`This car cannot be shipped — it is ${car.status.toLowerCase().replace(/_/g, ' ')}.`);
 
-    const company = await tx.party.findUnique({ where: { id: input.shippingCompanyId } });
-    if (!company || company.type !== PartyType.SHIPPING_COMPANY)
-      throw notFound('Shipping company not found');
-
     const carIds = [...new Set([id, ...input.alsoCarIds])];
     const departureDate = input.departureDate ?? new Date();
 
-    const shipment = await tx.shipment.create({
-      data: {
-        reference: input.reference?.trim() || autoReference(),
-        shippingCompanyId: company.id,
-        freightCostUsd: new Prisma.Decimal(input.freightCostUsd),
-        departureDate,
-        note: input.note || null,
-      },
-    });
+    let shipment;
+    if (input.shipmentId) {
+      // Joining a group that is already on its way.
+      const existing = await tx.shipment.findUnique({ where: { id: input.shipmentId } });
+      if (!existing) throw notFound('Shipment not found');
+      if (existing.status === ShipmentStatus.ARRIVED)
+        throw new AppError(
+          `"${existing.reference}" has already arrived, so nothing more can be added to it.`,
+        );
+      shipment = existing;
+    } else {
+      if (!input.reference?.trim())
+        throw new AppError('Give this shipment a name so you can recognise it later');
+      if (!input.shippingCompanyId) throw new AppError('Choose the shipping company');
+      const company = await tx.party.findUnique({ where: { id: input.shippingCompanyId } });
+      if (!company || company.type !== PartyType.SHIPPING_COMPANY)
+        throw notFound('Shipping company not found');
+
+      shipment = await tx.shipment.create({
+        data: {
+          reference: input.reference.trim(),
+          shippingCompanyId: company.id,
+          freightCostUsd: new Prisma.Decimal(0), // entered when it arrives
+          departureDate,
+          note: input.note || null,
+        },
+      });
+    }
 
     await assignCars(tx, shipment.id, carIds);
     await tx.car.updateMany({ where: { shipmentId: shipment.id }, data: { status: CarStatus.SHIPPED } });
     const sailed = await tx.shipment.update({
       where: { id: shipment.id },
-      data: { status: ShipmentStatus.SHIPPED },
-      include: { cars: true },
+      data: { status: ShipmentStatus.SHIPPED, departureDate: shipment.departureDate ?? departureDate },
+      include: { cars: true, shippingCompany: { select: { id: true, name: true } } },
     });
 
     await audit(tx, {
       userId: request.user?.id,
-      action: 'SHIP_FROM_CAR',
+      action: input.shipmentId ? 'JOIN_SHIPMENT' : 'SHIP_FROM_CAR',
       entity: 'Shipment',
       entityId: shipment.id,
-      after: { carIds, shippingCompany: company.name },
+      after: { carIds, reference: shipment.reference },
       ip: request.ip,
     });
     return sailed;
   }));
+
+  /** Shipments a car can still be added to: sailed, not yet arrived. */
+  app.get('/api/shipments/open', async () => {
+    const shipments = await prisma.shipment.findMany({
+      where: { status: { not: ShipmentStatus.ARRIVED } },
+      include: {
+        shippingCompany: { select: { id: true, name: true } },
+        cars: { select: { id: true, year: true, makeName: true, modelName: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return shipments;
+  });
 
   /**
    * Arrival condition, per car. These are the checkboxes that stay disabled

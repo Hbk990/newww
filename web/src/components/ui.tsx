@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { CarStatus } from '../lib/api';
 
 export function Card({ title, action, children }: { title?: string; action?: ReactNode; children: ReactNode }) {
@@ -55,13 +56,20 @@ export function Modal({
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  return (
+  // Rendered at the top of the page rather than where it was opened from.
+  // A dialog opened from a table cell used to sit inside that cell in the DOM,
+  // so it inherited the cell's styling — text in a dialog opened from a numbers
+  // column ran off the side instead of wrapping, because those cells are set
+  // not to wrap. A portal also keeps it clear of any parent that clips or
+  // scrolls its contents.
+  return createPortal(
     <div className="modal-backdrop" onClick={onClose}>
       <div className={`modal${wide ? ' wide' : ''}`} onClick={(e) => e.stopPropagation()}>
         <h2>{title}</h2>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

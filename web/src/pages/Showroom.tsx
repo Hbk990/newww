@@ -12,6 +12,9 @@ export default function Showroom() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [condition, setCondition] = useState<'all' | 'clean' | 'repaired'>('all');
+  const [priced, setPriced] = useState<'all' | 'priced' | 'unpriced'>('all');
+  const [sort, setSort] = useState<'oldest' | 'newest' | 'cost' | 'price' | 'profit'>('oldest');
 
   const load = () =>
     api
@@ -24,9 +27,53 @@ export default function Showroom() {
     return () => clearTimeout(timer);
   }, [search]);
 
+  const shown = (cars ?? [])
+    .filter((car) => (condition === 'all' ? true : condition === 'repaired' ? car.damaged : !car.damaged))
+    .filter((car) =>
+      priced === 'all' ? true : priced === 'priced' ? Boolean(car.askingPriceCfa) : !car.askingPriceCfa,
+    )
+    .sort((a, b) => {
+      switch (sort) {
+        case 'newest':
+          return (b.daysInStock ?? 0) - (a.daysInStock ?? 0) === 0 ? 0 : (a.daysInStock ?? 0) - (b.daysInStock ?? 0);
+        case 'cost':
+          return Number(b.costs.landedCostCfa ?? 0) - Number(a.costs.landedCostCfa ?? 0);
+        case 'price':
+          return Number(b.askingPriceCfa ?? 0) - Number(a.askingPriceCfa ?? 0);
+        case 'profit':
+          return Number(b.potentialProfitCfa ?? 0) - Number(a.potentialProfitCfa ?? 0);
+        default:
+          return (b.daysInStock ?? 0) - (a.daysInStock ?? 0);
+      }
+    });
+
+  const stockValue = shown.reduce((sum, car) => sum + Number(car.costs.landedCostCfa ?? 0), 0);
+  const askingTotal = shown.reduce((sum, car) => sum + Number(car.askingPriceCfa ?? 0), 0);
+  const unpriced = (cars ?? []).filter((car) => !car.askingPriceCfa).length;
+  const sittingLong = (cars ?? []).filter((car) => (car.daysInStock ?? 0) >= 60).length;
+
   return (
     <>
-      <PageHeader title="Showroom" sub="Ready to sell, with what each one really cost you" />
+      <PageHeader
+        title="Showroom"
+        sub={
+          cars
+            ? `${cars.length} car${cars.length === 1 ? '' : 's'} · ${fmt(stockValue.toFixed(0))} ${cfa} tied up`
+            : 'Ready to sell, with what each one really cost you'
+        }
+      />
+
+      {sittingLong > 0 && (
+        <Alert kind="warn">
+          {sittingLong} car{sittingLong > 1 ? 's have' : ' has'} been in the showroom for 60 days or
+          more. Money sitting still.
+        </Alert>
+      )}
+      {unpriced > 0 && (
+        <Alert kind="info">
+          {unpriced} car{unpriced > 1 ? 's have' : ' has'} no asking price yet.
+        </Alert>
+      )}
 
       <Alert kind="error">{error}</Alert>
       <Alert kind="success">{message}</Alert>
@@ -39,11 +86,41 @@ export default function Showroom() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by VIN, brand, model, colour or supplier…"
-            style={{ marginBottom: 12 }}
+            style={{ marginBottom: 10 }}
           />
-          {cars.length === 0 ? (
+
+          <div className="row" style={{ marginBottom: 12 }}>
+            <div style={{ flex: '0 0 190px' }}>
+              <select value={condition} onChange={(e) => setCondition(e.target.value as typeof condition)}>
+                <option value="all">Every car</option>
+                <option value="clean">Arrived undamaged</option>
+                <option value="repaired">Repaired in the garage</option>
+              </select>
+            </div>
+            <div style={{ flex: '0 0 180px' }}>
+              <select value={priced} onChange={(e) => setPriced(e.target.value as typeof priced)}>
+                <option value="all">Priced or not</option>
+                <option value="priced">Has an asking price</option>
+                <option value="unpriced">No asking price yet</option>
+              </select>
+            </div>
+            <div style={{ flex: '0 0 210px' }}>
+              <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
+                <option value="oldest">Longest in stock first</option>
+                <option value="newest">Newest arrivals first</option>
+                <option value="cost">Most expensive first</option>
+                <option value="price">Highest asking price</option>
+                <option value="profit">Best profit first</option>
+              </select>
+            </div>
+          </div>
+          {shown.length === 0 ? (
             <Empty>
-              {search ? `No car in the showroom matches “${search}”.` : 'Nothing in the showroom yet.'}
+              {cars.length === 0
+                ? search
+                  ? `No car in the showroom matches “${search}”.`
+                  : 'Nothing in the showroom yet.'
+                : 'No car matches those filters.'}
             </Empty>
           ) : (
           <>
@@ -60,7 +137,7 @@ export default function Showroom() {
                 </tr>
               </thead>
               <tbody>
-                {cars.map((car) => (
+                {shown.map((car) => (
                   <tr key={car.id}>
                     <td className="strong">
                       <Link to={`/cars/${car.id}`}>
@@ -76,7 +153,9 @@ export default function Showroom() {
                     <td className={`num ${Number(car.potentialProfitCfa ?? 0) < 0 ? 'neg' : 'pos'}`}>
                       {fmt(car.potentialProfitCfa)}
                     </td>
-                    <td className="num">{car.daysInStock ?? '—'}</td>
+                    <td className={`num ${(car.daysInStock ?? 0) >= 60 ? 'neg strong' : ''}`}>
+                      {car.daysInStock ?? '—'}
+                    </td>
                     <td className="num">
                       <button className="small" onClick={() => setSelling(car)}>
                         Sell
@@ -88,8 +167,9 @@ export default function Showroom() {
             </table>
           </div>
           <p className="small muted" style={{ marginBottom: 0 }}>
-            All amounts in {cfa}. Landed cost = purchase, expenses, tax and freight at the locked
-            rate, plus any garage work.
+            Showing {shown.length} of {cars.length}. All amounts in {cfa}. Landed cost = purchase,
+            expenses, tax and freight at the locked rate, plus any garage work.
+            {askingTotal > 0 && ` Asking prices here total ${fmt(askingTotal.toFixed(0))}.`}
           </p>
           </>
           )}
