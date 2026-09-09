@@ -1,6 +1,10 @@
+import { existsSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
+import fastifyStatic from '@fastify/static';
 import { ZodError } from 'zod';
 import { env } from './lib/env.js';
 import { AppError } from './lib/errors.js';
@@ -91,6 +95,18 @@ export async function buildApp() {
   await app.register(treasuryRoutes);
   await app.register(reportRoutes);
   await app.register(settingsRoutes);
+
+  // In production the API also serves the built interface, so the whole system
+  // is one process behind one certificate — no CORS, no second deployment.
+  const webDist = join(dirname(fileURLToPath(import.meta.url)), '../../web/dist');
+  if (existsSync(webDist)) {
+    await app.register(fastifyStatic, { root: webDist });
+    // Any non-API path renders the app; the browser router takes it from there.
+    app.setNotFoundHandler((request, reply) => {
+      if (request.url.startsWith('/api/')) return reply.status(404).send({ error: 'Not found' });
+      return reply.sendFile('index.html');
+    });
+  }
 
   return app;
 }
