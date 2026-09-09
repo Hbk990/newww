@@ -141,10 +141,24 @@ try {
   fail('Run "npm install" in this folder first.');
 }
 
+// A container started seconds ago is still bringing MySQL up, so a first
+// attempt fails on a machine where everything is actually fine. Wait for it
+// rather than reporting a problem that is about to solve itself.
 let db;
-try {
-  db = await mysql.createConnection(connection);
-} catch (error) {
+let lastError;
+for (let attempt = 1; attempt <= 20; attempt++) {
+  try {
+    db = await mysql.createConnection(connection);
+    break;
+  } catch (error) {
+    lastError = error;
+    if (attempt === 1) say('  Waiting for MySQL to be ready…');
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+  }
+}
+
+if (!db) {
+  const error = lastError;
   say('');
   fail(
     `Could not reach MySQL at ${connection.host}:${connection.port}.\n\n` +
