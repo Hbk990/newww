@@ -1,0 +1,483 @@
+// Car Import & Showroom Management System — database schema
+//
+// MONEY RULES ENCODED HERE (see docs/money-rules.md):
+//  1. Every amount is Decimal(18,4); every FX rate is Decimal(18,6). Never a float.
+//  2. A shipment's cfaRate is written ONCE on arrival and then frozen. Car cost
+//     snapshots (Car.*Cfa) are written at that same moment and never recomputed.
+//  3. Balances are never stored — a balance is always SUM(LedgerEntry.amount).
+//  4. Ledger entries are immutable. A mistake is corrected with a REVERSAL entry.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Auth, audit
+// ---------------------------------------------------------------------------
+
+model User {
+  id            Int       @id @default(autoincrement())
+  username      String    @unique
+  passwordHash  String    @db.Text
+  totpSecret    String?   @db.Text
+  totpEnabled   Boolean   @default(false)
+  failedLogins  Int       @default(0)
+  lockedUntil   DateTime?
+  createdAt     DateTime  @default(now())
+  lastLoginAt   DateTime?
+
+  sessions      Session[]
+  recoveryCodes RecoveryCode[]
+  auditLogs     AuditLog[]
+}
+
+model RecoveryCode {
+  id       Int       @id @default(autoincrement())
+  userId   Int
+  codeHash String    @db.Text
+  usedAt   DateTime?
+  user     User      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model Session {
+  id        String   @id // random token, stored hashed
+  userId    Int
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  ip        String?
+  userAgent String?  @db.Text
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model AuditLog {
+  id       Int      @id @default(autoincrement())
+  userId   Int?
+  at       DateTime @default(now())
+  action   String // CREATE | UPDATE | DELETE | LOGIN | LOGIN_FAILED | ...
+  entity   String
+  entityId String?
+  before   String?  @db.LongText // JSON
+  after    String?  @db.LongText // JSON
+  ip       String?
+  user     User?    @relation(fields: [userId], references: [id])
+
+  @@index([at])
+  @@index([entity, entityId])
+}
+
+model Setting {
+  key   String @id
+  value String @db.Text
+}
+
+// ---------------------------------------------------------------------------
+// Parties — every counterparty that can hold a running balance
+// ---------------------------------------------------------------------------
+
+enum PartyType {
+  CAR_SUPPLIER // USD. Balance + = I owe him
+  SHIPPING_COMPANY // USD. Balance + = I owe him
+  TRANSFER_COMPANY // CFA. Balance + = he holds my money; - = I overdrew
+  WORKER // CFA. Balance + = I owe him
+  PARTS_SUPPLIER // CFA. Balance + = I owe him
+  CUSTOMER // CFA. Balance + = he owes me
+}
+
+enum Country {
+  USA
+  CANADA
+}
+
+enum WholesalerType {
+  PRICE_ONLY // invoice is the car price only
+  PRICE_PLUS_TAX // invoice is car price + tax (Canada tax rule applies)
+}
+
+enum WorkerRole {
+  GARAGE
+  SHOWROOM
+}
+
+model Party {
+  id          Int             @id @default(autoincrement())
+  type        PartyType
+  name        String
+  companyName String?
+  mobile      String?
+  currency    String // "USD" or the configured CFA code
+  // car suppliers only
+  country     Country?
+  wholesaler  WholesalerType?
+  // workers only
+  workerRole  WorkerRole?
+  note        String?         @db.Text
+  active      Boolean         @default(true) // soft delete: never erase history
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  ledger            LedgerEntry[]
+  carsSupplied      Car[]              @relation("CarSupplier")
+  shipments         Shipment[]
+  repairJobs        RepairJob[]
+  repairParts       RepairPart[]
+  overheads         OverheadExpense[]
+  transfersFrom     Transaction[]      @relation("TransferCompany")
+  transfersTo       Transaction[]      @relation("Counterparty")
+  sales             Sale[]
+
+  @@index([type, active])
+}
+
+enum LedgerKind {
+  OPENING_BALANCE
+  CAR_PURCHASE
+  ORIGIN_EXPENSE
+  TAX_CHARGE
+  TAX_REFUND_CREDIT
+  FREIGHT_INVOICE
+  LABOUR_CHARGE
+  PARTS_CHARGE
+  SALARY_CHARGE
+  SALE_CHARGE
+  SALE_PAYMENT
+  ORIGIN_SALE_PROCEEDS
+  DEPOSIT
+  WIRE_OUT
+  PAYMENT
+  FEE
+  REVERSAL
+  ADJUSTMENT
+}
+
+/// Immutable. `amount` is signed, in the party's own currency.
+/// Sign meaning per party type is documented on PartyType above.
+model LedgerEntry {
+  id            Int        @id @default(autoincrement())
+  partyId       Int
+  date          DateTime
+  kind          LedgerKind
+  amount        Decimal    @db.Decimal(18, 4)
+  description   String     @db.Text
+  // provenance — what caused this line
+  carId         Int?
+  shipmentId    Int?
+  saleId        Int?
+  transactionId Int?
+  reversesId    Int? // set on a REVERSAL line
+  createdAt     DateTime   @default(now())
+  createdBy     Int?
+
+  party       Party        @relation(fields: [partyId], references: [id])
+  car         Car?         @relation(fields: [carId], references: [id])
+  shipment    Shipment?    @relation(fields: [shipmentId], references: [id])
+  sale        Sale?        @relation(fields: [saleId], references: [id])
+  transaction Transaction? @relation(fields: [transactionId], references: [id])
+
+  @@index([partyId, date])
+  @@index([carId])
+  @@index([transactionId])
+}
+
+// ---------------------------------------------------------------------------
+// Vehicle reference data (seeded from NHTSA vPIC — works offline once seeded)
+// ---------------------------------------------------------------------------
+
+model CarMake {
+  id     Int        @id @default(autoincrement())
+  vpicId Int?       @unique
+  name   String     @unique
+  models CarModel[]
+
+  @@index([name])
+}
+
+model CarModel {
+  id     Int     @id @default(autoincrement())
+  makeId Int
+  vpicId Int?
+  name   String
+  make   CarMake @relation(fields: [makeId], references: [id])
+
+  @@unique([makeId, name])
+  @@index([name])
+}
+
+// ---------------------------------------------------------------------------
+// Cars
+// ---------------------------------------------------------------------------
+
+enum CarStatus {
+  PURCHASED // bought, still in origin country
+  SHIPPED // on a shipment that has sailed
+  ARRIVED // shipment arrived, rate locked, cost in CFA
+  IN_GARAGE // damaged, being repaired
+  SHOWROOM // ready to sell
+  SOLD // sold locally in CFA
+  SOLD_IN_ORIGIN // sold in USA/Canada, never shipped, settled in supplier's USD account
+}
+
+enum TaxRefundMode {
+  NONE
+  SUPPLIER_CREDIT // excess over threshold credited to the supplier's account
+  SEPARATE_REFUND // excess paid back to me separately — tracked until received
+}
+
+model Car {
+  id         Int    @id @default(autoincrement())
+  supplierId Int
+  makeName   String
+  modelName  String
+  year       Int
+  color      String
+  vin        String @unique
+
+  purchasePriceUsd Decimal @db.Decimal(18, 4)
+  purchaseDate     DateTime
+
+  // Canada tax (zero for USA / PRICE_ONLY suppliers)
+  taxUsd            Decimal       @default(0) @db.Decimal(18, 4)
+  taxCapitalizedUsd Decimal       @default(0) @db.Decimal(18, 4) // min(tax, threshold) — enters car cost
+  taxRefundableUsd  Decimal       @default(0) @db.Decimal(18, 4) // max(tax - threshold, 0)
+  taxRefundMode     TaxRefundMode @default(NONE)
+  taxRefundSettled  Boolean       @default(false)
+  taxRefundSettledAt DateTime?
+
+  problemNote String? @db.Text
+  arrivalNote String? @db.Text
+
+  status      CarStatus @default(PURCHASED)
+  damaged     Boolean   @default(false)
+  driveAndRun Boolean   @default(false)
+
+  // shipment link
+  shipmentId       Int?
+  freightShareUsd  Decimal? @db.Decimal(18, 4) // equal split by default, editable
+
+  // ---- FROZEN COST SNAPSHOT, written once when the shipment is marked arrived
+  cfaRate           Decimal? @db.Decimal(18, 6)
+  purchaseCfa       Decimal? @db.Decimal(18, 4)
+  originExpensesCfa Decimal? @db.Decimal(18, 4)
+  taxCapitalizedCfa Decimal? @db.Decimal(18, 4)
+  freightCfa        Decimal? @db.Decimal(18, 4)
+  arrivalCostCfa    Decimal? @db.Decimal(18, 4) // sum of the four above — never recomputed
+  arrivedAt         DateTime?
+
+  askingPriceCfa Decimal?  @db.Decimal(18, 4)
+  showroomAt     DateTime?
+
+  photoPath String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  supplier       Party           @relation("CarSupplier", fields: [supplierId], references: [id])
+  shipment       Shipment?       @relation(fields: [shipmentId], references: [id])
+  originExpenses OriginExpense[]
+  repairJobs     RepairJob[]
+  repairParts    RepairPart[]
+  sale           Sale?
+  ledger         LedgerEntry[]
+
+  @@index([status])
+  @@index([supplierId])
+  @@index([shipmentId])
+}
+
+/// Expenses incurred inside USA/Canada. Always charged to the car's supplier.
+model OriginExpense {
+  id        Int      @id @default(autoincrement())
+  carId     Int
+  amountUsd Decimal  @db.Decimal(18, 4)
+  note      String?  @db.Text
+  date      DateTime
+  createdAt DateTime @default(now())
+  car       Car      @relation(fields: [carId], references: [id])
+
+  @@index([carId])
+}
+
+// ---------------------------------------------------------------------------
+// Shipments — 1..N cars. One car alone is a shipment of one.
+// ---------------------------------------------------------------------------
+
+enum ShipmentStatus {
+  DRAFT // being loaded
+  SHIPPED // sailed
+  ARRIVED // arrived, rate locked
+}
+
+model Shipment {
+  id                Int            @id @default(autoincrement())
+  reference         String // container no. / booking ref
+  shippingCompanyId Int
+  freightCostUsd    Decimal        @db.Decimal(18, 4)
+  cfaRate           Decimal?       @db.Decimal(18, 6) // set once on arrival, then frozen
+  departureDate     DateTime?
+  arrivalDate       DateTime?
+  status            ShipmentStatus @default(DRAFT)
+  note              String?        @db.Text
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  shippingCompany Party         @relation(fields: [shippingCompanyId], references: [id])
+  cars            Car[]
+  ledger          LedgerEntry[]
+
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Garage
+// ---------------------------------------------------------------------------
+
+enum ServiceType {
+  BLACKSMITH
+  PAINTER
+  MECHANIC
+}
+
+model RepairJob {
+  id            Int         @id @default(autoincrement())
+  carId         Int
+  serviceType   ServiceType
+  workerId      Int
+  labourCostCfa Decimal     @db.Decimal(18, 4)
+  description   String?     @db.Text
+  date          DateTime
+  createdAt     DateTime    @default(now())
+
+  car    Car   @relation(fields: [carId], references: [id])
+  worker Party @relation(fields: [workerId], references: [id])
+
+  @@index([carId])
+}
+
+model RepairPart {
+  id              Int      @id @default(autoincrement())
+  carId           Int
+  description     String   @db.Text
+  costCfa         Decimal  @db.Decimal(18, 4)
+  partsSupplierId Int
+  date            DateTime
+  createdAt       DateTime @default(now())
+
+  car           Car   @relation(fields: [carId], references: [id])
+  partsSupplier Party @relation(fields: [partsSupplierId], references: [id])
+
+  @@index([carId])
+}
+
+// ---------------------------------------------------------------------------
+// Sales
+// ---------------------------------------------------------------------------
+
+enum SaleChannel {
+  LOCAL // sold from the showroom, in CFA
+  ORIGIN // sold in USA/Canada, in USD, settled in the supplier's account
+}
+
+model Sale {
+  id           Int         @id @default(autoincrement())
+  carId        Int         @unique
+  channel      SaleChannel @default(LOCAL)
+  currency     String // CFA code for LOCAL, "USD" for ORIGIN
+  price        Decimal     @db.Decimal(18, 4)
+  saleDate     DateTime
+  buyerName    String
+  buyerMobile  String?
+  customerId   Int? // optional party, when the buyer pays over time
+  note         String?     @db.Text
+  createdAt    DateTime    @default(now())
+
+  car      Car           @relation(fields: [carId], references: [id])
+  customer Party?        @relation(fields: [customerId], references: [id])
+  payments SalePayment[]
+  ledger   LedgerEntry[]
+
+  @@index([saleDate])
+}
+
+model SalePayment {
+  id        Int      @id @default(autoincrement())
+  saleId    Int
+  amount    Decimal  @db.Decimal(18, 4)
+  date      DateTime
+  method    String? // cash, transfer company, ...
+  note      String?  @db.Text
+  createdAt DateTime @default(now())
+  sale      Sale     @relation(fields: [saleId], references: [id])
+
+  @@index([saleId])
+}
+
+// ---------------------------------------------------------------------------
+// Treasury
+// ---------------------------------------------------------------------------
+
+enum TransactionType {
+  DEPOSIT // I put CFA into a transfer company
+  WITHDRAWAL // I take CFA back out
+  WIRE_TO_SUPPLIER // CFA leaves the transfer company, USD credited to a car supplier
+  PAY_SHIPPING // pay a shipping company (USD account, may be funded in USD or CFA)
+  PAY_WORKER // CFA
+  PAY_PARTS_SUPPLIER // CFA
+  PAY_OVERHEAD // CFA — rent, salary, misc
+}
+
+model Transaction {
+  id   Int             @id @default(autoincrement())
+  type TransactionType
+  date DateTime
+
+  transferCompanyId Int? // which transfer company the money moved through
+  counterpartyId    Int? // supplier / shipping company / worker / parts supplier
+
+  amountCfa Decimal? @db.Decimal(18, 4) // what left my CFA treasury
+  amountUsd Decimal? @db.Decimal(18, 4) // what the counterparty was credited in USD
+  rate      Decimal? @db.Decimal(18, 6) // CFA per USD used for THIS transaction
+  feeCfa    Decimal  @default(0) @db.Decimal(18, 4) // optional visible commission
+
+  note      String?  @db.Text
+  createdAt DateTime @default(now())
+  createdBy Int?
+
+  transferCompany Party?        @relation("TransferCompany", fields: [transferCompanyId], references: [id])
+  counterparty    Party?        @relation("Counterparty", fields: [counterpartyId], references: [id])
+  ledger          LedgerEntry[]
+
+  @@index([date])
+  @@index([type])
+}
+
+enum OverheadCategory {
+  RENT
+  SALARY
+  UTILITIES
+  TRANSPORT
+  OTHER
+}
+
+/// Period expenses. Deliberately NOT added to any car's cost — they are
+/// subtracted at the bottom of the monthly report instead.
+model OverheadExpense {
+  id        Int              @id @default(autoincrement())
+  date      DateTime
+  category  OverheadCategory
+  amountCfa Decimal          @db.Decimal(18, 4)
+  note      String?          @db.Text
+  partyId   Int? // e.g. the showroom worker whose salary this is
+  createdAt DateTime         @default(now())
+  party     Party?           @relation(fields: [partyId], references: [id])
+
+  @@index([date])
+}
