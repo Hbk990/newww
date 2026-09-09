@@ -6,3 +6,4 @@ dist/
 *.log
 backups/
 server/prisma/vpic-cache.json
+*.tsbuildinfo
