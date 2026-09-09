@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router-dom';
 import { PageHeader, useApp } from '../App';
 import { api, fmt, fmtDate, fmtUsd, todayIso, type Car, type CarStatus } from '../lib/api';
 import { Alert, Card, Field, Spinner, StatusBadge, useSubmit } from '../components/ui';
+import { CarAction } from '../components/CarActions';
+import { MoneyInput } from '../components/MoneyInput';
 
 interface Adjustment {
   id: number;
@@ -61,7 +63,12 @@ export default function CarDetail() {
             {fmtDate(car.purchaseDate)}
           </>
         }
-        action={<StatusBadge status={car.status as CarStatus} />}
+        action={
+          <div className="row" style={{ alignItems: 'center' }}>
+            <StatusBadge status={car.status as CarStatus} />
+            <CarAction car={car} onDone={load} />
+          </div>
+        }
       />
 
       {car.problemNote && (
@@ -435,7 +442,7 @@ function CorrectCost({ car, onDone }: { car: CarDetailData; onDone: () => void }
         label={`Amount (${cfa})`}
         help="Negative to take cost off this car, positive to add. A repair entered twice at 100,000 is −100,000."
       >
-        <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="-100000" autoFocus />
+        <MoneyInput value={amount} onChange={setAmount} allowNegative placeholder="-100,000" autoFocus />
       </Field>
 
       <Field label="Why?" help="This stays on the record permanently.">
@@ -510,7 +517,7 @@ function AddExpense({ carId, disabled, onAdded }: { carId: number; disabled: boo
       <Alert kind="error">{error}</Alert>
       <div className="row">
         <Field label="Amount (USD)">
-          <input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+          <MoneyInput decimals={2} value={amount} onChange={setAmount} />
         </Field>
         <Field label="What for?">
           <input value={note} onChange={(e) => setNote(e.target.value)} />

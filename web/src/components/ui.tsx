@@ -119,7 +119,7 @@ function fmtLocal(value: string | number | null | undefined): string {
   const raw = String(value);
   const negative = raw.startsWith('-');
   const [whole, decimals] = raw.replace('-', '').split('.');
-  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   const cents = decimals && Number(decimals) !== 0 ? `.${decimals.replace(/0+$/, '')}` : '';
   return `${negative ? '−' : ''}${grouped}${cents}`;
 }

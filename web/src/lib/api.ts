@@ -50,7 +50,7 @@ export function fmt(value: string | number | null | undefined, currency?: string
   const raw = String(value);
   const negative = raw.startsWith('-');
   const [whole, decimals] = raw.replace('-', '').split('.');
-  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   const cents = decimals && Number(decimals) !== 0 ? `.${decimals.replace(/0+$/, '')}` : '';
   return `${negative ? '−' : ''}${grouped}${cents}${currency ? ` ${currency}` : ''}`;
 }
@@ -151,7 +151,12 @@ export interface Car {
   showroomAt: string | null;
   arrivedAt: string | null;
   supplier?: { id: number; name: string; country: string | null };
-  shipment?: { id: number; reference: string; status: string } | null;
+  shipment?: {
+    id: number;
+    reference: string;
+    status: string;
+    shippingCompany?: { id: number; name: string };
+  } | null;
   costs: CostBreakdown;
   daysInStock?: number | null;
   daysInGarage?: number | null;

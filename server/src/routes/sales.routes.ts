@@ -15,9 +15,24 @@ const money = z.coerce.number().positive('The amount must be more than zero');
 
 export async function saleRoutes(app: FastifyInstance) {
   /** Everything ready to sell, with what it actually cost to get it there. */
-  app.get('/api/showroom', async () => {
+  app.get('/api/showroom', async (request) => {
+    const { search } = z.object({ search: z.string().optional() }).parse(request.query);
     const cars = await prisma.car.findMany({
-      where: { status: CarStatus.SHOWROOM, active: true },
+      where: {
+        status: CarStatus.SHOWROOM,
+        active: true,
+        ...(search
+          ? {
+              OR: [
+                { vin: { contains: search } },
+                { makeName: { contains: search } },
+                { modelName: { contains: search } },
+                { color: { contains: search } },
+                { supplier: { name: { contains: search } } },
+              ],
+            }
+          : {}),
+      },
       include: {
         supplier: { select: { id: true, name: true } },
         originExpenses: true,

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { PageHeader, useApp } from '../App';
 import { api, fmt, todayIso, type Car, type Party } from '../lib/api';
 import { Alert, Card, Empty, Field, Modal, Spinner, useSubmit } from '../components/ui';
+import { MoneyInput } from '../components/MoneyInput';
 
 export default function Showroom() {
   const { cfa } = useApp();
@@ -10,16 +11,18 @@ export default function Showroom() {
   const [selling, setSelling] = useState<Car | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   const load = () =>
     api
-      .get<Car[]>('/api/showroom')
+      .get<Car[]>(`/api/showroom${search ? `?search=${encodeURIComponent(search)}` : ''}`)
       .then(setCars)
       .catch((e) => setError(e.message));
 
   useEffect(() => {
-    void load();
-  }, []);
+    const timer = setTimeout(() => void load(), 200);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   return (
     <>
@@ -30,12 +33,20 @@ export default function Showroom() {
 
       {!cars ? (
         <Spinner />
-      ) : cars.length === 0 ? (
-        <Card>
-          <Empty>Nothing in the showroom yet.</Empty>
-        </Card>
       ) : (
         <Card>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by VIN, brand, model, colour or supplier…"
+            style={{ marginBottom: 12 }}
+          />
+          {cars.length === 0 ? (
+            <Empty>
+              {search ? `No car in the showroom matches “${search}”.` : 'Nothing in the showroom yet.'}
+            </Empty>
+          ) : (
+          <>
           <div className="table-wrap">
             <table>
               <thead>
@@ -80,6 +91,8 @@ export default function Showroom() {
             All amounts in {cfa}. Landed cost = purchase, expenses, tax and freight at the locked
             rate, plus any garage work.
           </p>
+          </>
+          )}
         </Card>
       )}
 
@@ -150,7 +163,7 @@ function SellModal({
 
       <div className="row">
         <Field label={`Sale price (${cfa})`}>
-          <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} autoFocus />
+          <MoneyInput value={price} onChange={setPrice} autoFocus />
         </Field>
         <Field label="Sale date">
           <input type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} />
@@ -177,7 +190,7 @@ function SellModal({
 
       <div className="row">
         <Field label="Paid now" help="Leave empty if nothing has been paid yet.">
-          <input type="number" min="0" max={price || undefined} step="1" value={initialPayment} onChange={(e) => setInitialPayment(e.target.value)} />
+          <MoneyInput value={initialPayment} onChange={setInitialPayment} />
         </Field>
         <Field label="How?">
           <input value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} placeholder="cash" />

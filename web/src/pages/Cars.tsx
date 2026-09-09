@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { PageHeader, useApp } from '../App';
 import { api, fmt, fmtDate, fmtUsd, type Car, type CarStatus } from '../lib/api';
 import { Alert, Card, Empty, Spinner, StatusBadge } from '../components/ui';
+import { CarAction } from '../components/CarActions';
 
 const FILTERS: { value: string; label: string }[] = [
   { value: '', label: 'All cars' },
@@ -21,12 +22,13 @@ export default function Cars() {
   const [search, setSearch] = useState(params.get('search') ?? '');
   const [cars, setCars] = useState<Car[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reloads, setReloads] = useState(0);
+  const reload = () => setReloads((n) => n + 1);
 
   useEffect(() => {
     const query = new URLSearchParams();
     if (status) query.set('status', status);
     if (search) query.set('search', search);
-    setCars(null);
     const timer = setTimeout(() => {
       api
         .get<Car[]>(`/api/cars?${query}`)
@@ -34,7 +36,7 @@ export default function Cars() {
         .catch((e) => setError(e.message));
     }, 200);
     return () => clearTimeout(timer);
-  }, [status, search]);
+  }, [status, search, reloads]);
 
   return (
     <>
@@ -67,7 +69,7 @@ export default function Cars() {
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by VIN, brand, model or colour…"
+          placeholder="Search by VIN, brand, model, colour or supplier…"
           style={{ marginBottom: 12 }}
         />
 
@@ -87,6 +89,7 @@ export default function Cars() {
                   <th className="num">Cost USD</th>
                   <th className="num">Landed {cfa}</th>
                   <th>Stage</th>
+                  <th>Next step</th>
                 </tr>
               </thead>
               <tbody>
@@ -114,6 +117,14 @@ export default function Cars() {
                     <td>
                       <StatusBadge status={car.status as CarStatus} />
                       {car.damaged && <div className="badge red" style={{ marginTop: 3 }}>Damaged</div>}
+                      {car.shipment && (
+                        <div className="small muted" style={{ marginTop: 3 }}>
+                          with {car.shipment.shippingCompany?.name ?? 'shipping company'}
+                        </div>
+                      )}
+                    </td>
+                    <td className="num">
+                      <CarAction car={car} onDone={reload} />
                     </td>
                   </tr>
                 ))}

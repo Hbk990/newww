@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { PageHeader, useApp } from '../App';
 import { api, fmt, todayIso, type Car, type Party } from '../lib/api';
 import { Alert, Card, Empty, Field, Modal, Spinner, useSubmit } from '../components/ui';
+import { MoneyInput } from '../components/MoneyInput';
 
 const SERVICES = [
   { value: 'BLACKSMITH', label: 'Blacksmith (body work)' },
@@ -230,7 +231,7 @@ function AddWork({
           </Field>
 
           <Field label={`Cost (${cfa})`}>
-            <input type="number" value={labourCost} onChange={(e) => setLabourCost(e.target.value)} />
+            <MoneyInput value={labourCost} onChange={setLabourCost} />
           </Field>
 
           <Field label="What was done?">
@@ -259,7 +260,7 @@ function AddWork({
           </Field>
 
           <Field label={`Cost (${cfa})`}>
-            <input type="number" value={partCost} onChange={(e) => setPartCost(e.target.value)} />
+            <MoneyInput value={partCost} onChange={setPartCost} />
           </Field>
         </>
       )}
@@ -309,7 +310,7 @@ function FinishRepair({ car, onDone }: { car: GarageCar; onDone: () => void }) {
     <div style={{ marginTop: 10 }}>
       <Alert kind="error">{error}</Alert>
       <Field label={`Asking price (${cfa})`} help={`It cost ${fmt(car.costs.landedCostCfa)} to get here.`}>
-        <input type="number" value={asking} onChange={(e) => setAsking(e.target.value)} />
+        <MoneyInput value={asking} onChange={setAsking} />
       </Field>
       <div className="row">
         <button onClick={() => void run()} disabled={busy}>

@@ -71,9 +71,21 @@ const transfer = await prisma.party.create({
   data: { type: PartyType.TRANSFER_COMPANY, name: 'Western Transfer', currency: cfa },
 });
 
-await prisma.party.create({
-  data: { type: PartyType.TRANSFER_COMPANY, name: 'Cash box', currency: cfa, note: 'Money you hold yourself' },
+// Setup may already have made this, so never make a second one — two accounts
+// called "Cash box" would split the money and neither would show the truth.
+const existingCashBox = await prisma.party.findFirst({
+  where: { type: PartyType.TRANSFER_COMPANY, name: { contains: 'cash' } },
 });
+if (!existingCashBox) {
+  await prisma.party.create({
+    data: {
+      type: PartyType.TRANSFER_COMPANY,
+      name: 'Cash box',
+      currency: cfa,
+      note: 'Money you hold yourself',
+    },
+  });
+}
 
 const painter = await prisma.party.create({
   data: { type: PartyType.WORKER, name: 'Ibrahim', currency: cfa, workerRole: 'GARAGE' },

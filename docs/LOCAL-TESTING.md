@@ -225,12 +225,17 @@ the car's cost was not touched.
 Mitsubishi appear. Pick the Canadian supplier and enter a tax of `700` to see
 the $500 / $200 split happen as you type.
 
-**5. Ship one car on its own.**
+**5. Move a car along without leaving the list.**
 
-**Shipments → New shipment**, add just the one car, and see that a single car is
-simply a shipment of one. Before you confirm the arrival, the screen shows you
-exactly what each car will cost in local currency — check it against your own
-calculator before clicking.
+**All cars** has a *Next step* column. A car waiting in the origin country shows
+**Ship it** — choose the shipping company, enter the freight, tick any other
+cars in the same container, done. It is shipped; you never open the Shipments
+page. When it lands, the same row offers **It arrived** (enter the rate, and it
+shows exactly what each car will cost before you confirm), then **Set
+condition** to send it to the garage or the showroom.
+
+Shipments are identified by their shipping company and the cars on board. The
+container number is optional — fill it in only if you use one.
 
 ---
 

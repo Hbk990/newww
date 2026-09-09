@@ -11,7 +11,7 @@ import {
   splitFreightEqually,
 } from '../lib/money.js';
 import { post } from '../services/ledger.js';
-import { carLabel } from '../services/cars.js';
+import { carLabel, costBreakdown } from '../services/cars.js';
 
 const money = z.coerce.number().nonnegative();
 
@@ -56,20 +56,34 @@ export async function shipmentRoutes(app: FastifyInstance) {
       include: {
         shippingCompany: true,
         cars: {
-          include: { supplier: { select: { id: true, name: true } }, originExpenses: true },
+          include: {
+            supplier: { select: { id: true, name: true } },
+            originExpenses: true,
+            repairJobs: true,
+            repairParts: true,
+            costAdjustments: true,
+          },
           orderBy: { id: 'asc' },
         },
         ledger: true,
       },
     });
     if (!shipment) throw notFound('Shipment not found');
-    return shipment;
+    return {
+      ...shipment,
+      cars: shipment.cars.map((car) => ({
+        ...car,
+        label: carLabel(car),
+        costs: costBreakdown(car),
+      })),
+    };
   });
 
   app.post('/api/shipments', async (request) => atomic(async (tx) => {
     const input = z
       .object({
-        reference: z.string().min(1, 'Give the container or booking a reference'),
+        /** Optional: the shipping line's own paperwork number, if you use it. */
+        reference: z.string().optional().nullable(),
         shippingCompanyId: z.coerce.number(),
         freightCostUsd: money,
         departureDate: z.coerce.date().optional().nullable(),
@@ -85,7 +99,7 @@ export async function shipmentRoutes(app: FastifyInstance) {
     const shipment = await (async () => {
       const created = await tx.shipment.create({
         data: {
-          reference: input.reference.trim(),
+          reference: input.reference?.trim() || autoReference(),
           shippingCompanyId: input.shippingCompanyId,
           freightCostUsd: new Prisma.Decimal(input.freightCostUsd),
           departureDate: input.departureDate ?? null,
@@ -371,7 +385,9 @@ export async function shipmentRoutes(app: FastifyInstance) {
             date: arrivalDate,
             kind: LedgerKind.FREIGHT_INVOICE,
             amount: shipment.freightCostUsd,
-            description: `Freight — shipment ${shipment.reference} (${shipment.cars.length} car${shipment.cars.length > 1 ? 's' : ''})`,
+            description: `Freight — ${shipment.cars.length} car${shipment.cars.length > 1 ? 's' : ''}: ${shipment.cars
+              .map((c) => `${c.year} ${c.makeName} ${c.modelName}`)
+              .join(', ')}`,
             shipmentId: shipment.id,
           },
         ],
@@ -398,6 +414,74 @@ export async function shipmentRoutes(app: FastifyInstance) {
       ip: request.ip,
     });
     return result;
+  }));
+
+
+  /**
+   * SHIP A CAR STRAIGHT FROM THE CAR LIST.
+   *
+   * Creating a shipment, adding the car and marking it sailed were three
+   * actions on a screen the owner had to go and find. This does all three at
+   * once, in one transaction, from wherever the car is shown.
+   *
+   * Other cars still waiting in the origin country can travel with it, which is
+   * the normal case for a container.
+   */
+  app.post('/api/cars/:id/ship', async (request) => atomic(async (tx) => {
+    const { id } = z.object({ id: z.coerce.number() }).parse(request.params);
+    const input = z
+      .object({
+        shippingCompanyId: z.coerce.number(),
+        freightCostUsd: money,
+        departureDate: z.coerce.date().optional().nullable(),
+        /** Other cars loaded with it. The car in the URL is always included. */
+        alsoCarIds: z.array(z.coerce.number()).optional().default([]),
+        reference: z.string().optional().nullable(),
+        note: z.string().optional().nullable(),
+      })
+      .parse(request.body);
+
+    const car = await tx.car.findUnique({ where: { id } });
+    if (!car) throw notFound('Car not found');
+    if (car.shipmentId)
+      throw new AppError('This car is already on a shipment. Open that shipment to change it.');
+    if (car.status !== CarStatus.PURCHASED)
+      throw new AppError(`This car cannot be shipped — it is ${car.status.toLowerCase().replace(/_/g, ' ')}.`);
+
+    const company = await tx.party.findUnique({ where: { id: input.shippingCompanyId } });
+    if (!company || company.type !== PartyType.SHIPPING_COMPANY)
+      throw notFound('Shipping company not found');
+
+    const carIds = [...new Set([id, ...input.alsoCarIds])];
+    const departureDate = input.departureDate ?? new Date();
+
+    const shipment = await tx.shipment.create({
+      data: {
+        reference: input.reference?.trim() || autoReference(),
+        shippingCompanyId: company.id,
+        freightCostUsd: new Prisma.Decimal(input.freightCostUsd),
+        departureDate,
+        note: input.note || null,
+      },
+    });
+
+    await assignCars(tx, shipment.id, carIds);
+    await tx.car.updateMany({ where: { shipmentId: shipment.id }, data: { status: CarStatus.SHIPPED } });
+    const sailed = await tx.shipment.update({
+      where: { id: shipment.id },
+      data: { status: ShipmentStatus.SHIPPED },
+      include: { cars: true },
+    });
+
+    await audit(tx, {
+      userId: request.user?.id,
+      action: 'SHIP_FROM_CAR',
+      entity: 'Shipment',
+      entityId: shipment.id,
+      after: { carIds, shippingCompany: company.name },
+      ip: request.ip,
+    });
+    return sailed;
   }));
 
   /**
@@ -447,6 +531,13 @@ export async function shipmentRoutes(app: FastifyInstance) {
 }
 
 // ---------------------------------------------------------------------------
+
+/** Shipments are identified by their cars and their shipping company, so this
+ *  is only a quiet fallback for the reference column. */
+function autoReference(): string {
+  const now = new Date();
+  return `Shipment ${now.toISOString().slice(0, 10)}`;
+}
 
 async function assignCars(tx: Tx, shipmentId: number, carIds: number[]) {
   if (new Set(carIds).size !== carIds.length) throw new AppError('Choose each car only once');

@@ -297,3 +297,128 @@ describe('correcting a cost after the car is sold', () => {
     expect(list[0].reason).toContain('entered twice');
   });
 });
+
+describe('shipping a car without leaving the car list', () => {
+  let carA = 0;
+  let carB = 0;
+
+  it('creates the shipment, loads the car and sails it in one action', async () => {
+    carA = (await api('POST', '/api/cars', {
+      supplierId: ids.supplier,
+      makeName: 'Ford', modelName: 'Escape', year: 2021, color: 'Blue',
+      vin: '1FMCU9G61MU200001', purchasePriceUsd: 6000, purchaseDate: '2026-05-01',
+    })).id;
+    carB = (await api('POST', '/api/cars', {
+      supplierId: ids.supplier,
+      makeName: 'Honda', modelName: 'CR-V', year: 2021, color: 'Grey',
+      vin: '2HKRW2H830H500001', purchasePriceUsd: 7000, purchaseDate: '2026-05-01',
+    })).id;
+
+    const shipment = await api('POST', `/api/cars/${carA}/ship`, {
+      shippingCompanyId: ids.shipper,
+      freightCostUsd: 1600,
+      departureDate: '2026-05-05',
+      alsoCarIds: [carB],   // the other car in the same container
+    });
+
+    expect(shipment.status).toBe('SHIPPED');
+    expect(shipment.cars).toHaveLength(2);
+    expect(shipment.cars.every((c: { status: string }) => c.status === 'SHIPPED')).toBe(true);
+    // 1,600 split across the two of them
+    expect(shipment.cars.map((c: { freightShareUsd: string }) => c.freightShareUsd)).toEqual(['800', '800']);
+  });
+
+  it('names the shipment by its cars on the freight charge, not a container number', async () => {
+    const car = await api('GET', `/api/cars/${carA}`);
+    await api('POST', `/api/shipments/${car.shipment.id}/arrive`, {
+      cfaRate: 600, arrivalDate: '2026-06-01',
+    });
+    const statement = await api('GET', `/api/parties/${ids.shipper}/statement`);
+    const freight = statement.lines.at(-1);
+    expect(freight.kind).toBe('FREIGHT_INVOICE');
+    expect(freight.description).toContain('Ford Escape');
+    expect(freight.description).toContain('Honda CR-V');
+  });
+
+  it('refuses to ship a car that is already on a shipment', async () => {
+    await expect(
+      api('POST', `/api/cars/${carA}/ship`, { shippingCompanyId: ids.shipper, freightCostUsd: 100 }),
+    ).rejects.toThrow(/already on a shipment/i);
+  });
+
+  it('refuses to ship a car that has already arrived', async () => {
+    const fresh = await api('POST', '/api/cars', {
+      supplierId: ids.supplier,
+      makeName: 'Mazda', modelName: 'CX-5', year: 2020, color: 'Red',
+      vin: 'JM3KFBCM0L0600001', purchasePriceUsd: 5000, purchaseDate: '2026-05-02',
+    });
+    await api('POST', `/api/cars/${fresh.id}/ship`, {
+      shippingCompanyId: ids.shipper, freightCostUsd: 500,
+    });
+    const car = await api('GET', `/api/cars/${fresh.id}`);
+    await api('POST', `/api/shipments/${car.shipment.id}/arrive`, { cfaRate: 600 });
+
+    await expect(
+      api('POST', `/api/cars/${fresh.id}/ship`, { shippingCompanyId: ids.shipper, freightCostUsd: 100 }),
+    ).rejects.toThrow(/already on a shipment|cannot be shipped/i);
+  });
+
+  it('creates a shipment without asking for a container reference', async () => {
+    const shipment = await api('POST', '/api/shipments', {
+      shippingCompanyId: ids.shipper,
+      freightCostUsd: 900,
+    });
+    expect(shipment.reference).toMatch(/^Shipment \d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe('finding a car', () => {
+  it('searches the showroom by brand and by supplier', async () => {
+    const all = await api('GET', '/api/showroom');
+    expect(all.length).toBeGreaterThan(0);
+
+    const byBrand = await api('GET', '/api/showroom?search=Toyota');
+    expect(byBrand.every((c: { makeName: string }) => c.makeName === 'Toyota')).toBe(true);
+
+    const bySupplier = await api('GET', '/api/showroom?search=Mike');
+    expect(bySupplier.length).toBeGreaterThan(0);
+
+    expect(await api('GET', '/api/showroom?search=Lamborghini')).toHaveLength(0);
+  });
+
+  it('searches all cars by supplier name too', async () => {
+    const bySupplier = await api('GET', '/api/cars?search=Mike');
+    expect(bySupplier.length).toBeGreaterThan(0);
+    expect(bySupplier.every((c: { supplier: { name: string } }) => c.supplier.name.includes('Mike'))).toBe(true);
+  });
+});
+
+describe('the arrival preview', () => {
+  it('sends each car full cost, so the preview cannot understate what it will land at', async () => {
+    // Caught in a browser run: the preview showed only the freight, so a car
+    // about to cost 6,039,000 was previewed at 854,000.
+    const car = await api('POST', '/api/cars', {
+      supplierId: ids.supplier,
+      makeName: 'Toyota', modelName: 'Hilux', year: 2023, color: 'White',
+      vin: '5TFAX5GN0LX100001', purchasePriceUsd: 8500, purchaseDate: '2026-07-01',
+    });
+    await api('POST', `/api/cars/${car.id}/ship`, {
+      shippingCompanyId: ids.shipper, freightCostUsd: 1400,
+    });
+
+    const withShipment = await api('GET', `/api/cars/${car.id}`);
+    const shipment = await api('GET', `/api/shipments/${withShipment.shipment.id}`);
+    const onBoard = shipment.cars[0];
+
+    expect(onBoard.costs.usd.totalCostUsd).toBe('8500');
+    expect(onBoard.freightShareUsd).toBe('1400');
+
+    // What the preview multiplies out, and what arrival then actually locks.
+    const previewed = Math.round((Number(onBoard.costs.usd.totalCostUsd) + Number(onBoard.freightShareUsd)) * 610);
+    expect(previewed).toBe(6039000);
+
+    await api('POST', `/api/shipments/${withShipment.shipment.id}/arrive`, { cfaRate: 610 });
+    const landed = await api('GET', `/api/cars/${car.id}`);
+    expect(landed.costs.cfa.arrivalCostCfa).toBe(String(previewed));
+  });
+});

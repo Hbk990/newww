@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { PageHeader, useApp } from '../App';
 import { api, fmt, fmtDate, fmtUsd, todayIso, type Car, type Shipment } from '../lib/api';
 import { Alert, Card, Empty, Field, Modal, Spinner, useSubmit } from '../components/ui';
+import { MoneyInput } from '../components/MoneyInput';
 
 export default function ShipmentDetail() {
   const { id } = useParams();
@@ -52,12 +53,15 @@ export default function ShipmentDetail() {
   return (
     <>
       <PageHeader
-        title={shipment.reference}
+        title={shipment.shippingCompany.name}
         sub={
           <>
-            {shipment.shippingCompany.name} · freight {fmtUsd(shipment.freightCostUsd)} ·{' '}
-            {shipment.cars.length} car{shipment.cars.length === 1 ? '' : 's'}
+            {shipment.cars.length} car{shipment.cars.length === 1 ? '' : 's'} · freight{' '}
+            {fmtUsd(shipment.freightCostUsd)}
             {shipment.cfaRate && ` · rate locked at ${fmt(shipment.cfaRate)}`}
+            {shipment.reference && (
+              <span className="muted"> · {shipment.reference}</span>
+            )}
           </>
         }
         action={
@@ -113,13 +117,13 @@ export default function ShipmentDetail() {
                     <td className="num">{fmtUsd(car.costs?.usd.totalCostUsd)}</td>
                     <td className="num">
                       {editable ? (
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={shares[car.id] ?? ''}
-                          onChange={(e) => setShares({ ...shares, [car.id]: e.target.value })}
-                          style={{ width: 110, textAlign: 'right' }}
-                        />
+                        <div style={{ width: 120, marginLeft: 'auto' }}>
+                          <MoneyInput
+                            decimals={2}
+                            value={shares[car.id] ?? ''}
+                            onChange={(next) => setShares({ ...shares, [car.id]: next })}
+                          />
+                        </div>
                       ) : (
                         fmtUsd(car.freightShareUsd)
                       )}

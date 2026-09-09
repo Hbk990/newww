@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { PageHeader } from '../App';
 import { api, fmt, fmtDate, fmtUsd, todayIso, type Car, type Party, type Shipment } from '../lib/api';
 import { Alert, Card, Empty, Field, Modal, Spinner, useSubmit } from '../components/ui';
+import { MoneyInput, hasAmount, moneyValue } from '../components/MoneyInput';
 
 const STATUS_BADGE: Record<string, string> = {
   DRAFT: 'grey',
@@ -45,9 +46,8 @@ export default function Shipments() {
             <table>
               <thead>
                 <tr>
-                  <th>Reference</th>
                   <th>Shipping company</th>
-                  <th className="num">Cars</th>
+                  <th>Cars on board</th>
                   <th className="num">Freight</th>
                   <th className="num">Rate</th>
                   <th>Departed</th>
@@ -59,10 +59,16 @@ export default function Shipments() {
                 {shipments.map((shipment) => (
                   <tr key={shipment.id}>
                     <td className="strong">
-                      <Link to={`/shipments/${shipment.id}`}>{shipment.reference}</Link>
+                      <Link to={`/shipments/${shipment.id}`}>{shipment.shippingCompany.name}</Link>
                     </td>
-                    <td>{shipment.shippingCompany.name}</td>
-                    <td className="num">{shipment.carCount ?? shipment.cars.length}</td>
+                    <td className="small">
+                      {shipment.cars.map((car) => (
+                        <div key={car.id}>
+                          {car.year} {car.makeName} {car.modelName}
+                        </div>
+                      ))}
+                      {shipment.cars.length === 0 && <span className="muted">no cars yet</span>}
+                    </td>
                     <td className="num">{fmtUsd(shipment.freightCostUsd)}</td>
                     <td className="num">{shipment.cfaRate ? fmt(shipment.cfaRate) : '—'}</td>
                     <td className="small">{fmtDate(shipment.departureDate)}</td>
@@ -109,9 +115,9 @@ function NewShipment({ onClose, onCreated }: { onClose: () => void; onCreated: (
 
   const { busy, error, run } = useSubmit(async () => {
     await api.post('/api/shipments', {
-      reference,
+      reference: reference || null,
       shippingCompanyId: Number(shippingCompanyId),
-      freightCostUsd: Number(freight),
+      freightCostUsd: moneyValue(freight),
       departureDate,
       carIds: selected,
     });
@@ -125,30 +131,29 @@ function NewShipment({ onClose, onCreated }: { onClose: () => void; onCreated: (
     <Modal title="New shipment" onClose={onClose} wide>
       <Alert kind="error">{error}</Alert>
 
-      <div className="row">
-        <Field label="Container / booking reference">
-          <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="MSCU-7781234" autoFocus />
-        </Field>
-        <Field label="Shipping company">
-          <select value={shippingCompanyId} onChange={(e) => setShippingCompanyId(e.target.value)}>
-            <option value="">Choose…</option>
-            {companies.map((company) => (
-              <option key={company.id} value={company.id}>
-                {company.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
+      <Field label="Shipping company" help="This is what identifies the shipment afterwards.">
+        <select value={shippingCompanyId} onChange={(e) => setShippingCompanyId(e.target.value)} autoFocus>
+          <option value="">Choose…</option>
+          {companies.map((company) => (
+            <option key={company.id} value={company.id}>
+              {company.name}
+            </option>
+          ))}
+        </select>
+      </Field>
 
       <div className="row">
         <Field label="Freight cost (USD)" help="The whole invoice for this shipment.">
-          <input type="number" step="0.01" value={freight} onChange={(e) => setFreight(e.target.value)} />
+          <MoneyInput decimals={2} value={freight} onChange={setFreight} />
         </Field>
         <Field label="Departure date">
           <input type="date" value={departureDate} onChange={(e) => setDepartureDate(e.target.value)} />
         </Field>
       </div>
+
+      <Field label="Container or booking number" help="Optional — only if the shipping line gave you one you want to keep.">
+        <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="MSCU-7781234" />
+      </Field>
 
       <h3 style={{ marginTop: 14 }}>Which cars are on it?</h3>
       {available.length === 0 ? (
@@ -187,7 +192,7 @@ function NewShipment({ onClose, onCreated }: { onClose: () => void; onCreated: (
         <button className="secondary" onClick={onClose}>
           Cancel
         </button>
-        <button onClick={() => void run()} disabled={busy || !reference || !shippingCompanyId || !Number(freight)}>
+        <button onClick={() => void run()} disabled={busy || !shippingCompanyId || !hasAmount(freight)}>
           {busy ? 'Creating…' : 'Create shipment'}
         </button>
       </div>

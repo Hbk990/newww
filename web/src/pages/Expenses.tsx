@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { PageHeader, useApp } from '../App';
 import { api, fmt, fmtDate, todayIso, type Party } from '../lib/api';
 import { Alert, Card, Empty, Field, Modal, Spinner, useSubmit } from '../components/ui';
+import { MoneyInput } from '../components/MoneyInput';
 
 interface Overhead {
   id: number;
@@ -149,7 +150,7 @@ function AddExpense({ onClose, onSaved }: { onClose: () => void; onSaved: () => 
           </select>
         </Field>
         <Field label={`Amount (${cfa})`}>
-          <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus />
+          <MoneyInput value={amount} onChange={setAmount} autoFocus />
         </Field>
         <Field label="Date">
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />

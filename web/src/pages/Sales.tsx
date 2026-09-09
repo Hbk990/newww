@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { PageHeader, useApp } from '../App';
 import { api, fmt, fmtDate, fmtUsd, todayIso, type Car, type Party } from '../lib/api';
 import { Alert, Card, Empty, Field, Modal, Spinner, useSubmit } from '../components/ui';
+import { MoneyInput } from '../components/MoneyInput';
 
 interface Sale {
   id: number;
@@ -184,7 +185,7 @@ function PaymentModal({ sale, onClose, onSaved }: { sale: Sale; onClose: () => v
 
       <div className="row">
         <Field label="Amount received">
-          <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus />
+          <MoneyInput value={amount} onChange={setAmount} autoFocus />
         </Field>
         <Field label="Date">
           <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -270,7 +271,7 @@ function SellAbroad({ onClose, onSold }: { onClose: () => void; onSold: () => vo
 
       <div className="row">
         <Field label="Sale price (USD)">
-          <input type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} />
+          <MoneyInput decimals={2} value={price} onChange={setPrice} />
         </Field>
         <Field label="Sale date">
           <input type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} />

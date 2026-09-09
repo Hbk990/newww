@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { PageHeader, useApp } from '../App';
 import { api, fmtDate } from '../lib/api';
 import { Alert, Card, Field, useSubmit } from '../components/ui';
+import { MoneyInput } from '../components/MoneyInput';
 
 interface AuditRow {
   id: number;
@@ -67,7 +68,7 @@ export default function SettingsPage() {
               label="Canada tax limit (USD)"
               help="Tax up to this amount stays in the car's cost. Anything above it is refundable to you. Changing this only affects cars bought from now on."
             >
-              <input type="number" value={threshold} onChange={(e) => setThreshold(e.target.value)} />
+              <MoneyInput decimals={2} value={threshold} onChange={setThreshold} />
             </Field>
 
             <Field

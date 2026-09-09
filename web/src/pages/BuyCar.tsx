@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { PageHeader, useApp } from '../App';
 import { api, fmtUsd, todayIso, type Party } from '../lib/api';
 import { Alert, Card, Field, useSubmit } from '../components/ui';
+import { MoneyInput } from '../components/MoneyInput';
 
 interface Make { id: number; name: string }
 interface Model { id: number; name: string }
@@ -239,7 +240,7 @@ export default function BuyCar() {
         <div>
           <Card title="Money">
             <Field label="Purchase price (USD)">
-              <input type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="10000" />
+              <MoneyInput decimals={2} value={price} onChange={setPrice} placeholder="10,000" />
             </Field>
 
             {taxApplies && (
@@ -248,7 +249,7 @@ export default function BuyCar() {
                   label="Tax on the invoice (USD)"
                   help={`Tax up to $${threshold} becomes part of the car's cost. Anything above comes back to you.`}
                 >
-                  <input type="number" step="0.01" value={taxUsd} onChange={(e) => setTaxUsd(e.target.value)} placeholder="700" />
+                  <MoneyInput decimals={2} value={taxUsd} onChange={setTaxUsd} placeholder="700" />
                 </Field>
 
                 {tax && tax.refundable > 0 && (
@@ -280,12 +281,11 @@ export default function BuyCar() {
             {expenses.map((expense, index) => (
               <div className="row" key={index}>
                 <Field label="Amount (USD)">
-                  <input
-                    type="number"
-                    step="0.01"
+                  <MoneyInput
+                    decimals={2}
                     value={expense.amountUsd}
-                    onChange={(e) =>
-                      setExpenses(expenses.map((x, i) => (i === index ? { ...x, amountUsd: e.target.value } : x)))
+                    onChange={(next) =>
+                      setExpenses(expenses.map((x, i) => (i === index ? { ...x, amountUsd: next } : x)))
                     }
                   />
                 </Field>

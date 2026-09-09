@@ -71,13 +71,22 @@ export async function carRoutes(app: FastifyInstance) {
                 { makeName: { contains: q.search } },
                 { modelName: { contains: q.search } },
                 { color: { contains: q.search } },
+                { supplier: { name: { contains: q.search } } },
+                { supplier: { companyName: { contains: q.search } } },
               ],
             }
           : {}),
       },
       include: {
         supplier: { select: { id: true, name: true, companyName: true, country: true } },
-        shipment: { select: { id: true, reference: true, status: true } },
+        shipment: {
+          select: {
+            id: true,
+            reference: true,
+            status: true,
+            shippingCompany: { select: { id: true, name: true } },
+          },
+        },
         originExpenses: true,
         repairJobs: true,
         repairParts: true, costAdjustments: true,

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { PageHeader, useApp } from '../App';
 import { api, fmt, fmtDate, fmtUsd, todayIso, type Party } from '../lib/api';
 import { Alert, Card, Empty, Field, Modal, Spinner, useSubmit } from '../components/ui';
+import { MoneyInput } from '../components/MoneyInput';
 
 interface Overview {
   accounts: (Party & { balance: string })[];
@@ -328,7 +329,7 @@ function PaymentModal({ action, onClose, onDone }: { action: Exclude<Action, nul
                 : `Amount (${cfa})`
           }
         >
-          <input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus />
+          <MoneyInput decimals={2} value={amount} onChange={setAmount} autoFocus />
         </Field>
 
         {needsRate && (
@@ -340,7 +341,7 @@ function PaymentModal({ action, onClose, onDone }: { action: Exclude<Action, nul
 
       {(needsRate || action === 'transfer') && (
         <Field label={`Commission (${cfa})`} help="Leave empty when the company does not charge a visible fee.">
-          <input type="number" value={feeCfa} onChange={(e) => setFeeCfa(e.target.value)} />
+          <MoneyInput value={feeCfa} onChange={setFeeCfa} />
         </Field>
       )}
 

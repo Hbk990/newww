@@ -183,15 +183,10 @@ try {
   run('npx', ['tsx', 'prisma/seed-vpic.ts', '--offline']);
 }
 
-// --- 4b. Somewhere for sale money to land -----------------------------------
-
-step('5. Cash box');
-run('npx', ['tsx', 'scripts/ensure-cash-box.ts']);
-
 // --- 5. Practice data -------------------------------------------------------
 
 if (!has('no-demo')) {
-  step('6. Practice data');
+  step('5. Practice data');
   // Never overwrite data that is already there — it might be real.
   const [[{ cars }]] = await db.query(`SELECT COUNT(*) AS cars FROM \`${dbName}\`.Car`);
   const existing = Number(cars);
@@ -204,6 +199,13 @@ if (!has('no-demo')) {
 }
 
 await db.end();
+
+// --- Somewhere for sale money to land ---------------------------------------
+// After the practice data, so it adopts the cash box that came with it rather
+// than adding a second one.
+
+step('6. Cash box');
+run('npx', ['tsx', 'scripts/ensure-cash-box.ts']);
 
 // --- 6. Login ---------------------------------------------------------------
 
