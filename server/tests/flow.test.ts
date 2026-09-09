@@ -496,3 +496,105 @@ describe('the audit trail', () => {
     expect(entries[0].user.username).toBe('owner');
   });
 });
+
+describe('guards found while reviewing the code', () => {
+  let shipmentId = 0;
+  let carA = 0;
+  let carB = 0;
+  let shipperId = 0;
+
+  it('sets up a fresh draft shipment', async () => {
+    const suppliers = await api('GET', '/api/parties?type=CAR_SUPPLIER');
+    const american = suppliers.find((s: { country: string }) => s.country === 'USA');
+    [{ id: shipperId }] = await api('GET', '/api/parties?type=SHIPPING_COMPANY');
+
+    carA = (
+      await api('POST', '/api/cars', {
+        supplierId: american.id,
+        makeName: 'Nissan', modelName: 'Rogue', year: 2019, color: 'White',
+        vin: '5N1AT2MV8KC123456',
+        purchasePriceUsd: 7500, purchaseDate: '2026-04-01',
+      })
+    ).id;
+    carB = (
+      await api('POST', '/api/cars', {
+        supplierId: american.id,
+        makeName: 'Ford', modelName: 'Escape', year: 2020, color: 'Grey',
+        vin: '1FMCU9G67LU123456',
+        purchasePriceUsd: 8500, purchaseDate: '2026-04-01',
+      })
+    ).id;
+
+    shipmentId = (
+      await api('POST', '/api/shipments', {
+        reference: 'TEST-CONTAINER-2',
+        shippingCompanyId: shipperId,
+        freightCostUsd: 2000,
+        carIds: [carA, carB],
+      })
+    ).id;
+    expect(shipmentId).toBeGreaterThan(0);
+  });
+
+  it('refuses freight shares that leave a car out, even when the total matches', async () => {
+    await expect(
+      api('POST', `/api/shipments/${shipmentId}/shares`, {
+        shares: [{ carId: carA, amountUsd: 2000 }],
+      }),
+    ).rejects.toThrow(/share for every car/i);
+  });
+
+  it('refuses a share for a car that is not on the shipment', async () => {
+    await expect(
+      api('POST', `/api/shipments/${shipmentId}/shares`, {
+        shares: [
+          { carId: carA, amountUsd: 1000 },
+          { carId: 99999, amountUsd: 1000 },
+        ],
+      }),
+    ).rejects.toThrow(/not on this shipment/i);
+  });
+
+  it('accepts an uneven split that still adds up', async () => {
+    const result = await api('POST', `/api/shipments/${shipmentId}/shares`, {
+      shares: [
+        { carId: carA, amountUsd: 1300 }, // the bigger car took more space
+        { carId: carB, amountUsd: 700 },
+      ],
+    });
+    expect(result.cars.map((c: { freightShareUsd: string }) => c.freightShareUsd).sort()).toEqual([
+      '1300', '700',
+    ]);
+  });
+
+  it('will not sell a car abroad while it is loaded on a shipment', async () => {
+    await expect(
+      api('POST', `/api/cars/${carA}/sell`, {
+        channel: 'ORIGIN',
+        price: 9000,
+        saleDate: '2026-04-05',
+        buyerName: 'Someone',
+      }),
+    ).rejects.toThrow(/already loaded onto a shipment/i);
+  });
+
+  it('debits the treasury exactly what was handed over when freight is paid in CFA', async () => {
+    const [transfer] = await api('GET', '/api/parties?type=TRANSFER_COMPANY');
+    const before = await api('GET', `/api/parties/${transfer.id}/statement`);
+
+    // A rate that does not divide evenly: 1,000,000 / 613 is not a round number
+    // of dollars, so a naive round-trip through USD would drift.
+    const result = await api('POST', '/api/treasury/pay-shipping', {
+      shippingCompanyId: shipperId,
+      transferCompanyId: transfer.id,
+      payCurrency: 'CFA',
+      amount: 1000000,
+      rate: 613,
+      date: '2026-04-06',
+    });
+
+    const after = await api('GET', `/api/parties/${transfer.id}/statement`);
+    expect(Number(before.closingBalance) - Number(after.closingBalance)).toBe(1000000);
+    expect(result.amountUsd).toBe('1631.32'); // 1,000,000 / 613
+  });
+});

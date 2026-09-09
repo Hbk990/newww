@@ -117,6 +117,12 @@ export async function saleRoutes(app: FastifyInstance) {
       throw new AppError(
         'A car sold in the origin country must still be there — it cannot already be shipped or arrived.',
       );
+    } else if (car.shipmentId) {
+      // Leaving it on the shipment would keep it in the freight split for cars
+      // that really are travelling.
+      throw new AppError(
+        'This car is already loaded onto a shipment. Take it off that shipment first.',
+      );
     }
 
     if (input.customerId) {

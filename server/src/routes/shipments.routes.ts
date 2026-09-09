@@ -211,6 +211,18 @@ export async function shipmentRoutes(app: FastifyInstance) {
     if (shipment.status === ShipmentStatus.ARRIVED)
       throw new AppError('This shipment has arrived and its costs are locked');
 
+    // Shares for a subset would pass the total check while leaving the cars
+    // that were left out carrying stale amounts.
+    const onShipment = new Set(shipment.cars.map((car) => car.id));
+    const given = new Set(shares.map((share) => share.carId));
+    const foreign = shares.filter((share) => !onShipment.has(share.carId));
+    if (foreign.length > 0)
+      throw new AppError('One of those cars is not on this shipment');
+    if (given.size !== onShipment.size)
+      throw new AppError(
+        `Give a share for every car on this shipment — ${onShipment.size} car(s), ${given.size} given.`,
+      );
+
     const check = checkFreightShares(
       shares.map((s) => s.amountUsd),
       shipment.freightCostUsd.toString(),

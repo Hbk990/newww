@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { prisma, Prisma, type Tx } from '../lib/db.js';
 import { audit } from '../lib/audit.js';
 import { AppError, notFound } from '../lib/errors.js';
-import { usdCreditedForCfa, wireCfaCost } from '../lib/money.js';
+import { roundCfa, usdCreditedForCfa, wireCfaCost } from '../lib/money.js';
 import { balancesByParty, post, type PostableEntry } from '../services/ledger.js';
 
 const money = z.coerce.number().positive('The amount must be more than zero');
@@ -265,15 +265,17 @@ export async function treasuryRoutes(app: FastifyInstance) {
     if (!shipper || shipper.type !== PartyType.SHIPPING_COMPANY)
       throw notFound('Shipping company not found');
 
-    // Whichever currency was handed over, both sides of the entry must agree.
-    const amountUsd =
-      input.payCurrency === 'USD'
-        ? wireCfaCost(input.amount, input.rate, 0).amountUsd
-        : usdCreditedForCfa(input.amount, input.rate);
-    const principalCfa =
-      input.payCurrency === 'USD'
-        ? wireCfaCost(input.amount, input.rate, 0).principalCfa
-        : wireCfaCost(usdCreditedForCfa(input.amount, input.rate), input.rate, 0).principalCfa;
+    // Whichever currency was handed over, both sides of the entry must agree —
+    // and the side that was actually counted out is the one taken as exact.
+    // Paid in USD: the USD is exact, the CFA follows from the rate.
+    // Paid in CFA: the CFA is exact, the USD credited follows from the rate.
+    const paidInUsd = input.payCurrency === 'USD';
+    const amountUsd = paidInUsd
+      ? wireCfaCost(input.amount, input.rate, 0).amountUsd
+      : usdCreditedForCfa(input.amount, input.rate);
+    const principalCfa = paidInUsd
+      ? wireCfaCost(input.amount, input.rate, 0).principalCfa
+      : roundCfa(input.amount);
     const feeCfa = new Prisma.Decimal(input.feeCfa);
 
     const transaction = await prisma.$transaction(async (tx) => {

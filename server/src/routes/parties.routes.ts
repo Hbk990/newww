@@ -197,7 +197,16 @@ export async function partyRoutes(app: FastifyInstance) {
 
   app.post('/api/parties/:id/restore', async (request) => {
     const { id } = z.object({ id: z.coerce.number() }).parse(request.params);
-    return prisma.party.update({ where: { id }, data: { active: true } });
+    const party = await prisma.party.update({ where: { id }, data: { active: true } });
+    await audit(prisma, {
+      userId: request.user?.id,
+      action: 'RESTORE',
+      entity: 'Party',
+      entityId: id,
+      after: party,
+      ip: request.ip,
+    });
+    return party;
   });
 
   /** The full account statement, with a running balance. */
