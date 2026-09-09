@@ -131,8 +131,7 @@ try {
     `Could not reach MySQL at ${connection.host}:${connection.port}.\n\n` +
       `  ${error.message}\n\n` +
       '  Is MySQL running? The quickest way to get one:\n' +
-      '    docker run --name showroom-db -e MYSQL_ROOT_PASSWORD=devpassword \\\n' +
-      '      -p 3306:3306 -d mysql:8\n\n' +
+      '    docker run --name showroom-db -e MYSQL_ROOT_PASSWORD=devpassword -p 3306:3306 -d mysql:8\n\n' +
       '  Then run this again with:\n' +
       '    npm run setup -- --db "mysql://root:devpassword@127.0.0.1:3306/carshowroom"',
   );
@@ -187,7 +186,7 @@ await db.end();
 step('6. Your login');
 
 const username = flag('user') ?? 'owner';
-const password = flag('password') ?? 'Showroom-Test-2026!';
+const password = flag('password') ?? 'Showroom-Test-2026';
 
 try {
   run('npx', ['tsx', 'scripts/create-user.ts', username, password]);

@@ -73,7 +73,7 @@ balance in your business, so make it long:
 
 ```bash
 cd /opt/showroom/server
-npm run create:user -- yourname 'a-long-passphrase-you-will-remember'
+npm run create:user -- yourname "a-long-passphrase-you-will-remember"
 ```
 
 ## 4. Keep it running

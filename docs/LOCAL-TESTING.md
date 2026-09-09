@@ -8,64 +8,168 @@ Works on Windows, Mac and Linux.
 
 ---
 
+## Which terminal do I type these in?
+
+**Windows:** PowerShell. Click Start, type `powershell`, press Enter. (Windows
+Terminal works too, and so does Command Prompt — every command in this guide
+runs the same in all three.)
+
+**Mac:** Terminal — press `Cmd + Space`, type `terminal`, press Enter.
+
+**Linux:** whatever terminal you already use.
+
+Everything below is typed into that one window. You do not need to be an
+administrator unless a step says so.
+
+---
+
 ## What you need first
 
-**1. Node.js 20 or newer** — <https://nodejs.org> (take the LTS version).
+### 1. Node.js
 
-Check it worked by opening a terminal and typing:
+Download the **LTS** version from <https://nodejs.org> and install it — click
+Next through the installer, the defaults are correct.
 
-```bash
+**Close PowerShell and open it again** after installing, or it will not find the
+new command. Then check:
+
+```powershell
 node --version
 ```
 
-**2. MySQL.** Two ways — pick one.
+You should see something like `v22.14.0`. Anything from `v20` upwards is fine.
 
-<details>
-<summary><b>Option A — Docker (easiest, nothing to configure)</b></summary>
+### 2. Git
 
-Install Docker Desktop from <https://docker.com>, then run:
+Download from <https://git-scm.com/download/win> and install with the defaults.
+Reopen PowerShell, then check:
 
-```bash
+```powershell
+git --version
+```
+
+*(If you would rather not install Git: go to
+<https://github.com/Hbk990/newww>, click the green **Code** button →
+**Download ZIP**, and unzip it somewhere like `C:\showroom`. Then skip the
+`git clone` line later.)*
+
+### 3. MySQL — pick one of these two
+
+<details open>
+<summary><b>Option A — Docker Desktop (recommended: nothing to configure, easy to remove)</b></summary>
+
+**Install it**
+
+1. Go to <https://www.docker.com/products/docker-desktop/> and download
+   **Docker Desktop for Windows**.
+2. Run the installer. Leave **"Use WSL 2 instead of Hyper-V"** ticked.
+3. **Restart your computer** when it asks. It really does need this.
+4. Open **Docker Desktop** from the Start menu and wait until the whale icon in
+   the bottom-left corner turns green and says *Engine running*. The first
+   start takes a few minutes.
+5. Skip the sign-in / account prompts — you do not need an account for this.
+
+If the installer complains about **WSL 2**, open PowerShell **as
+Administrator** (right-click PowerShell → *Run as administrator*), run:
+
+```powershell
+wsl --install
+```
+
+restart, then open Docker Desktop again.
+
+If it complains about **virtualization being disabled**, that is a BIOS setting
+on your PC — search your PC model plus "enable virtualization in BIOS", or use
+Option B instead.
+
+**Start the database**
+
+With Docker Desktop running, in normal PowerShell:
+
+```powershell
 docker run --name showroom-db -e MYSQL_ROOT_PASSWORD=devpassword -p 3306:3306 -d mysql:8
 ```
 
-That's it. Your database address is:
+The first run downloads MySQL (a few hundred MB) and prints a long string of
+letters and numbers. That means it worked. Check it:
+
+```powershell
+docker ps
+```
+
+You should see `showroom-db` listed as *Up*.
+
+Your database address is:
 
 ```
 mysql://root:devpassword@127.0.0.1:3306/carshowroom
 ```
 
-To stop it later: `docker stop showroom-db` · to start again: `docker start showroom-db`
+**Day to day**
+
+| | |
+|---|---|
+| Stop the database | `docker stop showroom-db` |
+| Start it again | `docker start showroom-db` |
+| Is it running? | `docker ps` |
+| Delete it completely | `docker rm -f showroom-db` |
+
+The database keeps your data when you stop and start it. It loses everything
+only if you `rm` it. Docker Desktop must be running for any of this to work — if
+you restart your PC, open Docker Desktop first, then `docker start showroom-db`.
 </details>
 
 <details>
-<summary><b>Option B — Install MySQL directly</b></summary>
+<summary><b>Option B — Install MySQL directly (no Docker)</b></summary>
 
-- **Windows:** the MySQL Installer from <https://dev.mysql.com/downloads/installer/> — choose "Server only" and set a root password you will remember.
+- **Windows:** the MySQL Installer from
+  <https://dev.mysql.com/downloads/installer/> — choose **"Server only"**, and
+  set a root password you will remember. It installs as a Windows service and
+  starts automatically with your PC.
 - **Mac:** `brew install mysql && brew services start mysql`
 - **Linux:** `sudo apt install mysql-server`
 
-Your database address is then `mysql://root:YOUR-PASSWORD@127.0.0.1:3306/carshowroom`
+Your database address is then:
+
+```
+mysql://root:YOUR-PASSWORD@127.0.0.1:3306/carshowroom
+```
 </details>
 
 ---
 
 ## Set it up — one command
 
-```bash
+In PowerShell, go to where you want it to live and download it:
+
+```powershell
+cd C:\
 git clone https://github.com/Hbk990/newww.git showroom
 cd showroom
 npm install
 npm run setup
 ```
 
+`npm install` takes a couple of minutes and prints a lot of text. Warnings are
+normal; only a line starting with `npm error` is a problem.
+
 `npm run setup` asks where your MySQL is, then does everything else: creates the
 database, builds the tables, loads the car brands and models, loads the practice
 data, and creates your login.
 
-To skip the questions, pass the database address directly:
+If you used **Docker**, answer the questions like this:
 
-```bash
+```
+Host [127.0.0.1]:        press Enter
+Port [3306]:             press Enter
+MySQL username [root]:   press Enter
+MySQL password:          devpassword
+Database name:           press Enter
+```
+
+Or skip the questions entirely by passing the address:
+
+```powershell
 npm run setup -- --db "mysql://root:devpassword@127.0.0.1:3306/carshowroom"
 ```
 
@@ -73,7 +177,7 @@ npm run setup -- --db "mysql://root:devpassword@127.0.0.1:3306/carshowroom"
 
 ## Start it
 
-```bash
+```powershell
 npm run dev
 ```
 
@@ -81,7 +185,7 @@ Then open **<http://localhost:5173>** in your browser.
 
 ```
 username:  owner
-password:  Showroom-Test-2026!
+password:  Showroom-Test-2026
 ```
 
 Press `Ctrl+C` in the terminal to stop it.
@@ -132,14 +236,14 @@ calculator before clicking.
 
 ## Starting over
 
-```bash
+```powershell
 npm run db:seed:demo -- --wipe    # fresh practice data, keeps your login
 npm run setup -- --fresh          # erase the database completely and rebuild
 ```
 
 ## Running the tests
 
-```bash
+```powershell
 npm test
 ```
 
@@ -161,8 +265,8 @@ for a red error line, and make sure MySQL is still running.
 
 **Forgot the password** — make a new one:
 
-```bash
-npm run create:user -- owner 'a-new-password-12-chars+'
+```powershell
+npm run create:user -- owner "a-new-password-12-chars+"
 ```
 
 **Anything else** — the terminal running `npm run dev` prints the real reason.
