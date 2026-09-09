@@ -1,0 +1,26 @@
+# Paths are relative to the repository root because the app now lives there
+# rather than in a hidden wholesale-* folder. If these patterns ever stop
+# matching, config.php and settings.json — which hold the password hashes —
+# would start being committed.
+
+# Product photography — ~1150 files, ~20 MB. Managed through the admin
+# dashboard ("Bulk product pictures"), not through git.
+/uploads/
+
+# Live catalog data and store settings. settings.json holds the admin
+# password hash and the customer passcode hash.
+/storage/*.json
+/storage/*.lock
+/storage/backups/
+
+# Install token + customer password hash.
+/inc/config.php
+
+# Build output
+*.zip
+
+# Marketing video build output — the scripts are source, the renders are not.
+marketing/out/
+marketing/frames/
+marketing/plates/
+marketing/node_modules

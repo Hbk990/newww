@@ -1,0 +1,583 @@
+/* ==========================================================================
+   DR PHONE — admin dashboard, supplementary styles
+   Loaded after admin.css. Covers the pieces built by admin.js at runtime:
+   the variant editors and the operations panel.
+   Dark glass, same tokens as admin.css.
+   ========================================================================== */
+
+/* ---------- Sticky bulk bar ---------------------------------------------- */
+
+.bulk-bar { position: sticky; top: 10px; z-index: 5; }
+.select-category input { width: 17px; height: 17px; accent-color: var(--red); }
+/* Wrapper around the per-product select box. Its only job is to be a bigger
+   click target than the checkbox itself; see the touch block at the bottom. */
+.row-check-tap { display: grid; place-items: center; cursor: pointer; }
+
+/* ---------- Operations dialog -------------------------------------------- */
+
+#operations-dialog { width: min(94vw, 940px); }
+.operations-panel { padding: 24px; }
+.operations-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.operations-grid section {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--glass-line);
+  border-radius: var(--radius);
+  background: var(--glass);
+}
+.operations-grid h3 { margin: 0 0 6px; font-size: 15px; }
+.operations-grid p { margin: 0 0 12px; color: var(--text-mid); font-size: 11px; }
+.operations-grid form { display: grid; gap: 9px; }
+.operations-grid input { max-width: 100%; }
+.operations-grid input[type=file] {
+  padding: 10px;
+  border: 1px solid var(--glass-line);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, .3);
+  color: var(--text-hi);
+  font-size: 12px;
+}
+.operations-grid button { min-height: 38px; padding: 0 14px; }
+.tool-list { max-height: 260px; overflow: auto; overscroll-behavior: contain; }
+.download-backup {
+  display: block;
+  margin-top: 10px;
+  color: var(--text-mid);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.download-backup:hover { color: var(--red); }
+
+/* ---------- Variant editors ---------------------------------------------- */
+
+.variant-editor {
+  margin-top: 6px;
+  padding: 15px;
+  border: 1px solid var(--glass-line);
+  border-radius: var(--radius);
+  background: rgba(0, 0, 0, .22);
+}
+.variant-editor-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.variant-editor-head h3 { font-size: 14px; }
+.variant-editor-head small { display: block; margin-top: 3px; color: var(--text-mid); font-size: 11px; font-weight: 500; }
+.variant-editor-head button { min-height: 36px; padding: 0 13px; border-radius: 9px; }
+.variant-rows { display: grid; gap: 8px; }
+.variant-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, .8fr) 38px;
+  align-items: end;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--glass-line);
+  border-radius: 10px;
+  background: var(--glass);
+}
+.variant-row.option-row { grid-template-columns: minmax(0, 1.4fr) minmax(0, .7fr) minmax(0, 1fr) minmax(0, .8fr) 38px; }
+.variant-row label { display: grid; gap: 4px; min-width: 0; }
+.variant-row span { color: var(--text-low); font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.variant-row input, .variant-row select {
+  min-height: 36px;
+  padding: 0 9px;
+  border: 1px solid var(--glass-line);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, .34);
+  color: var(--text-hi);
+  font-size: 12px;
+  outline: 0;
+}
+.variant-row input:focus, .variant-row select:focus { border-color: var(--red); }
+.variant-row option { background: var(--surface-2); color: var(--text-hi); }
+.variant-remove {
+  width: 38px;
+  height: 36px;
+  border: 1px solid var(--glass-line);
+  border-radius: 8px;
+  background: var(--glass);
+  color: #ff9a9a;
+  font-size: 17px;
+  line-height: 1;
+}
+.variant-remove:hover { border-color: var(--red); background: var(--red-soft); }
+
+/* ---------- Two-factor + picture import ---------------------------------- */
+
+.two-factor-setting span { display: flex; align-items: center; gap: 9px; color: var(--text-hi); font-size: 12px; }
+.two-factor-setting input[type=checkbox] { width: 17px; height: 17px; min-height: 0; accent-color: var(--red); }
+#two-factor-secret {
+  display: block;
+  margin-top: 8px;
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, .38);
+  color: var(--warn);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  word-break: break-all;
+}
+#two-factor-secret:empty { display: none; }
+.picture-import-section input[type=file] { font-size: 11px; }
+
+/* ---------- Responsive ---------------------------------------------------- */
+
+@media (max-width: 700px) {
+  .operations-grid { grid-template-columns: 1fr; }
+  .operations-panel { padding: 16px; }
+  .bulk-bar > * { flex: 1 1 140px; }
+  .category-section h2 { flex-wrap: wrap; }
+  .category-tools { width: 100%; margin-left: 0; }
+  .category-tools button { flex: 1; }
+  .variant-editor-head { align-items: flex-start; flex-direction: column; }
+  .variant-editor-head button { width: 100%; }
+  .variant-row, .variant-row.option-row { grid-template-columns: 1fr 1fr; }
+  .variant-row label:first-child { grid-column: 1 / -1; }
+  .variant-remove { width: 100%; grid-column: 1 / -1; }
+}
+
+/* ---------- Order log ------------------------------------------------------ */
+
+.orders-toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.orders-toolbar input {
+  flex: 1 1 180px;
+  min-height: 36px;
+  padding: 0 11px;
+  border: 1px solid var(--glass-line);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, .32);
+  color: var(--text-hi);
+  font-size: 12px;
+  outline: 0;
+}
+.orders-toolbar input:focus { border-color: var(--red); }
+.orders-toolbar button { min-height: 36px; padding: 0 12px; border-radius: 9px; font-size: 12px; }
+/* `.tool-list > div { display: block }` in admin.css (0,1,1) outranks a bare
+   `.order-row` (0,1,0), so this rule has to name both: without it the whole
+   grid below is inert and every part of the row simply stacks. */
+.tool-list > .order-row {
+  display: grid;
+  /* Heading and total on the first line, the action buttons on their own. The
+     panel is half the operations dialog wide, so five buttons never fit beside
+     a customer name. */
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 12px;
+  border: 1px solid var(--glass-line);
+  border-radius: 10px;
+  background: var(--glass);
+}
+.order-row strong { display: block; font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.order-row span { color: var(--text-mid); font-size: 11px; }
+.order-row > b { font-size: 13px; font-weight: 900; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.order-open, .order-del {
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--glass-line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-hi);
+  font-size: 11px;
+}
+.order-del { width: 30px; padding: 0; color: #ff9a9a; font-size: 15px; }
+.order-open:hover { border-color: var(--glass-line-hi); }
+.order-del:hover { border-color: var(--red); background: var(--red-soft); }
+.order-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.order-items {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 3px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--glass-line);
+}
+.order-items span { color: var(--text-mid); font-size: 11px; }
+/* display:grid above would otherwise defeat the [hidden] attribute, which is
+   why the Items toggle never actually hid anything. */
+.order-items[hidden] { display: none; }
+.orders-note { display: block; margin-top: 10px; color: var(--text-low); font-size: 10px; line-height: 1.5; }
+/* Placed explicitly rather than left to auto-flow, which put the total on its
+   own line once the buttons became a full-width item. */
+.order-row > div:first-child { grid-column: 1; grid-row: 1; }
+.order-row > b { grid-column: 2; grid-row: 1; text-align: right; }
+.order-actions .order-del { margin-left: auto; }
+
+/* Order status. Carried by a worded pill and a left border, never colour alone. */
+.order-status {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+.status-unconfirmed .order-status { background: rgba(250, 178, 25, .16); color: var(--warn); }
+.status-confirmed .order-status { background: rgba(12, 163, 12, .16); color: #6fe06f; }
+.status-cancelled .order-status { background: rgba(255, 77, 77, .16); color: #ff8f8f; }
+.order-row.status-unconfirmed { border-left: 3px solid var(--warn); }
+.order-row.status-confirmed { border-left: 3px solid var(--ok); }
+.order-row.status-cancelled { border-left: 3px solid #ff4d4d; opacity: .72; }
+.order-row.status-cancelled strong, .order-row.status-cancelled > b { text-decoration: line-through; }
+
+.order-mark {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--glass-line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-hi);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.order-mark:hover { border-color: var(--glass-line-hi); }
+.order-mark.confirm:hover { border-color: var(--ok); background: rgba(12, 163, 12, .14); }
+.order-mark.cancel:hover { border-color: #ff4d4d; background: var(--red-soft); }
+
+#orders-status {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--glass-line);
+  border-radius: 9px;
+  background: rgba(0, 0, 0, .32);
+  color: var(--text-hi);
+  font-size: 12px;
+}
+
+/* Unconfirmed orders are excluded from the figures, so their value is stated
+   right beside them rather than quietly dropped. */
+.sales-pending {
+  display: block;
+  width: 100%;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid rgba(250, 178, 25, .38);
+  border-radius: 12px;
+  background: rgba(250, 178, 25, .10);
+  color: var(--text-mid);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur) linear, border-color var(--dur) linear;
+}
+.sales-pending:hover { border-color: var(--warn); background: rgba(250, 178, 25, .16); }
+.sales-pending b { color: var(--warn); font-size: 14px; }
+.sales-pending i { color: var(--text-hi); font-style: normal; font-weight: 800; text-decoration: underline; }
+
+/* The order log is the tallest tool list; give it more room before scrolling. */
+.orders-section .tool-list { max-height: 360px; }
+
+/* ==========================================================================
+   TOUCH DEVICES
+   Scoped to (pointer: coarse); the desktop dashboard is untouched.
+   Same two drivers as the storefront: iOS zooms on any control under 16px,
+   and 44x44px is the minimum touch target. The worst offenders here were the
+   bulk-select checkbox (16x16), the row move arrows (32x34) and the inline
+   price/stock fields (11-12px, so every tap zoomed the page).
+   ========================================================================== */
+
+@media (pointer: coarse) {
+
+  /* --- never below 16px, or iOS zooms on focus --- */
+  input, select, textarea,
+  .toolbar input, #admin-category-filter, #admin-search,
+  .quick-input, .quick-select,
+  .orders-toolbar input,
+  .variant-row input, .variant-row select,
+  .form-grid input, .form-grid select, .form-grid textarea,
+  .auth-card input,
+  dialog > form > label input, dialog > form > label select {
+    font-size: 16px;
+  }
+
+  /* --- touch targets --- */
+  .quick-input { height: 46px; width: 88px; }
+  .quick-select { height: 46px; }
+  .quick-edit { gap: 10px; flex-wrap: wrap; }
+
+  .row-move { width: 44px; height: 44px; }
+  /* A 22px checkbox is the right size to look at and the wrong size to hit.
+     Chrome ignores an author border on a native checkbox, so the hit area is
+     grown on the wrapping label instead — a label click toggles its box. */
+  .row-check, .select-category input[type="checkbox"] { width: 22px; height: 22px; }
+  .row-check-tap { width: 44px; height: 44px; }
+  .select-category { min-height: 44px; }
+  .admin-product { grid-template-columns: 44px 48px minmax(0, 1fr); }
+  .admin-actions button { min-height: 44px; padding: 0 14px; }
+  /* catches the filter/sort selects that sit outside .toolbar */
+  select, #admin-category-filter { min-height: 46px; }
+
+  .tab { min-height: 46px; }
+  .header-button, .admin-header a { min-height: 46px; }
+  .category-tools button { min-height: 44px; }
+  .chip { min-height: 44px; }
+  .icon-button, .panel-close { width: 44px; height: 44px; }
+  .variant-remove { width: 44px; height: 44px; }
+
+  .toolbar input, .toolbar button, .toolbar select { min-height: 46px; }
+  .bulk-bar select, .bulk-bar button { min-height: 46px; }
+  .form-grid input, .form-grid select { min-height: 46px; }
+  .auth-card input, .auth-card button { height: 52px; }
+  .operations-grid button { min-height: 46px; }
+
+  /* the Overview category bars are tappable, so they need real height */
+  .viz-bar-row { padding: 12px 8px; min-height: 44px; }
+  .viz-bar-track { height: 14px; }
+
+  .orders-toolbar input, .orders-toolbar button { min-height: 46px; }
+  .order-open { min-height: 44px; padding: 0 14px; }
+  .order-del { width: 44px; height: 44px; }
+  .order-mark { min-height: 44px; padding: 0 14px; }
+  /* a 16px-tall link is not a tap target */
+  .download-backup { display: flex; align-items: center; min-height: 44px; }
+  .orders-note { font-size: 11px; }
+  #orders-status { min-height: 46px; font-size: 16px; }
+  .sales-pending { min-height: 44px; }
+
+  /* 9px pills and labels are unreadable on a phone */
+  .stock-pill, .visibility-pill { font-size: 11px; }
+  .viz-icon { font-size: 11px; }
+  .quick-field span, .variant-row span { font-size: 11px; }
+  .admin-product p { font-size: 12px; }
+}
+
+/* ---------- Sales tab ---------------------------------------------------- */
+
+.sales-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 0 0 18px;
+}
+.sales-head h2 { margin: 0; font-size: 19px; letter-spacing: -.02em; }
+.sales-head .panel-note { margin: 6px 0 0; max-width: 62ch; }
+
+.range-picker { display: inline-flex; border: 1px solid var(--glass-line); border-radius: 999px; overflow: hidden; }
+.range-picker button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  background: transparent;
+  color: var(--text-mid);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background var(--dur) linear, color var(--dur) linear;
+}
+.range-picker button:hover { color: var(--text-hi); background: var(--glass); }
+.range-picker button.active { background: var(--red); color: #fff; }
+
+/* A read-out, not a deep link: no hover lift, no pointer. */
+.stat-tile.stat-static { cursor: default; }
+.stat-tile.stat-static:hover { transform: none; }
+
+/* Single-series line. The stroke is non-scaling so the 2px spec survives the
+   preserveAspectRatio="none" stretch. */
+.viz-line { display: block; width: 100%; height: 190px; overflow: visible; }
+.viz-axis {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+  color: var(--text-low);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.viz-axis span:nth-child(2) { color: var(--text-mid); font-weight: 700; }
+
+/* Restock report. Status is carried by a glyph and a worded label as well as
+   colour, so it survives colour-blindness, greyscale print and forced colours. */
+.restock-lead { margin: 0 0 14px; color: var(--text-mid); font-size: 12px; }
+.restock-lead b { color: var(--text-hi); font-size: 14px; }
+.restock-lead.restock-ok { color: var(--ok); }
+
+.restock-list { display: grid; gap: 8px; }
+.restock-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 2fr) minmax(0, 2fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--glass-line);
+  border-radius: 10px;
+  background: var(--glass);
+}
+.restock-flag { font-size: 12px; line-height: 1; text-align: center; }
+.restock-row.state-out .restock-flag,
+.restock-row.state-out .restock-cover { color: #ff4d4d; }
+.restock-row.state-warn .restock-flag,
+.restock-row.state-warn .restock-cover { color: var(--warn); }
+.restock-row.state-good .restock-flag,
+.restock-row.state-good .restock-cover { color: var(--ok); }
+.restock-row.state-out { border-color: rgba(255, 77, 77, .34); }
+
+.restock-main { min-width: 0; }
+.restock-main b {
+  display: block;
+  overflow: hidden;
+  color: var(--text-hi);
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.restock-main span { color: var(--text-low); font-size: 11px; }
+
+.restock-nums { display: flex; flex-wrap: wrap; gap: 4px 16px; color: var(--text-low); font-size: 11px; }
+.restock-nums i { color: var(--text-mid); font-style: normal; font-weight: 800; font-variant-numeric: tabular-nums; }
+.restock-cover { font-size: 12px; font-weight: 800; white-space: nowrap; text-align: right; }
+
+@media (max-width: 760px) {
+  .restock-row { grid-template-columns: 20px minmax(0, 1fr) auto; row-gap: 6px; }
+  .restock-nums { grid-column: 2 / -1; }
+  .restock-cover { grid-column: 2 / -1; text-align: left; }
+  .sales-head { align-items: flex-start; }
+  .range-picker { width: 100%; }
+  .range-picker button { flex: 1 1 0; padding: 0 6px; }
+}
+
+@media (pointer: coarse) {
+  .range-picker button { min-height: 44px; }
+  .restock-row { padding: 12px; }
+}
+
+.restock-lead.restock-untracked { margin-top: 20px; color: var(--text-mid); }
+.restock-row.state-untracked .restock-flag,
+.restock-row.state-untracked .restock-cover { color: var(--text-low); }
+
+/* ---------- Order receipt ------------------------------------------------ *
+ * The receipt is a document, not another dashboard panel, so it is drawn on
+ * white the way it will print. Screen and paper then show the same thing, and
+ * @media print has only to remove everything around it. */
+
+.receipt-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  /* start, not stretch: a two-line receipt is two lines tall, not a full page
+     of white. minmax(0,1fr), because an implicit `auto` column grows to the
+     table's min-width and pushes the whole sheet wider than the phone. */
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 12px;
+  padding: 16px;
+  overflow: auto;
+  background: rgba(6, 6, 8, .82);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+/* display:grid above would otherwise defeat the [hidden] attribute. */
+.receipt-sheet[hidden] { display: none; }
+/* The sheet scrolls; the dashboard behind it must not. */
+body.showing-receipt { overflow: hidden; }
+
+.receipt-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  width: min(720px, 100%);
+  margin: 0 auto;
+}
+.receipt-actions button { min-height: 40px; padding: 0 16px; border-radius: 10px; font-size: 13px; }
+
+.receipt {
+  width: min(720px, 100%);
+  margin: 0 auto;
+  padding: 24px;
+  border-radius: 12px;
+  background: #fff;
+  color: #16161a;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.receipt-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 2px solid #16161a;
+}
+.receipt-head h2 { margin: 0; color: var(--red); font-size: 22px; font-weight: 900; letter-spacing: .04em; }
+.receipt-head p { margin: 2px 0 0; color: #55555f; font-size: 11px; }
+.receipt-ref { display: grid; gap: 2px; text-align: right; }
+.receipt-ref b { font-size: 14px; font-weight: 900; font-variant-numeric: tabular-nums; }
+.receipt-ref span { color: #55555f; font-size: 11px; }
+.receipt-ref .order-status { margin-left: 0; justify-self: end; background: #ececf0; color: #16161a; }
+
+.receipt-customer {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 14px 0 0;
+}
+.receipt-customer span { color: #55555f; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+.receipt-customer b { font-size: 16px; font-weight: 800; }
+
+/* On a 320 px phone four columns of prices do not fit. Rather than shrink the
+   figures below the 11 px floor the rest of the dashboard keeps, the table
+   scrolls inside its own box; printing puts it back (overflow: visible). */
+.receipt-scroll { margin-top: 14px; overflow-x: auto; }
+.receipt-table { width: 100%; min-width: 300px; border-collapse: collapse; }
+.receipt-table th, .receipt-table td { padding: 7px 6px; text-align: left; vertical-align: top; }
+.receipt-table thead th {
+  border-bottom: 1px solid #c9c9d1;
+  color: #55555f;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.receipt-table tbody td { border-bottom: 1px solid #ececf1; }
+.receipt-table td small { display: block; color: #55555f; font-size: 11px; }
+.receipt-table th:nth-child(n+2), .receipt-table td:nth-child(n+2) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.receipt-table tfoot th { padding-top: 11px; border-top: 2px solid #16161a; font-size: 14px; font-weight: 900; }
+.receipt-terms { margin: 16px 0 0; color: #55555f; font-size: 11px; }
+
+@media (max-width: 560px) {
+  .receipt { padding: 16px; }
+  .receipt-head { flex-direction: column; }
+  .receipt-ref { text-align: left; }
+  .receipt-ref .order-status { justify-self: start; }
+  .receipt-table th, .receipt-table td { padding: 7px 4px; }
+}
+@media (pointer: coarse) {
+  .receipt-actions button { min-height: 44px; }
+}
+
+/* Printing a receipt prints the receipt: the dashboard around it is removed
+   rather than restyled, and the scrim goes with it so the sheet is the page. */
+@media print {
+  body.showing-receipt > *:not(.receipt-sheet) { display: none !important; }
+  body.showing-receipt .receipt-sheet {
+    position: static;
+    padding: 0;
+    overflow: visible;
+    background: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  body.showing-receipt .receipt-actions { display: none !important; }
+  body.showing-receipt .receipt { width: auto; padding: 0; border-radius: 0; }
+  body.showing-receipt .receipt-scroll { overflow: visible; }
+  /* admin.css's print block sets the whole page to black; the shop's name on its
+     own receipt keeps its colour. */
+  body.showing-receipt .receipt-head h2 { color: var(--red); }
+}

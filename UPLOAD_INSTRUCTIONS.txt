@@ -1,0 +1,131 @@
+DR PHONE WHOLESALE — INSTALLATION (v21)
+
+WHAT CHANGED IN THIS VERSION
+
+0. THE CATALOG IS YOUR SPREADSHEET OF 8 SEPTEMBER
+   1041 products in 47 categories. The 8 products you removed are gone from this
+   ZIP, and so are their 8 pictures:
+
+       DR-000267  Jmary - FM-17RS Panel Led Light 17 Inch
+       DR-000587  Samsung - Watch Ultra Logo
+       DR-000596  Porodo - Track Fit Screenless Smart FitBand
+       DR-000940  XO - NB-R258A IP To IP Audio Converter
+       DR-000954  8 IN 1 - Type-c TO HDTV
+       DR-001008  Kingston - DT70 USB-C Flash - Original
+       DR-001012  Sandisk - Portable SSD 2TB 800MB/s
+       DR-001013  Sandisk - Portable SSD 2TB 1050MB/s
+
+   Your other edits came across too: the JBL headphone spelling ("Tour Pne" is
+   now "Tour One"), and two products moved category.
+
+   Extracting does not delete anything already on the server, so those 8 old
+   pictures stay in public_html/uploads/products until you clear them. Admin
+   Dashboard > Operations > "Delete unused pictures" removes them in one click.
+
+   The counts on the public landing page follow this automatically — 1041 now,
+   and whatever it is after your next change.
+
+EVERYTHING BELOW IS UNCHANGED FROM v20, WHICH YOU MAY NOT HAVE INSTALLED YET.
+
+
+1. SEND A CUSTOMER A LINK TO ONE BRAND
+   Search for a brand and the address bar now names that search, so you can copy
+   it and send it:
+
+       drphonewholesale.online/#s/xo
+       drphonewholesale.online/#s/anker%20cable
+
+   The customer opens it, enters the passcode as usual, and lands directly on
+   those products instead of the whole catalog.
+
+   There is a SHARE button beside the item count, next to Cards / Order pad. On a
+   phone it opens the share sheet straight into WhatsApp; on a computer it copies
+   the link. You do not have to copy the address bar by hand.
+
+   If a customer already has the catalog open and you send them a second link,
+   tapping it switches their view — it no longer sits there doing nothing.
+
+   Category links (drphonewholesale.online/#airpods) and single-product links
+   still work exactly as before.
+
+2. A PUBLIC LANDING PAGE
+   The passcode form is unchanged and still the first thing on the page. Below it,
+   for anyone who does NOT have the passcode, there is now: what you stock with
+   real counts, the brands you carry, how trade access works, and a WhatsApp
+   button to request a passcode. Before this, a stranger who found the site got a
+   locked box with no phone number and no way to ask for access.
+
+   Customers who already have the passcode notice no difference at all — the
+   field is still first, still focused, and nothing was moved.
+
+   The product and category numbers on that page come from your live catalog and
+   update themselves whenever you save a product, import a CSV or delete
+   something. They are never typed in by hand.
+
+   Google can now find something worth listing, and a link pasted into WhatsApp
+   shows a proper title and description instead of a bare address.
+
+3. THE PASSCODE PAGE NOW FITS A SMALL PHONE
+   On a 320px-wide phone (iPhone SE and similar) the Open catalog button used to
+   fall below the fold. The whole form now fits on one screen.
+
+TWO THINGS WORTH SETTING
+   Account & store still has the shipped placeholder in "Location label"
+   ("DR PHONE Location"), and no currency, minimum order, payment or delivery
+   terms. The landing page leaves the address out entirely rather than printing
+   the placeholder, and receipts print without terms. Filling those in improves
+   both.
+
+INSTALLING THIS UPDATE
+  1. Upload this ZIP into public_html and extract it there, overwriting when
+     asked. Nothing moves and nothing is deleted.
+  2. Put back your own storage/orders.json — the ZIP contains no order history.
+     The catalog in this ZIP is your 1041-product spreadsheet of 8 September and
+     is meant to replace the one on the server. Only put your own
+     storage/catalog.json back if you have edited products SINCE exporting it.
+  3. Delete the ZIP from the server.
+  4. Check: open the site logged out and scroll past the passcode box. Then sign
+     in, search for "xo", and press Share.
+
+You do not have to sign in again, and no addresses change.
+
+PICTURES
+This ZIP carries 1040 pictures for 1041 products. One product, DR-000283, uses a
+picture uploaded on the server itself, so it is not in the ZIP — extract OVER the
+existing uploads folder (do not delete it first) and that picture stays.
+Pictures for deleted products are not removed by extracting; clear them with
+Admin Dashboard > Operations > "Delete unused pictures" when you are ready.
+
+ADDRESSES
+  Customer catalog:  https://drphonewholesale.online
+  Admin dashboard:   https://drphonewholesale.online/admin/
+
+WHAT THE ORDER LOG STORES
+- Reference, date, status, every line with SKU, variant, quantity, unit price and
+  line total, the piece count, the order total, and the CUSTOMER'S NAME.
+- It does NOT store the phone number, the business name, or the order notes.
+  Those are typed into the cart, travel in the WhatsApp message, and never reach
+  the server. Export CSV exports the same fields, name included.
+
+SPREADSHEET IMPORT
+- Export CSV from the dashboard, edit in Excel, and import the same file back.
+- Import updates products by their product_id and adds any new rows. It does not
+  delete: products you remove from the spreadsheet stay in the catalog until you
+  delete them in the dashboard.
+
+BULK PRODUCT PICTURES
+- Name each main picture exactly as its SKU: DR-00001.jpg
+- Add gallery pictures with a number: DR-00001-2.jpg, DR-00001-3.webp
+- JPG, PNG and WEBP only, maximum 5 MB each. Upload in batches if your host
+  limits one selection to 20 files.
+
+SECURITY
+- The customer passcode is the only thing between the public and your prices. The
+  landing page shows categories, brands and counts — never a price.
+- Five wrong password attempts from one connection locks logins for 15 minutes.
+- TURNING ON TWO-FACTOR AUTHENTICATION IS STRONGLY RECOMMENDED —
+  Account & store > two-factor.
+
+NOTE ON PRICE TIERS
+A single cart line is capped at 999 pieces, so a tier whose minimum quantity is
+1000 or more can never be reached. Keep tier minimums below 1000.

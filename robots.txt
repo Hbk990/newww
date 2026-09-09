@@ -1,0 +1,11 @@
+# The catalog is public to search engines now. The products themselves sit
+# behind the customer passcode, so a crawler only ever reaches the front page.
+# The dashboard and the data endpoints have no business in a search index.
+
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /inc/
+Disallow: /storage/
+Disallow: /logout.php
