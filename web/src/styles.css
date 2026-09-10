@@ -145,7 +145,60 @@ h1 { font-size: 22px; }
 h2 { font-size: 17px; }
 h3 { font-size: 15px; }
 
-a { color: var(--primary); }
+/* ---------- Links ----------
+   A blue underline everywhere makes a working screen look like a 1998 web
+   page, and when half the words are blue none of them stand out. So a link is
+   the same colour as the text around it, carries its weight, and shows what it
+   is under the cursor. Colour is kept for meaning: money, warnings, status. */
+
+a {
+  color: inherit;
+  text-decoration: none;
+  transition: color 140ms var(--ease);
+}
+a:hover { color: var(--primary); }
+a:focus-visible { outline: none; box-shadow: var(--ring); border-radius: 4px; }
+
+/* A name that opens something. */
+.name-link {
+  font-weight: 600;
+  border-bottom: 1px solid transparent;
+  transition: color 140ms var(--ease), border-color 140ms var(--ease);
+}
+.name-link:hover { color: var(--primary); border-bottom-color: currentColor; }
+
+/* A reference to something with a face: a supplier, a shipper, a car. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  padding: 3px 10px 3px 3px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  transition: background 160ms var(--ease), border-color 160ms var(--ease), transform 160ms var(--ease);
+}
+.chip:hover { background: var(--primary-soft); border-color: var(--primary); transform: translateY(-1px); }
+.chip .avatar {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #fff;
+  background: var(--kind, var(--primary));
+}
+.chip .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip.plain { border-color: transparent; background: transparent; padding-left: 0; }
+.chip.plain:hover { background: var(--surface-2); border-color: var(--border); }
 
 /* ---------- Layout ---------- */
 
@@ -357,8 +410,19 @@ button.secondary:hover:not(:disabled) { background: var(--surface-2); }
 button.danger { background: var(--danger); border-color: var(--danger); color: #fff; }
 button.small { padding: 4px 9px; font-size: 13px; }
 button.link {
-  background: none; border: none; color: var(--primary);
-  padding: 0; font-weight: 500; text-decoration: underline;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  padding: 3px 8px;
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 999px;
+}
+button.link:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--primary);
+  box-shadow: none;
 }
 
 .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
@@ -831,4 +895,89 @@ button.link {
 @media (max-width: 980px) {
   .split { grid-template-columns: 1fr; }
   .split-list { max-height: 320px; }
+}
+
+/* ---------- Account cards ----------
+   Each kind of account looks like what it is: a supplier carries his flag, a
+   shipper a ship, the garage a spanner. The colour band is identity, not
+   decoration — you find the row you want by shape before you read a word. */
+
+.account-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.account {
+  --kind: var(--primary);
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: rise 240ms var(--ease) both;
+  transition: transform 200ms var(--ease), box-shadow 200ms var(--ease), border-color 200ms var(--ease);
+}
+.account:hover { transform: translateY(-3px); box-shadow: var(--shadow-lift); border-color: var(--kind); }
+
+.account .crest {
+  position: relative;
+  height: 76px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--kind);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--kind) 22%, transparent), transparent 72%),
+    var(--surface-2);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+}
+/* The mark sits large and faint behind the corner, the way a letterhead does. */
+.account .crest .mark {
+  position: absolute;
+  right: -8px;
+  bottom: -26px;
+  opacity: 0.18;
+  line-height: 0;
+  pointer-events: none;
+}
+.account .crest .who { position: relative; z-index: 1; min-width: 0; }
+.account .crest .who .name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account .crest .who .company { font-size: 12.5px; color: var(--muted); }
+.account .crest .flag { position: relative; z-index: 1; flex: 0 0 auto; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.18)); }
+
+.account .body { padding: 11px 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.account .balance { font-size: 21px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.account .balance .unit { font-size: 13px; font-weight: 600; color: var(--muted); margin-left: 4px; }
+.account .meaning { font-size: 12.5px; color: var(--muted); }
+.account .foot { display: flex; gap: 6px; padding: 0 12px 12px; }
+.account .foot > * { flex: 1; }
+
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.tabs button {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13.5px;
+}
+.tabs button:hover:not(.on) { background: var(--surface-2); color: var(--text); box-shadow: none; }
+.tabs button.on {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--surface);
 }

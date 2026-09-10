@@ -4,6 +4,8 @@ import { PageHeader, useApp } from '../App';
 import { api, fmt, fmtDate, fmtUsd, type Car, type CarStatus } from '../lib/api';
 import { Alert, Card, Empty, Spinner, StatusBadge } from '../components/ui';
 import { CarAction } from '../components/CarActions';
+import { Chip } from '../components/Chip';
+import { CarMark } from '../components/icons';
 
 const FILTERS: { value: string; label: string }[] = [
   { value: '', label: 'All cars' },
@@ -39,7 +41,7 @@ export default function Cars() {
   }, [status, search, reloads]);
 
   return (
-    <>
+    <div className="page">
       <PageHeader
         title="All cars"
         sub="Every car you have bought, wherever it is"
@@ -50,12 +52,11 @@ export default function Cars() {
         }
       />
 
-      <div className="row" style={{ marginBottom: 12 }}>
+      <div className="tabs">
         {FILTERS.map((filter) => (
           <button
             key={filter.value}
-            className={filter.value === status ? '' : 'secondary'}
-            style={{ flex: '0 0 auto' }}
+            className={filter.value === status ? 'on' : ''}
             onClick={() => setParams(filter.value ? { status: filter.value } : {})}
           >
             {filter.label}
@@ -95,16 +96,25 @@ export default function Cars() {
               <tbody>
                 {cars.map((car) => (
                   <tr key={car.id}>
-                    <td className="strong">
-                      <Link to={`/cars/${car.id}`}>
-                        {car.year} {car.makeName} {car.modelName}
-                      </Link>
-                      <div className="small muted">{car.color}</div>
+                    <td>
+                      <Chip
+                        to={`/cars/${car.id}`}
+                        kind="car"
+                        name={`${car.year} ${car.makeName} ${car.modelName}`}
+                        icon={<CarMark size={14} />}
+                      />
+                      <div className="small muted" style={{ marginTop: 3 }}>{car.color}</div>
                     </td>
                     <td className="small" style={{ fontFamily: 'ui-monospace, monospace' }}>
                       {car.vin}
                     </td>
-                    <td className="small">{car.supplier?.name}</td>
+                    <td>
+                      {car.supplier ? (
+                        <Chip to={`/accounts/${car.supplier.id}`} kind="supplier" name={car.supplier.name} plain />
+                      ) : (
+                        <span className="muted small">—</span>
+                      )}
+                    </td>
                     <td className="small">{fmtDate(car.purchaseDate)}</td>
                     <td className="num">{fmtUsd(car.costs.usd.totalCostUsd)}</td>
                     <td className="num">
@@ -118,8 +128,13 @@ export default function Cars() {
                       <StatusBadge status={car.status as CarStatus} />
                       {car.damaged && <div className="badge red" style={{ marginTop: 3 }}>Damaged</div>}
                       {car.shipment && (
-                        <div className="small muted" style={{ marginTop: 3 }}>
-                          with {car.shipment.shippingCompany?.name ?? 'shipping company'}
+                        <div style={{ marginTop: 4 }}>
+                          <Chip
+                            to={`/shipments/${car.shipment.id}`}
+                            kind="shipping"
+                            name={car.shipment.shippingCompany?.name ?? 'Shipping company'}
+                            plain
+                          />
                         </div>
                       )}
                     </td>
@@ -133,6 +148,6 @@ export default function Cars() {
           </div>
         )}
       </Card>
-    </>
+    </div>
   );
 }

@@ -202,18 +202,27 @@ try {
 
 const big = has('big');
 
+/** The chassis numbers the practice data uses, and nothing else ever does. */
+const DEMO_VINS = ['WDDSJ4EB0KN712345', '4T1B11HK5LU123456', '2T3P1RFV8MC123456'];
+const isPractice = (vin) => DEMO_VINS.includes(vin) || String(vin).startsWith('TEST5');
+
 if (!has('no-demo')) {
   step('5. Practice data');
-  // Never overwrite data that is already there — it might be real.
-  const [[{ cars }]] = await db.query(`SELECT COUNT(*) AS cars FROM \`${dbName}\`.Car`);
-  const existing = Number(cars);
-  if (existing > 0) {
-    warn(`There are already ${existing} cars — leaving your data alone.`);
-    say(`    To replace it with fresh practice data: npm run db:seed:${big ? 'large' : 'demo'} -- --wipe`);
+  const [rows] = await db.query(`SELECT vin FROM \`${dbName}\`.Car`);
+  const vins = rows.map((row) => row.vin);
+  const seeder = big ? 'prisma/seed-large.ts' : 'prisma/seed-demo.ts';
+
+  if (vins.length === 0) {
+    run('npx', ['tsx', seeder]);
+  } else if (vins.every(isPractice)) {
+    // Only practice cars are there, so swapping them for the set you asked for
+    // loses nothing. Doing it by hand every time was needless work.
+    warn(`Replacing the ${vins.length} practice cars that were already here.`);
+    run('npx', ['tsx', seeder, '--wipe']);
   } else {
-    // --big loads a full showroom: 50 cars, five suppliers, five shippers,
-    // five transfer companies and the sales behind them.
-    run('npx', ['tsx', big ? 'prisma/seed-large.ts' : 'prisma/seed-demo.ts']);
+    // Real cars. Never touch them.
+    warn(`There are already ${vins.length} cars, and some are not practice data — leaving them alone.`);
+    say(`    To wipe everything and load practice data: npm run db:seed:${big ? 'large' : 'demo'} -- --wipe`);
   }
 }
 

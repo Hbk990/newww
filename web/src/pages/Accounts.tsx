@@ -1,16 +1,76 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader, useApp } from '../App';
-import { api, type Party, type PartyType } from '../lib/api';
-import { Alert, Balance, Card, Empty, Field, Modal, Spinner, useSubmit } from '../components/ui';
+import { api, fmt, type Party, type PartyType } from '../lib/api';
+import { Alert, Empty, Field, Modal, Spinner, useSubmit } from '../components/ui';
+import { KIND_COLOUR, initialsOf, type Kind } from '../components/Chip';
+import { Flag, PartMark, PersonMark, ShipMark, ToolMark, WalletMark } from '../components/icons';
 
-const TABS: { type: PartyType; label: string; blurb: string }[] = [
-  { type: 'CAR_SUPPLIER', label: 'Car suppliers', blurb: 'Where you buy cars. Balances in USD.' },
-  { type: 'SHIPPING_COMPANY', label: 'Shipping', blurb: 'Ocean freight. Invoiced in USD.' },
-  { type: 'TRANSFER_COMPANY', label: 'Transfer companies', blurb: 'Your money. A negative balance means you have overdrawn.' },
-  { type: 'WORKER', label: 'Workers', blurb: 'Garage and showroom staff, paid in local currency.' },
-  { type: 'PARTS_SUPPLIER', label: 'Parts suppliers', blurb: 'Auto parts bought on account.' },
-  { type: 'CUSTOMER', label: 'Customers', blurb: 'Only needed for a buyer who pays over time.' },
+/**
+ * WHO YOU DEAL WITH.
+ *
+ * A table of names told you nothing at a glance. Each account is now a card
+ * that looks like what it is — a supplier carries his country's flag, a shipper
+ * a ship, the garage a spanner — and the balance is the largest thing on it,
+ * because that is the only reason anyone opens this page.
+ */
+
+const TABS: {
+  type: PartyType;
+  label: string;
+  singular: string;
+  blurb: string;
+  kind: Kind;
+  mark: () => JSX.Element | null;
+}[] = [
+  {
+    type: 'CAR_SUPPLIER',
+    label: 'Car suppliers',
+    singular: 'supplier',
+    blurb: 'Where you buy cars. Balances in USD.',
+    kind: 'supplier',
+    mark: () => null,
+  },
+  {
+    type: 'SHIPPING_COMPANY',
+    label: 'Shipping',
+    singular: 'shipping company',
+    blurb: 'Ocean freight. Invoiced in USD.',
+    kind: 'shipping',
+    mark: () => <ShipMark size={96} />,
+  },
+  {
+    type: 'TRANSFER_COMPANY',
+    label: 'Transfer companies',
+    singular: 'transfer company',
+    blurb: 'Your money. A negative balance means you have overdrawn.',
+    kind: 'transfer',
+    mark: () => <WalletMark size={96} />,
+  },
+  {
+    type: 'WORKER',
+    label: 'Workers',
+    singular: 'worker',
+    blurb: 'Garage and showroom staff, paid in local currency.',
+    kind: 'worker',
+    mark: () => <ToolMark size={96} />,
+  },
+  {
+    type: 'PARTS_SUPPLIER',
+    label: 'Parts suppliers',
+    singular: 'parts supplier',
+    blurb: 'Auto parts bought on account.',
+    kind: 'parts',
+    mark: () => <PartMark size={96} />,
+  },
+  {
+    type: 'CUSTOMER',
+    label: 'Customers',
+    singular: 'customer',
+    blurb: 'Only needed for a buyer who pays over time.',
+    kind: 'customer',
+    mark: () => <PersonMark size={96} />,
+  },
 ];
 
 export default function Accounts() {
@@ -35,21 +95,16 @@ export default function Accounts() {
   const tab = TABS.find((t) => t.type === type)!;
 
   return (
-    <>
+    <div className="page">
       <PageHeader
         title="Accounts"
         sub={tab.blurb}
-        action={<button onClick={() => setEditing('new')}>Add {tab.label.replace(/s$/, '').toLowerCase()}</button>}
+        action={<button onClick={() => setEditing('new')}>Add a {tab.singular}</button>}
       />
 
-      <div className="row" style={{ marginBottom: 12 }}>
+      <div className="tabs">
         {TABS.map((t) => (
-          <button
-            key={t.type}
-            className={t.type === type ? '' : 'secondary'}
-            style={{ flex: '0 0 auto' }}
-            onClick={() => setType(t.type)}
-          >
+          <button key={t.type} className={t.type === type ? 'on' : ''} onClick={() => setType(t.type)}>
             {t.label}
           </button>
         ))}
@@ -57,63 +112,17 @@ export default function Accounts() {
 
       <Alert kind="error">{error}</Alert>
 
-      <Card>
-        {!parties ? (
-          <Spinner />
-        ) : parties.length === 0 ? (
-          <Empty>No {tab.label.toLowerCase()} yet.</Empty>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Company</th>
-                  <th>Mobile</th>
-                  {type === 'CAR_SUPPLIER' && <th>Country</th>}
-                  <th className="num">Balance</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {parties.map((party) => (
-                  <tr key={party.id}>
-                    <td className="strong">
-                      <Link to={`/accounts/${party.id}`}>{party.name}</Link>
-                    </td>
-                    <td>{party.companyName ?? '—'}</td>
-                    <td>{party.mobile ?? '—'}</td>
-                    {type === 'CAR_SUPPLIER' && (
-                      <td>
-                        {party.country === 'CANADA' ? (
-                          <span className="badge red">
-                            Canada{party.wholesaler === 'PRICE_PLUS_TAX' ? ' + tax' : ''}
-                          </span>
-                        ) : (
-                          <span className="badge blue">USA</span>
-                        )}
-                      </td>
-                    )}
-                    <td className="num">
-                      <Balance
-                        amount={party.balance}
-                        currency={party.currency}
-                        label={party.balanceLabel}
-                        invertColour={type === 'TRANSFER_COMPANY' || type === 'CUSTOMER'}
-                      />
-                    </td>
-                    <td className="num">
-                      <button className="link" onClick={() => setEditing(party)}>
-                        Edit
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
+      {!parties ? (
+        <Spinner />
+      ) : parties.length === 0 ? (
+        <Empty>No {tab.label.toLowerCase()} yet.</Empty>
+      ) : (
+        <div className="account-grid">
+          {parties.map((party) => (
+            <AccountCard key={party.id} party={party} tab={tab} onEdit={() => setEditing(party)} />
+          ))}
+        </div>
+      )}
 
       {editing && (
         <PartyForm
@@ -126,7 +135,85 @@ export default function Accounts() {
           }}
         />
       )}
-    </>
+    </div>
+  );
+}
+
+/** One account, as a card. */
+function AccountCard({
+  party,
+  tab,
+  onEdit,
+}: {
+  party: Party;
+  tab: (typeof TABS)[number];
+  onEdit: () => void;
+}) {
+  const balance = Number(party.balance ?? 0);
+  // For a supplier or a worker a positive balance is a debt of yours; for your
+  // own money and for a customer it is the other way round.
+  const positiveIsGood = tab.type === 'TRANSFER_COMPANY' || tab.type === 'CUSTOMER';
+  const tone = balance === 0 ? '' : (balance > 0) === positiveIsGood ? 'pos' : 'neg';
+
+  return (
+    <div className="account" style={{ ['--kind' as string]: KIND_COLOUR[tab.kind] }}>
+      <div className="crest">
+        <div className="who">
+          <div className="name">{party.name}</div>
+          {(party.companyName || party.note) && (
+            <div className="company">{party.companyName ?? party.note}</div>
+          )}
+          {party.mobile && <div className="company">{party.mobile}</div>}
+        </div>
+
+        {tab.type === 'CAR_SUPPLIER' ? (
+          <span className="flag">
+            <Flag country={party.country} />
+          </span>
+        ) : (
+          <span className="avatar" style={{ background: KIND_COLOUR[tab.kind], width: 28, height: 28, borderRadius: 999, display: 'grid', placeItems: 'center', color: '#fff', fontSize: 12, fontWeight: 800 }}>
+            {initialsOf(party.name)}
+          </span>
+        )}
+
+        <span className="mark">{tab.mark()}</span>
+      </div>
+
+      <div className="body">
+        <div>
+          <div className={`balance ${tone}`}>
+            {fmt(party.balance ?? 0)}
+            <span className="unit">{party.currency}</span>
+          </div>
+          <div className="meaning">{party.balanceLabel ?? 'Nothing owed either way'}</div>
+        </div>
+
+        <div className="row" style={{ gap: 6 }}>
+          {party.country && (
+            <span className="badge grey" style={{ flex: '0 0 auto' }}>
+              {party.country === 'CANADA' ? 'Canada' : 'USA'}
+              {party.wholesaler === 'PRICE_PLUS_TAX' ? ' · invoices tax' : ''}
+            </span>
+          )}
+          {party.workerRole && (
+            <span className="badge amber" style={{ flex: '0 0 auto' }}>
+              {party.workerRole === 'GARAGE' ? 'Garage' : 'Showroom'}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="foot">
+        <Link to={`/accounts/${party.id}`}>
+          <button className="secondary small" style={{ width: '100%' }}>
+            Statement
+          </button>
+        </Link>
+        <button className="secondary small" onClick={onEdit}>
+          Edit
+        </button>
+      </div>
+    </div>
   );
 }
 
