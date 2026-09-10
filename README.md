@@ -13,6 +13,8 @@ Read these before changing anything structural:
   truth for the data model
 - [`docs/CATALOG_FINDINGS.md`](docs/CATALOG_FINDINGS.md) — analysis of the 1,155
   line wholesale catalog export and how it is used
+- [`docs/DECISIONS.md`](docs/DECISIONS.md) — the 58 feature decisions: what is in
+  scope, what is explicitly out, and the schema changes they require
 
 ## Getting started
 
