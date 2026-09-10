@@ -161,13 +161,27 @@ for (let attempt = 1; attempt <= 20; attempt++) {
 if (!db) {
   const error = lastError;
   say('');
+  // Access denied means MySQL is there and answering — it is the password that
+  // is wrong, which on a machine like this nearly always means an old container
+  // from an earlier attempt is still running, with the password it was born
+  // with. Saying "is MySQL running?" there sends people looking in the wrong
+  // place, so name the real cause and the way out of it.
+  const denied = /access denied/i.test(error.message);
   fail(
-    `Could not reach MySQL at ${connection.host}:${connection.port}.\n\n` +
+    `Could not use MySQL at ${connection.host}:${connection.port}.\n\n` +
       `  ${error.message}\n\n` +
-      '  Is MySQL running? The quickest way to get one:\n' +
-      '    docker run --name showroom-db -e MYSQL_ROOT_PASSWORD=devpassword -p 3306:3306 -d mysql:8\n\n' +
-      '  Then run this again with:\n' +
-      '    npm run setup -- --db "mysql://root:devpassword@127.0.0.1:3306/carshowroom"',
+      (denied
+        ? '  MySQL is running, but it did not accept that password. If this is a\n' +
+          '  container left over from an earlier attempt, it still has its old\n' +
+          '  password. Delete it and let this build a new one:\n\n' +
+          '    docker rm -f showroom-db\n' +
+          `    docker run --name showroom-db -e MYSQL_ROOT_PASSWORD=devpassword -p ${connection.port}:3306 -d mysql:8\n\n` +
+          '  WARNING: that erases whatever was in the old container.\n' +
+          '  Then run this setup again.'
+        : '  Is MySQL running? The quickest way to get one:\n' +
+          `    docker run --name showroom-db -e MYSQL_ROOT_PASSWORD=devpassword -p ${connection.port}:3306 -d mysql:8\n\n` +
+          '  Then run this again with:\n' +
+          `    npm run setup -- --db "mysql://root:devpassword@127.0.0.1:${connection.port}/carshowroom"`),
   );
 }
 
