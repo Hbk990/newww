@@ -111,7 +111,7 @@ export default function Analysis() {
   if (error) return <Alert kind="error">{error}</Alert>;
 
   return (
-    <>
+    <div className="page">
       <PageHeader
         title="Analysis"
         sub="Which suppliers earn, which shippers overcharge, and which cars are in trouble"
@@ -356,6 +356,6 @@ export default function Analysis() {
           </>
         )}
       </Card>
-    </>
+    </div>
   );
 }

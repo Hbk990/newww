@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { BrowserRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { api, type Settings } from './lib/api';
+import { useTheme } from './lib/theme';
 import { Spinner } from './components/ui';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -140,7 +141,32 @@ function Sidebar({ businessName, onSignOut }: { businessName: string; onSignOut:
       <a href="#" onClick={(e) => { e.preventDefault(); void onSignOut(); }}>
         Sign out
       </a>
+
+      <ThemeSwitch />
     </nav>
+  );
+}
+
+/** Day or evening. Nothing else changes — same screens, same numbers. */
+function ThemeSwitch() {
+  const { theme, setTheme } = useTheme();
+  return (
+    <div className="theme-toggle">
+      <button
+        type="button"
+        className={theme === 'light' ? 'on' : ''}
+        onClick={() => setTheme('light')}
+      >
+        Day
+      </button>
+      <button
+        type="button"
+        className={theme === 'dark' ? 'on' : ''}
+        onClick={() => setTheme('dark')}
+      >
+        Night
+      </button>
+    </div>
   );
 }
 

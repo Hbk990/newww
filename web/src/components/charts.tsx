@@ -15,13 +15,23 @@ import { fmt } from '../lib/api';
  * touching marks.
  */
 
-export const SERIES = ['#2a78d6', '#eb6834', '#1baf7a'] as const;
-export const STATUS = { good: '#0ca30c', warning: '#fab219', critical: '#d03b3b' } as const;
+/*
+ * The colours come from the stylesheet rather than from here, so the charts
+ * follow the day/night switch without being redrawn. Each theme defines its own
+ * steps: the dark ones were checked for colour-blind separation against the
+ * dark surface, not dimmed from the light ones.
+ */
+export const SERIES = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)'] as const;
+export const STATUS = {
+  good: 'var(--chart-good)',
+  warning: 'var(--warning)',
+  critical: 'var(--chart-bad)',
+} as const;
 
-const SURFACE = '#ffffff';
-const GRID = '#e2e8f0';
-const TEXT_MUTED = '#64748b';
-const TEXT = '#0f172a';
+const SURFACE = 'var(--chart-surface)';
+const GRID = 'var(--chart-grid)';
+const TEXT_MUTED = 'var(--muted)';
+const TEXT = 'var(--text)';
 
 /** Round axis ticks to numbers a person would say out loud. */
 function niceTicks(max: number, count = 4, wholeNumbers = false): number[] {
@@ -58,8 +68,10 @@ function Tooltip({ tip, width }: { tip: Tip; width: number }) {
     <foreignObject x={left} y={Math.max(tip.y - 12 - tip.lines.length * 17, 2)} width={boxWidth} height={tip.lines.length * 17 + 12}>
       <div
         style={{
-          background: '#0f172a',
-          color: '#fff',
+          background: 'var(--surface-3)',
+          color: 'var(--text)',
+          border: '1px solid var(--border-strong)',
+          boxShadow: 'var(--shadow-lift)',
           borderRadius: 6,
           padding: '5px 8px',
           fontSize: 12,

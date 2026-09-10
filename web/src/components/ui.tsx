@@ -166,7 +166,7 @@ export function Stat({
   tone,
 }: {
   label: string;
-  value: string;
+  value: ReactNode;
   hint?: ReactNode;
   negative?: boolean;
   tone?: 'good' | 'bad';
@@ -179,4 +179,77 @@ export function Stat({
       {hint && <div className="hint">{hint}</div>}
     </div>
   );
+}
+
+/**
+ * A short message that slides in and leaves by itself.
+ *
+ * In the showroom you are doing one thing after another — price, sell, hold —
+ * and a banner at the top of a long page confirms a sale you can no longer see.
+ * A toast appears where you are looking and gets out of the way.
+ */
+export interface Toast {
+  id: number;
+  text: string;
+  bad?: boolean;
+}
+
+export function useToasts() {
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const push = (text: string, bad?: boolean) => {
+    const id = Date.now() + Math.random();
+    setToasts((current) => [...current, { id, text, bad }]);
+    setTimeout(() => setToasts((current) => current.filter((toast) => toast.id !== id)), 5000);
+  };
+
+  return { toasts, push };
+}
+
+export function Toasts({ toasts }: { toasts: Toast[] }) {
+  if (toasts.length === 0) return null;
+  return createPortal(
+    <div className="toast-wrap">
+      {toasts.map((toast) => (
+        <div key={toast.id} className={`toast${toast.bad ? ' bad' : ''}`}>
+          {toast.text}
+        </div>
+      ))}
+    </div>,
+    document.body,
+  );
+}
+
+/**
+ * A number that counts up to its value when it first appears.
+ *
+ * Only on the dashboard's headline figures: it draws the eye to what changed
+ * since yesterday. Anywhere a number has to be read carefully — a statement, a
+ * price, a ledger — it is printed plainly and never moves.
+ */
+export function CountUp({ value, format }: { value: number; format: (value: number) => string }) {
+  const [shown, setShown] = useState(value);
+
+  useEffect(() => {
+    if (!Number.isFinite(value)) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setShown(value);
+      return;
+    }
+    const from = 0;
+    const start = performance.now();
+    const duration = 620;
+    let frame = 0;
+    const tick = (now: number) => {
+      const progress = Math.min((now - start) / duration, 1);
+      // Fast at first, easing into the real figure.
+      const eased = 1 - (1 - progress) ** 3;
+      setShown(from + (value - from) * eased);
+      if (progress < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
+
+  return <>{format(shown)}</>;
 }

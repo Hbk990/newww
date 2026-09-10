@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp, PageHeader } from '../App';
 import { api, fmt, fmtUsd } from '../lib/api';
-import { Card, Spinner, Alert, Stat } from '../components/ui';
-import { BarRows, ChartFrame, ColumnChart, STATUS } from '../components/charts';
+import { Card, Spinner, Alert, Stat, CountUp } from '../components/ui';
+import { BarRows, ChartFrame, ColumnChart, SERIES, STATUS } from '../components/charts';
 
 interface DashboardData {
   carsByStatus: Record<string, number>;
@@ -97,7 +97,7 @@ export default function Dashboard() {
   const profitThisYear = (trend ?? []).reduce((sum, month) => sum + Number(month.netProfitCfa), 0);
 
   return (
-    <>
+    <div className="page">
       <PageHeader title="Dashboard" sub="Where the business stands right now" />
 
       {awaitingCondition > 0 && (
@@ -119,12 +119,24 @@ export default function Dashboard() {
       )}
 
       <div className="grid cols-4">
-        <Stat label="Cars in stock" value={String(data.carsInStock)} hint="not yet sold" />
-        <Stat label={`Stock value ${cfa}`} value={fmt(data.stockValueCfa)} hint="landed cost of cars here" />
-        <Stat label="Still abroad" value={fmtUsd(data.abroadValueUsd)} hint="cost of cars not yet arrived" />
+        <Stat
+          label="Cars in stock"
+          value={<CountUp value={data.carsInStock} format={(v) => String(Math.round(v))} />}
+          hint="not yet sold"
+        />
+        <Stat
+          label={`Stock value ${cfa}`}
+          value={<CountUp value={Number(data.stockValueCfa)} format={(v) => fmt(v.toFixed(0))} />}
+          hint="landed cost of cars here"
+        />
+        <Stat
+          label="Still abroad"
+          value={<CountUp value={Number(data.abroadValueUsd)} format={(v) => fmtUsd(v.toFixed(0))} />}
+          hint="cost of cars not yet arrived"
+        />
         <Stat
           label={`Treasury ${cfa}`}
-          value={fmt(data.treasuryCfa)}
+          value={<CountUp value={Number(data.treasuryCfa)} format={(v) => fmt(v.toFixed(0))} />}
           hint="held by transfer companies"
           negative={Number(data.treasuryCfa) < 0}
         />
@@ -170,7 +182,7 @@ export default function Dashboard() {
                 ],
               }))}
               currency={cfa}
-              colorFor={(value) => (value < 0 ? STATUS.critical : '#2a78d6')}
+              colorFor={(value) => (value < 0 ? STATUS.critical : SERIES[0])}
             />
           </ChartFrame>
         </div>
@@ -356,7 +368,7 @@ export default function Dashboard() {
           </div>
         </Card>
       )}
-    </>
+    </div>
   );
 }
 
