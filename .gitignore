@@ -10,3 +10,6 @@ server/prisma/vpic-cache.json
 
 # Uploaded car photos live on disk, never in the repository or a backup zip.
 server/uploads/
+
+# Written by "npm run setup" so a failed run can be sent to someone.
+setup-log.txt

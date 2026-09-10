@@ -15,9 +15,9 @@
  *   --big                                                     50 cars instead of 3
  *   --fresh                                                   ERASE and start over
  */
-import { execFileSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,42 +35,98 @@ const flag = (name) => {
 };
 const has = (name) => argv.includes(`--${name}`);
 
-const say = (message) => console.log(message);
-const step = (message) => console.log(`\n\x1b[1m${message}\x1b[0m`);
-const ok = (message) => console.log(`  \x1b[32m✓\x1b[0m ${message}`);
-const warn = (message) => console.log(`  \x1b[33m!\x1b[0m ${message}`);
+/**
+ * Everything printed also goes here. A step that fails prints its reason and
+ * then scrolls away under whatever comes next, and asking someone to find it
+ * again in a terminal is asking a lot. One file can just be sent.
+ */
+const logPath = join(root, 'setup-log.txt');
+writeFileSync(
+  logPath,
+  [
+    `Car Showroom setup log`,
+    `${new Date().toISOString()}`,
+    `node ${process.version} on ${process.platform}`,
+    `folder ${root}`,
+    `arguments ${argv.join(' ') || '(none)'}`,
+    '',
+    '',
+  ].join('\n'),
+);
+const log = (text) => {
+  try {
+    // Strip the colour codes: they are noise in a file.
+    appendFileSync(logPath, String(text).replace(/\x1b\[[0-9;]*m/g, ''));
+  } catch {
+    // A log that cannot be written must never stop the setup it is logging.
+  }
+};
+
+const say = (message) => (console.log(message), log(`${message}\n`));
+const step = (message) => (console.log(`\n\x1b[1m${message}\x1b[0m`), log(`\n== ${message} ==\n`));
+const ok = (message) => (console.log(`  \x1b[32m✓\x1b[0m ${message}`), log(`  OK   ${message}\n`));
+const warn = (message) => (console.log(`  \x1b[33m!\x1b[0m ${message}`), log(`  WARN ${message}\n`));
 const fail = (message) => {
   console.error(`\n\x1b[31m✗ ${message}\x1b[0m\n`);
+  log(`\nFAILED ${message}\n`);
+  console.error(`  The whole run, including the message above, is saved in:`);
+  console.error(`    ${logPath}\n`);
   process.exit(1);
 };
 
 /** Never print a database password to the screen or a log. */
 const redact = (url) => url.replace(/\/\/([^:]+):[^@]*@/, '//$1:****@');
 
-/** Runs a step and lets the caller deal with a failure. */
-const tryRun = (command, args, cwd = serverDir, env = {}) =>
-  execFileSync(command, args, {
-    cwd,
-    stdio: 'inherit',
-    env: { ...process.env, ...env },
-    shell: process.platform === 'win32',
-  });
+/**
+ * Runs one of this project's own TypeScript scripts.
+ *
+ * Deliberately not "npx tsx": npx re-resolves the tool on every call and will
+ * try the network when it does not like what it finds, which turns an offline
+ * moment into a failed install. This uses the Node already running and the tsx
+ * that npm installed, and nothing else.
+ */
+const script = (file, ...args) => [process.execPath, ['--import', 'tsx', file, ...args]];
 
 /**
- * Runs a step that must succeed. The step prints its own reason as it goes,
- * so a Node stack trace on top of it only buries the one line worth reading.
+ * Runs a step, showing its output as it appears and keeping a copy in the log.
+ * Resolves with the exit code; never throws, so each caller decides what a
+ * failure means.
  */
-const run = (command, args, cwd = serverDir, env = {}) => {
-  try {
-    return tryRun(command, args, cwd, env);
-  } catch {
+const attempt = (command, args, cwd = serverDir, env = {}) =>
+  new Promise((resolve) => {
+    log(`\n$ ${[command, ...args].join(' ')}\n`);
+    const child = spawn(command, args, {
+      cwd,
+      stdio: ['inherit', 'pipe', 'pipe'],
+      env: { ...process.env, ...env },
+      shell: process.platform === 'win32',
+    });
+    const tee = (stream, out) =>
+      stream?.on('data', (chunk) => {
+        out.write(chunk);
+        log(chunk.toString());
+      });
+    tee(child.stdout, process.stdout);
+    tee(child.stderr, process.stderr);
+    child.on('error', (error) => {
+      const message = `Could not run "${command}": ${error.message}\n`;
+      process.stderr.write(message);
+      log(message);
+      resolve(1);
+    });
+    child.on('close', (code) => resolve(code ?? 1));
+  });
+
+/** Runs a step that must succeed. */
+const run = async (command, args, cwd = serverDir, env = {}) => {
+  const code = await attempt(command, args, cwd, env);
+  if (code !== 0)
     fail(
       `This step stopped:  ${[command, ...args].join(' ')}\n\n` +
         '  Its own error message is printed above this box — that is the one\n' +
         '  that says why. Everything below it is just Node reporting that the\n' +
         '  step failed.',
     );
-  }
 };
 
 // ---------------------------------------------------------------------------
@@ -216,18 +272,16 @@ ok(`Database "${dbName}" is ready at ${connection.host}:${connection.port}`);
 // --- 3. Tables --------------------------------------------------------------
 
 step('3. Tables');
-run('npx', ['prisma', 'migrate', 'deploy']);
-run('node', ['scripts/ensure-client.mjs']);
+await run('npx', ['prisma', 'migrate', 'deploy']);
+await run(process.execPath, ['scripts/ensure-client.mjs']);
 ok('Tables created');
 
 // --- 4. Car brands ----------------------------------------------------------
 
 step('4. Car brands and models');
-try {
-  tryRun('npx', ['tsx', 'prisma/seed-vpic.ts']);
-} catch {
+if ((await attempt(...script('prisma/seed-vpic.ts'))) !== 0) {
   warn('Could not load the full list — falling back to the bundled one');
-  run('npx', ['tsx', 'prisma/seed-vpic.ts', '--offline']);
+  await run(...script('prisma/seed-vpic.ts', '--offline'));
 }
 
 // --- 5. Practice data -------------------------------------------------------
@@ -240,10 +294,8 @@ const big = has('big');
  * never stop setup before the login exists, or you are left with a system you
  * cannot sign in to and no obvious way back.
  */
-const loadPractice = (seeder, extra) => {
-  try {
-    tryRun('npx', ['tsx', seeder, ...extra]);
-  } catch {
+const loadPractice = async (seeder, extra) => {
+  if ((await attempt(...script(seeder, ...extra))) !== 0) {
     warn('The practice data did not load. Its reason is printed above.');
     warn('Setup is carrying on — the system itself is fine, it just has no');
     warn('practice cars in it. Load them later with:');
@@ -261,12 +313,12 @@ if (!has('no-demo')) {
   const seeder = big ? 'prisma/seed-large.ts' : 'prisma/seed-demo.ts';
 
   if (vins.length === 0) {
-    loadPractice(seeder, []);
+    await loadPractice(seeder, []);
   } else if (vins.every(isPractice)) {
     // Only practice cars are there, so swapping them for the set you asked for
     // loses nothing. Doing it by hand every time was needless work.
     warn(`Replacing the ${vins.length} practice cars that were already here.`);
-    loadPractice(seeder, ['--wipe']);
+    await loadPractice(seeder, ['--wipe']);
   } else {
     // Real cars. Never touch them.
     warn(`There are already ${vins.length} cars, and some are not practice data — leaving them alone.`);
@@ -281,7 +333,7 @@ await db.end();
 // than adding a second one.
 
 step('6. Cash box');
-run('npx', ['tsx', 'scripts/ensure-cash-box.ts']);
+await run(...script('scripts/ensure-cash-box.ts'));
 
 // --- 6. Login ---------------------------------------------------------------
 
@@ -290,11 +342,7 @@ step('7. Your login');
 const username = flag('user') ?? 'owner';
 const password = flag('password') ?? 'Showroom-Test-2026';
 
-try {
-  run('npx', ['tsx', 'scripts/create-user.ts', username, password]);
-} catch {
-  fail('Could not create the login. Check the message above.');
-}
+await run(...script('scripts/create-user.ts', username, password));
 
 // --- Done -------------------------------------------------------------------
 

@@ -168,6 +168,20 @@ if (web && !api) note('Run the halves apart to see the real error: npm run dev:a
 
 // --- Verdict -----------------------------------------------------------------
 
+const setupLog = join(root, 'setup-log.txt');
+if (existsSync(setupLog)) {
+  head('Last setup run');
+  const text = readFileSync(setupLog, 'utf8');
+  const failed = text.split('\n').find((line) => line.startsWith('FAILED '));
+  if (failed) {
+    problems++;
+    bad(failed.replace(/^FAILED\s*/, '').split('\n')[0]);
+  }
+  else ok('Finished without stopping');
+  note(`The whole run is in ${setupLog}`);
+  if (failed) note('Send that file to whoever is helping — it holds the real error.');
+}
+
 console.log('\n  ─────────────────────────────────────────');
 if (problems === 0) console.log('  Nothing wrong found.\n');
 else console.log(`  ${problems} problem${problems === 1 ? '' : 's'} above, each with what to do about it.\n`);
