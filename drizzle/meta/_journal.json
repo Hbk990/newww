@@ -36,6 +36,27 @@
       "when": 1789081237387,
       "tag": "0004_fix_device_fit_on_variant_delete",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789083595525,
+      "tag": "0005_feature_decisions",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789083665118,
+      "tag": "0006_drop_global_order_seq",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789083699369,
+      "tag": "0007_decision_functions",
+      "breakpoints": true
     }
   ]
 }

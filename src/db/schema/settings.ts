@@ -37,8 +37,12 @@ export const storeSettings = pgTable(
     displayCurrency: char({ length: 3 }),
     displayRate: numeric({ precision: 18, scale: 6 }),
     displayRateUpdatedAt: timestamp({ withTimezone: true }),
-    orderNumberSeq: integer().notNull().default(1000),
     storeName: text().notNull(),
+    /**
+     * While true the storefront sends `noindex` and blocks crawlers, so a
+     * half-finished catalog never gets indexed. Turn it off at launch.
+     */
+    isPrivate: boolean().notNull().default(true),
   },
   (t) => [check("store_settings_single_row", sql`${t.id}`)],
 );

@@ -2,6 +2,7 @@ import {
   boolean,
   char,
   index,
+  numeric,
   pgTable,
   text,
   timestamp,
@@ -40,6 +41,8 @@ export const addresses = pgTable(
     name: text().notNull(),
     line1: text().notNull(),
     line2: text(),
+    building: text(),
+    floor: text(),
     city: text().notNull(),
     region: text().notNull(),
     postalCode: text(),
@@ -47,6 +50,10 @@ export const addresses = pgTable(
     country: char({ length: 2 }).notNull(),
     phone: text().notNull(),
     directions: text(),
+    // Optional map pin. Stored as plain numerics rather than PostGIS: we only
+    // ever hand these to a map, never compute distances with them.
+    latitude: numeric({ precision: 10, scale: 7 }),
+    longitude: numeric({ precision: 10, scale: 7 }),
     isDefault: boolean().notNull().default(false),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

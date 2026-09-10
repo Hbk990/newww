@@ -31,11 +31,18 @@ export const carts = pgTable(
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp({ withTimezone: true }),
+    // Set once a recovery email goes out, so a cart is chased once rather than
+    // every night until it expires.
+    reminderSentAt: timestamp({ withTimezone: true }),
   },
   (t) => [
     index("carts_user_idx")
       .on(t.userId)
       .where(sql`${t.userId} is not null`),
+    // The recovery worklist: active carts never yet chased.
+    index("carts_abandoned_idx")
+      .on(t.updatedAt)
+      .where(sql`${t.status} = 'active' and ${t.reminderSentAt} is null`),
   ],
 );
 

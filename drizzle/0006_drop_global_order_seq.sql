@@ -1,0 +1,1 @@
+ALTER TABLE "store_settings" DROP COLUMN "order_number_seq";

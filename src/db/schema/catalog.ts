@@ -4,6 +4,7 @@ import {
   check,
   index,
   integer,
+  numeric,
   pgTable,
   primaryKey,
   text,
@@ -61,6 +62,14 @@ export const products = pgTable(
     // has to join inventory across every variant, which is the same aggregate
     // problem as the price — and stock changes far more often than price.
     inStock: boolean().notNull().default(false),
+    // Units sold, excluding cancelled and returned orders. Drives Best Sellers.
+    // Recomputed by trigger, never incremented from application code.
+    salesCount: integer().notNull().default(0),
+    // Approved reviews only, so a listing card can show stars without a join.
+    reviewCount: integer().notNull().default(0),
+    ratingAvg: numeric({ precision: 2, scale: 1 }),
+    // True when this product is sold as a bundle of other variants.
+    isBundle: boolean().notNull().default(false),
   },
   (t) => [
     index("products_status_published_idx").on(t.status, t.publishedAt.desc()),
@@ -78,6 +87,10 @@ export const products = pgTable(
     index("products_buyable_idx")
       .on(t.publishedAt.desc())
       .where(sql`${t.status} = 'active' and ${t.inStock}`),
+    // Best Sellers.
+    index("products_bestselling_idx")
+      .on(t.salesCount.desc())
+      .where(sql`${t.status} = 'active'`),
   ],
 );
 

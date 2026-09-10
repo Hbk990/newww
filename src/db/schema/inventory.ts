@@ -33,9 +33,23 @@ export const inventory = pgTable(
     reserved: integer().notNull().default(0),
     track: boolean().notNull().default(true),
     policy: inventoryPolicy().notNull().default("deny"),
+    /**
+     * Reorder point. `in_stock` already flips at zero; this is what warns you
+     * before that, so the alert arrives while there is still time to rebuy.
+     * Null means no threshold set.
+     */
+    lowStockThreshold: integer(),
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [check("inventory_reserved_nonneg", sql`${t.reserved} >= 0`)],
+  (t) => [
+    check("inventory_reserved_nonneg", sql`${t.reserved} >= 0`),
+    // The low-stock worklist: only variants actually at or under their point.
+    index("inventory_low_stock_idx")
+      .on(t.variantId)
+      .where(
+        sql`${t.track} and ${t.lowStockThreshold} is not null and (${t.onHand} - ${t.reserved}) <= ${t.lowStockThreshold}`,
+      ),
+  ],
 );
 
 /**

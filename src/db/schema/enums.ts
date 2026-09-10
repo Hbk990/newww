@@ -54,14 +54,25 @@ export const cartStatus = pgEnum("cart_status", [
 ]);
 
 /**
- * The Cash on Delivery lifecycle. An order stays `pending` until someone phones
- * the customer to confirm it, and only a `confirmed` order is dispatched.
- * Skipping that call means paying couriers to deliver parcels nobody accepts.
+ * Where the order physically is. An order stays `new` until someone phones the
+ * customer to confirm it, and only a `confirmed` order is dispatched — skipping
+ * that call means paying couriers to deliver parcels nobody accepts.
+ *
+ * Eight operational values, not the nine that were asked for: `refunded` is a
+ * fact about money and lives on `paymentStatus`. A refunded order is also
+ * `returned` or `cancelled`, which is what happened to the goods. Keeping the
+ * two apart is what lets a partial refund of a partial shipment stay
+ * expressible.
  */
 export const orderStatus = pgEnum("order_status", [
-  "pending",
+  "new",
   "confirmed",
+  "preparing",
+  "ready",
+  "out_for_delivery",
+  "delivered",
   "cancelled",
+  "returned",
 ]);
 
 /**
@@ -85,6 +96,10 @@ export const discountKind = pgEnum("discount_kind", [
   "percent",
   "fixed",
   "free_shipping",
+  // "buy a case, get a protector free"
+  "buy_x_get_y",
+  // "3 cables for $5"
+  "quantity_break",
 ]);
 
 /**
@@ -93,3 +108,36 @@ export const discountKind = pgEnum("discount_kind", [
  * `alter type payment_method add value 'whish'` with no table migration.
  */
 export const paymentMethod = pgEnum("payment_method", ["cod"]);
+
+/** How an order reached us, so WhatsApp volume is countable rather than guessed. */
+export const orderSource = pgEnum("order_source", ["web", "whatsapp", "admin"]);
+
+/** Reviews are held until a person approves them. */
+export const reviewStatus = pgEnum("review_status", [
+  "pending",
+  "approved",
+  "rejected",
+]);
+
+/** Why two products are linked. */
+export const relationKind = pgEnum("relation_kind", [
+  "cross_sell",
+  "accessory",
+  "similar",
+]);
+
+export const alertKind = pgEnum("alert_kind", ["back_in_stock", "price_drop"]);
+
+/**
+ * Email only for now. Kept as an enum so adding WhatsApp or SMS later is
+ * `alter type` plus a sender, with no change to the notifications table.
+ */
+export const notificationChannel = pgEnum("notification_channel", ["email"]);
+
+export const notificationStatus = pgEnum("notification_status", [
+  "queued",
+  "sent",
+  "failed",
+]);
+
+export const stockCountStatus = pgEnum("stock_count_status", ["open", "closed"]);

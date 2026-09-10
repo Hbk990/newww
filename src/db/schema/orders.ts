@@ -12,11 +12,12 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import { variants } from "./catalog";
+import { products, variants } from "./catalog";
 import { carts } from "./cart";
 import { discounts } from "./discounts";
 import {
   fulfillmentStatus,
+  orderSource,
   orderStatus,
   paymentMethod,
   paymentStatus,
@@ -47,7 +48,7 @@ export const orders = pgTable(
     // Standalone, because guest checkout has no user row to read it from.
     email: text().notNull(),
 
-    status: orderStatus().notNull().default("pending"),
+    status: orderStatus().notNull().default("new"),
     paymentStatus: paymentStatus().notNull().default("unpaid"),
     fulfillmentStatus: fulfillmentStatus().notNull().default("unfulfilled"),
 
@@ -69,6 +70,9 @@ export const orders = pgTable(
     phone: text().notNull(),
     // The courier's collection fee, when it is passed to the customer.
     codFeeCents: integer().notNull().default(0),
+    // Free text from the customer at checkout. Couriers genuinely read these.
+    customerNote: text(),
+    source: orderSource().notNull().default("web"),
 
     // The confirmation call that gates dispatch.
     confirmedAt: timestamp({ withTimezone: true }),
@@ -90,7 +94,7 @@ export const orders = pgTable(
     // first. Partial, so it holds only the work outstanding.
     index("orders_awaiting_confirmation_idx")
       .on(t.createdAt)
-      .where(sql`${t.status} = 'pending'`),
+      .where(sql`${t.status} = 'new'`),
     // The COD collection worklist: dispatched but not yet paid.
     index("orders_unpaid_idx")
       .on(t.createdAt)
@@ -114,6 +118,12 @@ export const orderItems = pgTable(
       .notNull()
       .references(() => orders.id, { onDelete: "cascade" }),
     variantId: uuid().references(() => variants.id, { onDelete: "set null" }),
+    /**
+     * Kept alongside `variantId` for reporting. Sales counts are aggregated per
+     * product, and a deleted variant would otherwise sever the only link back —
+     * losing the sales history that Best Sellers is computed from.
+     */
+    productId: uuid().references(() => products.id, { onDelete: "set null" }),
     productTitle: text().notNull(),
     variantTitle: text().notNull(),
     sku: text(),
@@ -123,6 +133,7 @@ export const orderItems = pgTable(
   },
   (t) => [
     index("order_items_order_idx").on(t.orderId),
+    index("order_items_product_idx").on(t.productId),
     check("order_items_quantity_positive", sql`${t.quantity} > 0`),
   ],
 );

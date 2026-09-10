@@ -37,11 +37,22 @@ round-trip latency, or the driver error if it can't connect.
 | `npm run lint` | ESLint |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run db:generate` | Generate a migration from the Drizzle schema |
-| `npm run db:migrate` | Apply pending migrations |
+| `npm run db:migrate` | Apply pending migrations (via `scripts/migrate.mjs`) |
 | `npm run db:studio` | Drizzle Studio |
 
 Migrations are generated and reviewed as SQL before being applied — there is no
 `db:push`, deliberately, so no schema change reaches a database unread.
+
+`db:migrate` runs `scripts/migrate.mjs` rather than `drizzle-kit migrate`,
+because the CLI exits non-zero without printing the failing statement. The
+script prints the error, the Postgres code and the offending query.
+
+A fresh database applies **every pending migration in one transaction**. That
+means a migration must not use an enum value that an earlier pending migration
+added with `ALTER TYPE ... ADD VALUE` — Postgres refuses ("unsafe use of new
+value"), and the failure appears only on fresh databases, never in development
+where the earlier migration already committed. Compare as `status::text` when
+this comes up.
 
 ## Layout
 
