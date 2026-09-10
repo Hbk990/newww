@@ -21,15 +21,15 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 model User {
-  id            Int       @id @default(autoincrement())
-  username      String    @unique
-  passwordHash  String    @db.Text
-  totpSecret    String?   @db.Text
-  totpEnabled   Boolean   @default(false)
-  failedLogins  Int       @default(0)
-  lockedUntil   DateTime?
-  createdAt     DateTime  @default(now())
-  lastLoginAt   DateTime?
+  id           Int       @id @default(autoincrement())
+  username     String    @unique
+  passwordHash String    @db.Text
+  totpSecret   String?   @db.Text
+  totpEnabled  Boolean   @default(false)
+  failedLogins Int       @default(0)
+  lockedUntil  DateTime?
+  createdAt    DateTime  @default(now())
+  lastLoginAt  DateTime?
 
   sessions      Session[]
   recoveryCodes RecoveryCode[]
@@ -125,18 +125,19 @@ model Party {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
-  ledger            LedgerEntry[]
-  carsSupplied      Car[]              @relation("CarSupplier")
-  shipments         Shipment[]
-  repairJobs        RepairJob[]
-  repairParts       RepairPart[]
-  overheads         OverheadExpense[]
-  transfersFrom     Transaction[]      @relation("TransferCompany")
-  transfersTo       Transaction[]      @relation("Counterparty")
-  sales             Sale[]
-  saleReceipts      SalePayment[]      @relation("SaleReceipts")
-  reservationDeposits Reservation[]    @relation("ReservationDeposits")
-  costAdjustments   CostAdjustment[]   @relation("CostAdjustments")
+  ledger              LedgerEntry[]
+  carsSupplied        Car[]             @relation("CarSupplier")
+  shipments           Shipment[]
+  repairJobs          RepairJob[]
+  repairParts         RepairPart[]
+  partsNeeded         PartNeeded[]      @relation("PartsNeeded")
+  overheads           OverheadExpense[]
+  transfersFrom       Transaction[]     @relation("TransferCompany")
+  transfersTo         Transaction[]     @relation("Counterparty")
+  sales               Sale[]
+  saleReceipts        SalePayment[]     @relation("SaleReceipts")
+  reservationDeposits Reservation[]     @relation("ReservationDeposits")
+  costAdjustments     CostAdjustment[]  @relation("CostAdjustments")
 
   @@index([type, active])
 }
@@ -255,24 +256,24 @@ model CarPhoto {
 /// reservation until the sale completes (when it counts towards the price),
 /// the buyer walks away and you refund it, or he walks away and you keep it.
 model Reservation {
-  id           Int               @id @default(autoincrement())
-  carId        Int
-  customerName String
+  id             Int               @id @default(autoincrement())
+  carId          Int
+  customerName   String
   customerMobile String?
-  depositCfa   Decimal           @db.Decimal(18, 4)
-  date         DateTime
-  note         String?           @db.Text
-  status       ReservationStatus @default(ACTIVE)
+  depositCfa     Decimal           @db.Decimal(18, 4)
+  date           DateTime
+  note           String?           @db.Text
+  status         ReservationStatus @default(ACTIVE)
 
   /// Where the deposit money landed.
   destinationAccountId Int?
   ledgerEntryId        Int? @unique
 
   /// How it ended.
-  closedAt     DateTime?
-  closedReason String?   @db.Text
+  closedAt      DateTime?
+  closedReason  String?   @db.Text
   /// The refund's ledger line, when the money was given back.
-  refundEntryId Int? @unique
+  refundEntryId Int?      @unique
 
   createdAt DateTime @default(now())
   createdBy Int?
@@ -316,15 +317,15 @@ model Car {
   color      String
   vin        String @unique
 
-  purchasePriceUsd Decimal @db.Decimal(18, 4)
+  purchasePriceUsd Decimal  @db.Decimal(18, 4)
   purchaseDate     DateTime
 
   // Canada tax (zero for USA / PRICE_ONLY suppliers)
-  taxUsd            Decimal       @default(0) @db.Decimal(18, 4)
-  taxCapitalizedUsd Decimal       @default(0) @db.Decimal(18, 4) // min(tax, threshold) — enters car cost
-  taxRefundableUsd  Decimal       @default(0) @db.Decimal(18, 4) // max(tax - threshold, 0)
-  taxRefundMode     TaxRefundMode @default(NONE)
-  taxRefundSettled  Boolean       @default(false)
+  taxUsd             Decimal       @default(0) @db.Decimal(18, 4)
+  taxCapitalizedUsd  Decimal       @default(0) @db.Decimal(18, 4) // min(tax, threshold) — enters car cost
+  taxRefundableUsd   Decimal       @default(0) @db.Decimal(18, 4) // max(tax - threshold, 0)
+  taxRefundMode      TaxRefundMode @default(NONE)
+  taxRefundSettled   Boolean       @default(false)
   taxRefundSettledAt DateTime?
 
   problemNote String? @db.Text
@@ -343,16 +344,16 @@ model Car {
   needsMechanic   Boolean @default(false)
 
   // shipment link
-  shipmentId       Int?
-  freightShareUsd  Decimal? @db.Decimal(18, 4) // equal split by default, editable
+  shipmentId      Int?
+  freightShareUsd Decimal? @db.Decimal(18, 4) // equal split by default, editable
 
   // ---- FROZEN COST SNAPSHOT, written once when the shipment is marked arrived
-  cfaRate           Decimal? @db.Decimal(18, 6)
-  purchaseCfa       Decimal? @db.Decimal(18, 4)
-  originExpensesCfa Decimal? @db.Decimal(18, 4)
-  taxCapitalizedCfa Decimal? @db.Decimal(18, 4)
-  freightCfa        Decimal? @db.Decimal(18, 4)
-  arrivalCostCfa    Decimal? @db.Decimal(18, 4) // sum of the four above — never recomputed
+  cfaRate           Decimal?  @db.Decimal(18, 6)
+  purchaseCfa       Decimal?  @db.Decimal(18, 4)
+  originExpensesCfa Decimal?  @db.Decimal(18, 4)
+  taxCapitalizedCfa Decimal?  @db.Decimal(18, 4)
+  freightCfa        Decimal?  @db.Decimal(18, 4)
+  arrivalCostCfa    Decimal?  @db.Decimal(18, 4) // sum of the four above — never recomputed
   arrivedAt         DateTime?
 
   /// What you expect to sell it for. Set at purchase or any time after, and
@@ -365,16 +366,17 @@ model Car {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  supplier       Party           @relation("CarSupplier", fields: [supplierId], references: [id])
-  shipment       Shipment?       @relation(fields: [shipmentId], references: [id])
-  originExpenses OriginExpense[]
-  repairJobs     RepairJob[]
-  repairParts    RepairPart[]
+  supplier        Party            @relation("CarSupplier", fields: [supplierId], references: [id])
+  shipment        Shipment?        @relation(fields: [shipmentId], references: [id])
+  originExpenses  OriginExpense[]
+  repairJobs      RepairJob[]
+  repairParts     RepairPart[]
   sale            Sale?
   ledger          LedgerEntry[]
   costAdjustments CostAdjustment[]
   photos          CarPhoto[]
   reservations    Reservation[]
+  partsNeeded     PartNeeded[]
 
   @@index([status])
   @@index([supplierId])
@@ -405,20 +407,20 @@ enum ShipmentStatus {
 }
 
 model Shipment {
-  id                Int            @id @default(autoincrement())
-  reference         String // what you call this shipment
-  shippingCompanyId Int
+  id                  Int            @id @default(autoincrement())
+  reference           String // what you call this shipment
+  shippingCompanyId   Int
   /// What you were quoted when the cars left. Compared with the real invoice
   /// on arrival, so a shipper who quotes low and bills high becomes visible.
-  estimatedFreightUsd Decimal?     @db.Decimal(18, 4)
-  freightCostUsd    Decimal        @db.Decimal(18, 4)
-  cfaRate           Decimal?       @db.Decimal(18, 6) // set once on arrival, then frozen
-  departureDate     DateTime?
-  arrivalDate       DateTime?
-  status            ShipmentStatus @default(DRAFT)
-  note              String?        @db.Text
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  estimatedFreightUsd Decimal?       @db.Decimal(18, 4)
+  freightCostUsd      Decimal        @db.Decimal(18, 4)
+  cfaRate             Decimal?       @db.Decimal(18, 6) // set once on arrival, then frozen
+  departureDate       DateTime?
+  arrivalDate         DateTime?
+  status              ShipmentStatus @default(DRAFT)
+  note                String?        @db.Text
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
 
   shippingCompany Party         @relation(fields: [shippingCompanyId], references: [id])
   cars            Car[]
@@ -446,10 +448,40 @@ model RepairJob {
   description   String?     @db.Text
   date          DateTime
   createdAt     DateTime    @default(now())
-  ledgerEntryId Int?       @unique // exact charge; null only for legacy repairs
+  ledgerEntryId Int?        @unique // exact charge; null only for legacy repairs
 
   car    Car   @relation(fields: [carId], references: [id])
   worker Party @relation(fields: [workerId], references: [id])
+
+  @@index([carId])
+}
+
+/// A part the car is waiting for, before anyone knows what it will cost.
+///
+/// A repair starts with a list — "front wing, left headlight, two clips" — and
+/// the prices arrive later, sometimes days later. Writing those into RepairPart
+/// would post a charge to a parts supplier for money nobody has agreed yet, so
+/// the list lives here until a price is known. Recording the price turns the
+/// line into a real RepairPart and charges the supplier then, and only then.
+model PartNeeded {
+  id               Int      @id @default(autoincrement())
+  carId            Int
+  description      String   @db.Text
+  /// Who is expected to supply it. Optional: sometimes you know the part
+  /// before you know where it is coming from.
+  partsSupplierId  Int?
+  /// What it is expected to cost. Null means nobody has priced it yet, which
+  /// is what the warning on the garage card is about.
+  estimatedCostCfa Decimal? @db.Decimal(18, 4)
+  note             String?  @db.Text
+  createdAt        DateTime @default(now())
+  createdBy        Int?
+  /// The charge this became, once it was bought. Set means it is settled.
+  repairPartId     Int?     @unique
+
+  car           Car         @relation(fields: [carId], references: [id])
+  partsSupplier Party?      @relation("PartsNeeded", fields: [partsSupplierId], references: [id])
+  repairPart    RepairPart? @relation(fields: [repairPartId], references: [id])
 
   @@index([carId])
 }
@@ -464,8 +496,9 @@ model RepairPart {
   createdAt       DateTime @default(now())
   ledgerEntryId   Int?     @unique // exact charge; null only for legacy parts
 
-  car           Car   @relation(fields: [carId], references: [id])
-  partsSupplier Party @relation(fields: [partsSupplierId], references: [id])
+  car           Car         @relation(fields: [carId], references: [id])
+  partsSupplier Party       @relation(fields: [partsSupplierId], references: [id])
+  neededAs      PartNeeded?
 
   @@index([carId])
 }
@@ -480,17 +513,17 @@ enum SaleChannel {
 }
 
 model Sale {
-  id           Int         @id @default(autoincrement())
-  carId        Int         @unique
-  channel      SaleChannel @default(LOCAL)
-  currency     String // CFA code for LOCAL, "USD" for ORIGIN
-  price        Decimal     @db.Decimal(18, 4)
-  saleDate     DateTime
-  buyerName    String
-  buyerMobile  String?
-  customerId   Int? // optional party, when the buyer pays over time
-  note         String?     @db.Text
-  createdAt    DateTime    @default(now())
+  id          Int         @id @default(autoincrement())
+  carId       Int         @unique
+  channel     SaleChannel @default(LOCAL)
+  currency    String // CFA code for LOCAL, "USD" for ORIGIN
+  price       Decimal     @db.Decimal(18, 4)
+  saleDate    DateTime
+  buyerName   String
+  buyerMobile String?
+  customerId  Int? // optional party, when the buyer pays over time
+  note        String?     @db.Text
+  createdAt   DateTime    @default(now())
 
   car      Car           @relation(fields: [carId], references: [id])
   customer Party?        @relation(fields: [customerId], references: [id])
@@ -501,18 +534,18 @@ model Sale {
 }
 
 model SalePayment {
-  id        Int      @id @default(autoincrement())
-  saleId    Int
-  amount    Decimal  @db.Decimal(18, 4)
-  date      DateTime
-  method    String? // cash, transfer company, ...
-  note      String?  @db.Text
-  createdAt DateTime @default(now())
+  id                   Int      @id @default(autoincrement())
+  saleId               Int
+  amount               Decimal  @db.Decimal(18, 4)
+  date                 DateTime
+  method               String? // cash, transfer company, ...
+  note                 String?  @db.Text
+  createdAt            DateTime @default(now())
   /// Which of my accounts the money landed in — normally the cash box.
   /// Null only on payments recorded before this was tracked.
   destinationAccountId Int?
   /// The credit posted to that account, so the two can never drift apart.
-  ledgerEntryId        Int? @unique
+  ledgerEntryId        Int?     @unique
 
   sale               Sale   @relation(fields: [saleId], references: [id])
   destinationAccount Party? @relation("SaleReceipts", fields: [destinationAccountId], references: [id])
@@ -530,15 +563,15 @@ model SalePayment {
 /// profit, is the original plus these adjustments — and the history shows both
 /// the mistake and the fix.
 model CostAdjustment {
-  id        Int      @id @default(autoincrement())
-  carId     Int
+  id            Int      @id @default(autoincrement())
+  carId         Int
   /// Signed: negative removes cost from the car, positive adds cost.
-  amountCfa Decimal  @db.Decimal(18, 4)
-  reason    String   @db.Text
-  date      DateTime
+  amountCfa     Decimal  @db.Decimal(18, 4)
+  reason        String   @db.Text
+  date          DateTime
   /// Whose account this also corrects, when the mistake changed a balance too.
   partyId       Int?
-  ledgerEntryId Int? @unique
+  ledgerEntryId Int?     @unique
   createdBy     Int?
   createdAt     DateTime @default(now())
 

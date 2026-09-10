@@ -7,6 +7,7 @@ import { audit } from '../lib/audit.js';
 import { AppError, notFound } from '../lib/errors.js';
 import { post, reverseEntryInTransaction } from '../services/ledger.js';
 import { carLabel, costBreakdown, getCarWithCosts } from '../services/cars.js';
+import { roundCfa } from '../lib/money.js';
 
 const money = z.coerce.number().positive('The amount must be more than zero');
 
@@ -31,6 +32,12 @@ export async function garageRoutes(app: FastifyInstance) {
         originExpenses: true,
         repairJobs: { include: { worker: { select: { id: true, name: true } } } },
         repairParts: { include: { partsSupplier: { select: { id: true, name: true } } } },
+        partsNeeded: {
+          where: { repairPartId: null },
+          include: { partsSupplier: { select: { id: true, name: true } } },
+          orderBy: { id: 'asc' },
+        },
+        costAdjustments: true,
       },
       orderBy: { arrivedAt: 'asc' },
     });
@@ -40,6 +47,15 @@ export async function garageRoutes(app: FastifyInstance) {
       label: carLabel(car),
       costs: costBreakdown(car),
       servicesDone: car.repairJobs.map((j) => j.serviceType),
+      /** Parts on the list that nobody has priced yet — the card's warning. */
+      unpricedParts: car.partsNeeded.filter((part) => part.estimatedCostCfa === null).length,
+      /** What the outstanding list is expected to add, where it is known. */
+      expectedPartsCfa: car.partsNeeded
+        .reduce(
+          (total, part) => total.plus(part.estimatedCostCfa ?? 0),
+          new Prisma.Decimal(0),
+        )
+        .toString(),
       daysInGarage: car.arrivedAt
         ? Math.floor((Date.now() - car.arrivedAt.getTime()) / 86400000)
         : null,
@@ -247,6 +263,196 @@ export async function garageRoutes(app: FastifyInstance) {
 
     const costs = costBreakdown(await getCarWithCosts(id, tx));
     return { car: updated, costs };
+  }));
+
+  // -------------------------------------------------------------------------
+  // What a car is waiting for, before anyone knows the price
+  // -------------------------------------------------------------------------
+
+  /**
+   * The list of parts a car needs. Prices are optional here on purpose: a
+   * mechanic knows what is missing long before the shop has quoted it, and
+   * forcing a number now would either invent one or stop the list being
+   * written at all. Nothing is charged to anybody until a price is recorded.
+   */
+  app.post('/api/cars/:id/parts-needed', async (request) => atomic(async (tx) => {
+    const { id } = z.object({ id: z.coerce.number() }).parse(request.params);
+    const input = z
+      .object({
+        parts: z
+          .array(
+            z.object({
+              description: z.string().trim().min(1, 'Say what the part is'),
+              partsSupplierId: z.coerce.number().optional().nullable(),
+              estimatedCostCfa: z.coerce.number().nonnegative().optional().nullable(),
+              note: z.string().optional().nullable(),
+            }),
+          )
+          .min(1, 'Add at least one part'),
+      })
+      .parse(request.body);
+
+    const car = await tx.car.findUnique({ where: { id } });
+    if (!car) throw notFound('Car not found');
+
+    for (const part of input.parts) {
+      if (part.partsSupplierId) {
+        const supplier = await tx.party.findUnique({ where: { id: part.partsSupplierId } });
+        if (!supplier || supplier.type !== PartyType.PARTS_SUPPLIER)
+          throw new AppError('That is not a parts supplier');
+      }
+    }
+
+    const created = await Promise.all(
+      input.parts.map((part) =>
+        tx.partNeeded.create({
+          data: {
+            carId: id,
+            description: part.description.trim(),
+            partsSupplierId: part.partsSupplierId || null,
+            estimatedCostCfa:
+              part.estimatedCostCfa === null || part.estimatedCostCfa === undefined
+                ? null
+                : new Prisma.Decimal(part.estimatedCostCfa),
+            note: part.note || null,
+            createdBy: request.user?.id ?? null,
+          },
+        }),
+      ),
+    );
+
+    await audit(tx, {
+      userId: request.user?.id,
+      action: 'PARTS_NEEDED',
+      entity: 'Car',
+      entityId: id,
+      after: created,
+      ip: request.ip,
+    });
+    return created;
+  }));
+
+  app.get('/api/cars/:id/parts-needed', async (request) => {
+    const { id } = z.object({ id: z.coerce.number() }).parse(request.params);
+    return prisma.partNeeded.findMany({
+      where: { carId: id },
+      include: { partsSupplier: { select: { id: true, name: true } } },
+      orderBy: { id: 'asc' },
+    });
+  });
+
+  app.patch('/api/parts-needed/:partId', async (request) => atomic(async (tx) => {
+    const { partId } = z.object({ partId: z.coerce.number() }).parse(request.params);
+    const input = z
+      .object({
+        description: z.string().trim().min(1).optional(),
+        partsSupplierId: z.coerce.number().optional().nullable(),
+        estimatedCostCfa: z.coerce.number().nonnegative().optional().nullable(),
+        note: z.string().optional().nullable(),
+      })
+      .parse(request.body);
+
+    const existing = await tx.partNeeded.findUnique({ where: { id: partId } });
+    if (!existing) throw notFound('That part is not on the list');
+    if (existing.repairPartId)
+      throw new AppError('This part has already been bought. Correct the charge instead.');
+
+    return tx.partNeeded.update({
+      where: { id: partId },
+      data: {
+        ...(input.description ? { description: input.description.trim() } : {}),
+        ...(input.partsSupplierId !== undefined
+          ? { partsSupplierId: input.partsSupplierId || null }
+          : {}),
+        ...(input.estimatedCostCfa !== undefined
+          ? {
+              estimatedCostCfa:
+                input.estimatedCostCfa === null
+                  ? null
+                  : new Prisma.Decimal(input.estimatedCostCfa),
+            }
+          : {}),
+        ...(input.note !== undefined ? { note: input.note || null } : {}),
+      },
+    });
+  }));
+
+  app.delete('/api/parts-needed/:partId', async (request) => atomic(async (tx) => {
+    const { partId } = z.object({ partId: z.coerce.number() }).parse(request.params);
+    const existing = await tx.partNeeded.findUnique({ where: { id: partId } });
+    if (!existing) throw notFound('That part is not on the list');
+    if (existing.repairPartId)
+      throw new AppError('This part has been bought, so it stays on the record.');
+    await tx.partNeeded.delete({ where: { id: partId } });
+    return { ok: true };
+  }));
+
+  /**
+   * The part has been bought. Now — and only now — it becomes a real cost on
+   * the car and a real debt to the parts supplier.
+   */
+  app.post('/api/parts-needed/:partId/bought', async (request) => atomic(async (tx) => {
+    const { partId } = z.object({ partId: z.coerce.number() }).parse(request.params);
+    const input = z
+      .object({
+        costCfa: money,
+        partsSupplierId: z.coerce.number().optional(),
+        date: z.coerce.date().optional(),
+      })
+      .parse(request.body);
+
+    const needed = await tx.partNeeded.findUnique({ where: { id: partId }, include: { car: true } });
+    if (!needed) throw notFound('That part is not on the list');
+    if (needed.repairPartId) throw new AppError('This part has already been recorded as bought');
+
+    const supplierId = input.partsSupplierId ?? needed.partsSupplierId;
+    if (!supplierId) throw new AppError('Choose which parts supplier it came from');
+    const supplier = await tx.party.findUnique({ where: { id: supplierId } });
+    if (!supplier || supplier.type !== PartyType.PARTS_SUPPLIER)
+      throw notFound('Parts supplier not found');
+    if (!roundCfa(input.costCfa).eq(input.costCfa))
+      throw new AppError('Enter the price in whole CFA francs');
+
+    const date = input.date ?? new Date();
+    const part = await tx.repairPart.create({
+      data: {
+        carId: needed.carId,
+        description: needed.description,
+        costCfa: new Prisma.Decimal(input.costCfa),
+        partsSupplierId: supplierId,
+        date,
+      },
+    });
+
+    const [entry] = await post(
+      tx,
+      [
+        {
+          partyId: supplierId,
+          date,
+          kind: LedgerKind.PARTS_CHARGE,
+          amount: new Prisma.Decimal(input.costCfa),
+          description: `${needed.description} — ${carLabel(needed.car)}`,
+          carId: needed.carId,
+        },
+      ],
+      request.user?.id,
+    );
+    await tx.repairPart.update({ where: { id: part.id }, data: { ledgerEntryId: entry.id } });
+    await tx.partNeeded.update({
+      where: { id: partId },
+      data: { repairPartId: part.id, partsSupplierId: supplierId },
+    });
+
+    await audit(tx, {
+      userId: request.user?.id,
+      action: 'PART_BOUGHT',
+      entity: 'Car',
+      entityId: needed.carId,
+      after: part,
+      ip: request.ip,
+    });
+    return part;
   }));
 }
 

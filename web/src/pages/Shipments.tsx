@@ -25,6 +25,7 @@ const STATUS_BADGE: Record<string, string> = {
 export default function Shipments() {
   const [shipments, setShipments] = useState<Shipment[] | null>(null);
   const [creating, setCreating] = useState(false);
+  const [waiting, setWaiting] = useState<Car[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = () =>
@@ -35,6 +36,9 @@ export default function Shipments() {
 
   useEffect(() => {
     void load();
+    // Cars sitting in the origin country. With none of them, a new shipment
+    // would be an empty record, so the button says why instead of opening.
+    void api.get<Car[]>('/api/cars?status=PURCHASED&unassigned=true').then(setWaiting);
   }, []);
 
   return (
@@ -42,10 +46,29 @@ export default function Shipments() {
       <PageHeader
         title="Shipments"
         sub="One car alone is simply a shipment with one car in it"
-        action={<button onClick={() => setCreating(true)}>New shipment</button>}
+        action={
+          <button
+            onClick={() => setCreating(true)}
+            disabled={waiting !== null && waiting.length === 0}
+            title={
+              waiting !== null && waiting.length === 0
+                ? 'Buy a car first — there is nothing waiting to be shipped'
+                : undefined
+            }
+          >
+            New shipment
+          </button>
+        }
       />
 
       <Alert kind="error">{error}</Alert>
+
+      {waiting !== null && waiting.length === 0 && (
+        <Alert kind="info">
+          Nothing is waiting to be shipped. A shipment can only be made once there is a car in the
+          origin country to put in it.
+        </Alert>
+      )}
 
       {!shipments ? (
         <Spinner />
@@ -184,7 +207,9 @@ function NewShipment({ onClose, onCreated }: { onClose: () => void; onCreated: (
     await api.post('/api/shipments', {
       reference: reference || null,
       shippingCompanyId: Number(shippingCompanyId),
-      freightCostUsd: moneyValue(freight),
+      // What you were quoted, if you were quoted anything. The invoice is
+      // entered on arrival, when it actually exists.
+      estimatedFreightUsd: moneyValue(freight),
       departureDate,
       carIds: selected,
     });
@@ -210,7 +235,10 @@ function NewShipment({ onClose, onCreated }: { onClose: () => void; onCreated: (
       </Field>
 
       <div className="row">
-        <Field label="Freight cost (USD)" help="The whole invoice for this shipment.">
+        <Field
+          label="Expected freight (USD) — optional"
+          help="What the shipper quoted, if he has. The real invoice is entered when the cars arrive."
+        >
           <MoneyInput decimals={2} value={freight} onChange={setFreight} />
         </Field>
         <Field label="Departure date">
@@ -224,7 +252,10 @@ function NewShipment({ onClose, onCreated }: { onClose: () => void; onCreated: (
 
       <h3 style={{ marginTop: 14 }}>Which cars are on it?</h3>
       {available.length === 0 ? (
-        <p className="muted small">No cars are waiting in the origin country.</p>
+        <Alert kind="warn">
+          No cars are waiting in the origin country. Buy a car first — a shipment is a group of cars,
+          and there is nothing to put in this one.
+        </Alert>
       ) : (
         <div style={{ maxHeight: 240, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 6, padding: 8 }}>
           {available.map((car) => (
@@ -250,8 +281,9 @@ function NewShipment({ onClose, onCreated }: { onClose: () => void; onCreated: (
 
       {selected.length > 0 && Number(freight) > 0 && (
         <Alert kind="info">
-          {fmtUsd(freight)} split across {selected.length} car{selected.length > 1 ? 's' : ''} ={' '}
-          <strong>{fmtUsd(share.toFixed(2))}</strong> each. You can change any car's share afterwards.
+          At {fmtUsd(freight)} that would be about <strong>{fmtUsd(share.toFixed(2))}</strong> a car.
+          The figure that counts is the invoice you enter on arrival; this one is only there to be
+          compared with it.
         </Alert>
       )}
 
@@ -259,7 +291,7 @@ function NewShipment({ onClose, onCreated }: { onClose: () => void; onCreated: (
         <button className="secondary" onClick={onClose}>
           Cancel
         </button>
-        <button onClick={() => void run()} disabled={busy || !shippingCompanyId || !hasAmount(freight)}>
+        <button onClick={() => void run()} disabled={busy || !shippingCompanyId || available.length === 0}>
           {busy ? 'Creating…' : 'Create shipment'}
         </button>
       </div>

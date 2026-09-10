@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import React, { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { CarStatus } from '../lib/api';
 
@@ -34,9 +34,58 @@ export function Field({
   );
 }
 
-export function Alert({ kind = 'info', children }: { kind?: 'error' | 'success' | 'warn' | 'info'; children: ReactNode }) {
+/**
+ * A message at the top of a page.
+ *
+ * Two things it must be able to do, learned from a screen with four of them
+ * stacked up: get out of the way when you have read it, and — when it is
+ * telling you money is being lost — take you to the thing that fixes it. A
+ * warning you cannot act on and cannot close is just noise you learn to skip.
+ */
+export function Alert({
+  kind = 'info',
+  children,
+  onDismiss,
+  onAct,
+  actLabel,
+}: {
+  kind?: 'error' | 'success' | 'warn' | 'info';
+  children: ReactNode;
+  /** Shows an × that removes it. */
+  onDismiss?: () => void;
+  /** Makes the whole message clickable — for the ones worth acting on now. */
+  onAct?: () => void;
+  actLabel?: string;
+}) {
   if (!children) return null;
-  return <div className={`alert ${kind}`}>{children}</div>;
+  return (
+    <div className={`alert ${kind}${onAct ? ' actionable' : ''}`}>
+      <div
+        className="alert-body"
+        {...(onAct
+          ? {
+              role: 'button',
+              tabIndex: 0,
+              onClick: onAct,
+              onKeyDown: (event: React.KeyboardEvent) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onAct();
+                }
+              },
+            }
+          : {})}
+      >
+        {children}
+        {onAct && <span className="alert-act">{actLabel ?? 'Fix it'} →</span>}
+      </div>
+      {onDismiss && (
+        <button type="button" className="alert-x" onClick={onDismiss} aria-label="Dismiss">
+          ×
+        </button>
+      )}
+    </div>
+  );
 }
 
 export function Modal({

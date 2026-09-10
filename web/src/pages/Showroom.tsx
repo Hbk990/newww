@@ -41,6 +41,7 @@ export default function Showroom() {
   const [held, setHeld] = useState<'all' | 'held' | 'free'>('all');
   const [sort, setSort] = useState<Sort>('oldest');
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [hidden, setHidden] = useState<string[]>([]);
 
   const [selling, setSelling] = useState<Car | null>(null);
   const [reserving, setReserving] = useState<Car | null>(null);
@@ -147,19 +148,32 @@ export default function Showroom() {
         }
       />
 
-      {sittingLong > 0 && (
-        <Alert kind="warn">
+      {sittingLong > 0 && !hidden.includes('old') && (
+        <Alert
+          kind="warn"
+          onDismiss={() => setHidden([...hidden, 'old'])}
+          onAct={() => {
+            setSort('oldest');
+            setHeld('all');
+          }}
+          actLabel="Show the oldest first"
+        >
           {sittingLong} car{sittingLong > 1 ? 's have' : ' has'} been here 60 days or more. Money sitting still.
         </Alert>
       )}
-      {reserved.length > 0 && (
-        <Alert kind="info">
+      {reserved.length > 0 && !hidden.includes('held') && (
+        <Alert kind="info" onDismiss={() => setHidden([...hidden, 'held'])} onAct={() => setHeld('held')} actLabel="Show them">
           {reserved.length} car{reserved.length > 1 ? 's are' : ' is'} held for a buyer —{' '}
           {fmt(depositsHeld.toFixed(0))} {cfa} of deposits already in your accounts.
         </Alert>
       )}
-      {unpriced > 0 && (
-        <Alert kind="info">
+      {unpriced > 0 && !hidden.includes('unpriced') && (
+        <Alert
+          kind="info"
+          onDismiss={() => setHidden([...hidden, 'unpriced'])}
+          onAct={() => setPriced('unpriced')}
+          actLabel="Price them"
+        >
           {unpriced} car{unpriced > 1 ? 's have' : ' has'} no asking price yet.
         </Alert>
       )}

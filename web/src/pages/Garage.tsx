@@ -25,6 +25,15 @@ const SERVICES = [
   { value: 'MECHANIC', label: 'Mechanic', short: 'Engine', colour: '#0f8a9e' },
 ];
 
+interface NeededPart {
+  id: number;
+  description: string;
+  partsSupplierId: number | null;
+  estimatedCostCfa: string | null;
+  note: string | null;
+  partsSupplier: { id: number; name: string } | null;
+}
+
 interface GarageCar extends Car {
   repairJobs: { id: number; serviceType: string; labourCostCfa: string; description: string | null; worker: { name: string } }[];
   repairParts: { id: number; description: string; costCfa: string; partsSupplier: { name: string } }[];
@@ -33,6 +42,9 @@ interface GarageCar extends Car {
   needsBlacksmith: boolean;
   needsPainter: boolean;
   needsMechanic: boolean;
+  partsNeeded: NeededPart[];
+  unpricedParts: number;
+  expectedPartsCfa: string;
 }
 
 /** What a car is waiting for: ticked as needed, and not yet done. */
@@ -111,6 +123,7 @@ export default function Garage() {
                       key={car.id}
                       car={car}
                       colour={column.colour}
+                      partsSuppliers={partsSuppliers}
                       onWork={() => setWorking(car)}
                       onChanged={load}
                     />
@@ -185,11 +198,13 @@ const COLUMNS: {
 function JobCard({
   car,
   colour,
+  partsSuppliers,
   onWork,
   onChanged,
 }: {
   car: GarageCar;
   colour: string;
+  partsSuppliers: Party[];
   onWork: () => void;
   onChanged: () => void;
 }) {
@@ -231,10 +246,24 @@ function JobCard({
         })}
       </div>
 
+      {car.unpricedParts > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <span className="warn-mark" title="Some parts on the list have no price yet">
+            ⚠ {car.unpricedParts} part{car.unpricedParts > 1 ? 's' : ''} not priced
+          </span>
+        </div>
+      )}
+
       <div className="money">
         <span>Cost so far</span>
         <span className="strong">{fmt(cost)}</span>
       </div>
+      {Number(car.expectedPartsCfa) > 0 && (
+        <div className="money" style={{ borderTop: 'none', paddingTop: 0, marginTop: 2 }}>
+          <span className="muted">Parts still to buy</span>
+          <span className="muted">≈ {fmt(car.expectedPartsCfa)}</span>
+        </div>
+      )}
       {margin !== null && (
         <div className="money" style={{ borderTop: 'none', paddingTop: 0, marginTop: 2 }}>
           <span className="muted">Left against {fmt(asking)}</span>
@@ -242,7 +271,7 @@ function JobCard({
         </div>
       )}
 
-      <div className="row" style={{ gap: 6, marginTop: 10, flexWrap: 'nowrap' }}>
+      <div className="row" style={{ gap: 6, marginTop: 10 }}>
         <div className="actions">
           <button className="small" onClick={onWork}>
             Add work
@@ -251,6 +280,7 @@ function JobCard({
         <div className="actions">
           <button className="small secondary" onClick={() => setNeedsOpen(true)}>
             What it needs
+            {car.partsNeeded.length > 0 ? ` (${car.partsNeeded.length})` : ''}
           </button>
         </div>
       </div>
@@ -264,6 +294,7 @@ function JobCard({
       {needsOpen && (
         <NeedsModal
           car={car}
+          partsSuppliers={partsSuppliers}
           onClose={() => setNeedsOpen(false)}
           onSaved={() => {
             setNeedsOpen(false);
@@ -275,19 +306,35 @@ function JobCard({
   );
 }
 
-/** Ticking the trades a car is waiting for — what puts it in a column. */
+/**
+ * What a car is waiting for: the trades, and the parts.
+ *
+ * Ticking a trade opens the parts list underneath it, because that is the order
+ * the conversation happens in the yard — "it needs the mechanic" is followed
+ * immediately by "and what does he need?". A price can be left empty: the shop
+ * has often not quoted it yet, and forcing a number now would only invent one.
+ * Nobody is charged anything until the part is actually bought.
+ */
 function NeedsModal({
   car,
+  partsSuppliers,
   onClose,
   onSaved,
 }: {
   car: GarageCar;
+  partsSuppliers: Party[];
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { cfa } = useApp();
   const [blacksmith, setBlacksmith] = useState(car.needsBlacksmith);
   const [painter, setPainter] = useState(car.needsPainter);
   const [mechanic, setMechanic] = useState(car.needsMechanic);
+  const [rows, setRows] = useState<{ description: string; supplierId: string; price: string }[]>([]);
+  const [busyPart, setBusyPart] = useState<number | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
+
+  const anyTrade = blacksmith || painter || mechanic;
 
   const { busy, error, run } = useSubmit(async () => {
     await api.patch(`/api/cars/${car.id}`, {
@@ -295,39 +342,159 @@ function NeedsModal({
       needsPainter: painter,
       needsMechanic: mechanic,
     });
+    const parts = rows.filter((row) => row.description.trim());
+    if (parts.length > 0) {
+      await api.post(`/api/cars/${car.id}/parts-needed`, {
+        parts: parts.map((row) => ({
+          description: row.description.trim(),
+          partsSupplierId: row.supplierId ? Number(row.supplierId) : null,
+          estimatedCostCfa: row.price ? Number(row.price) : null,
+        })),
+      });
+    }
     onSaved();
     return true;
   });
 
-  const rows: [string, boolean, (value: boolean) => void][] = [
-    ['Blacksmith — body work', blacksmith, setBlacksmith],
-    ['Painter', painter, setPainter],
-    ['Mechanic', mechanic, setMechanic],
+  const removePart = async (id: number) => {
+    setBusyPart(id);
+    try {
+      await api.del(`/api/parts-needed/${id}`);
+      onSaved();
+    } catch (e) {
+      setListError(e instanceof Error ? e.message : 'Could not remove it');
+    } finally {
+      setBusyPart(null);
+    }
+  };
+
+  const trades: [string, boolean, (value: boolean) => void, string][] = [
+    ['Blacksmith — body work', blacksmith, setBlacksmith, 'BLACKSMITH'],
+    ['Painter', painter, setPainter, 'PAINTER'],
+    ['Mechanic', mechanic, setMechanic, 'MECHANIC'],
   ];
 
   return (
-    <Modal title={`What does the ${car.year} ${car.makeName} ${car.modelName} need?`} onClose={onClose}>
+    <Modal
+      title={`What does the ${car.year} ${car.makeName} ${car.modelName} need?`}
+      onClose={onClose}
+      wide
+    >
       <Alert kind="error">{error}</Alert>
+      <Alert kind="error">{listError}</Alert>
+
       <p className="small muted" style={{ marginTop: 0 }}>
         Tick every trade it is waiting for. It moves along the board as each one is done.
       </p>
 
-      {rows.map(([label, value, set]) => (
-        <div className="checkbox" key={label}>
-          <input
-            type="checkbox"
-            id={`need-${label}`}
-            checked={value}
-            onChange={(e) => set(e.target.checked)}
-          />
-          <label htmlFor={`need-${label}`}>
+      {trades.map(([label, value, set, key]) => (
+        <div className="checkbox" key={key}>
+          <input type="checkbox" id={`need-${key}`} checked={value} onChange={(e) => set(e.target.checked)} />
+          <label htmlFor={`need-${key}`}>
             {label}
-            {car.servicesDone.includes(label.split(' ')[0].toUpperCase()) && (
+            {car.servicesDone.includes(key) && (
               <div className="small muted">Work has already been recorded for this trade.</div>
             )}
           </label>
         </div>
       ))}
+
+      {anyTrade && (
+        <>
+          <h3 style={{ marginTop: 18 }}>Parts it needs</h3>
+          <p className="small muted" style={{ marginTop: 0 }}>
+            Write what is missing. Leave the price empty if the shop has not said yet — the card
+            will carry a warning until every part has one. Nothing is charged to a parts supplier
+            until you record the part as bought.
+          </p>
+
+          {car.partsNeeded.length > 0 && (
+            <div className="table-wrap" style={{ marginBottom: 10 }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>On the list</th>
+                    <th>From</th>
+                    <th className="num">Expected</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {car.partsNeeded.map((part) => (
+                    <tr key={part.id}>
+                      <td>{part.description}</td>
+                      <td className="small">{part.partsSupplier?.name ?? <span className="muted">not chosen</span>}</td>
+                      <td className="num">
+                        {part.estimatedCostCfa ? (
+                          fmt(part.estimatedCostCfa)
+                        ) : (
+                          <span className="warn-mark">⚠ no price</span>
+                        )}
+                      </td>
+                      <td className="num">
+                        <button
+                          className="link small"
+                          disabled={busyPart === part.id}
+                          onClick={() => void removePart(part.id)}
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {rows.map((row, index) => (
+            <div className="row" key={index}>
+              <Field label="Part">
+                <input
+                  value={row.description}
+                  placeholder="Front wing, left headlight…"
+                  onChange={(e) =>
+                    setRows(rows.map((r, i) => (i === index ? { ...r, description: e.target.value } : r)))
+                  }
+                />
+              </Field>
+              <Field label="From which supplier?">
+                <select
+                  value={row.supplierId}
+                  onChange={(e) =>
+                    setRows(rows.map((r, i) => (i === index ? { ...r, supplierId: e.target.value } : r)))
+                  }
+                >
+                  <option value="">Not decided yet</option>
+                  {partsSuppliers.map((supplier) => (
+                    <option key={supplier.id} value={supplier.id}>
+                      {supplier.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label={`Price (${cfa})`} help="Can be left empty">
+                <MoneyInput
+                  value={row.price}
+                  onChange={(next) => setRows(rows.map((r, i) => (i === index ? { ...r, price: next } : r)))}
+                />
+              </Field>
+              <div className="actions">
+                <button className="secondary small" onClick={() => setRows(rows.filter((_, i) => i !== index))}>
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))}
+
+          <button
+            className="secondary small"
+            onClick={() => setRows([...rows, { description: '', supplierId: '', price: '' }])}
+          >
+            + Add a part
+          </button>
+        </>
+      )}
 
       <div className="modal-actions">
         <button className="secondary" onClick={onClose}>

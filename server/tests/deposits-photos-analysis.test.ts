@@ -334,6 +334,72 @@ describe('what a car is waiting for in the garage', () => {
   });
 });
 
+describe('parts a car is waiting for', () => {
+  let carId = 0;
+
+  it('takes a list with no prices, and charges nobody for it', async () => {
+    carId = await carInShowroom({
+      supplierId: ids.usa, vin: '4T1B11HK5LU200012', priceUsd: 6000,
+      quotedUsd: 800, freightUsd: 800, rate: 600, asking: 6000000,
+    });
+
+    const before = await api('GET', `/api/parties/${ids.parts}/statement`);
+
+    await api('POST', `/api/cars/${carId}/parts-needed`, {
+      parts: [
+        { description: 'Front wing', partsSupplierId: ids.parts, estimatedCostCfa: 120000 },
+        { description: 'Left headlight' },
+      ],
+    });
+
+    const list = await api('GET', `/api/cars/${carId}/parts-needed`);
+    expect(list).toHaveLength(2);
+    expect(list[1].estimatedCostCfa).toBeNull();
+    expect(list[1].partsSupplierId).toBeNull();
+
+    // Writing down what is needed must never become a debt.
+    const after = await api('GET', `/api/parties/${ids.parts}/statement`);
+    expect(after.closingBalance).toBe(before.closingBalance);
+  });
+
+  it('charges the parts supplier only when the part is bought', async () => {
+    const list = await api('GET', `/api/cars/${carId}/parts-needed`);
+    const before = Number((await api('GET', `/api/parties/${ids.parts}/statement`)).closingBalance);
+
+    await api('POST', `/api/parts-needed/${list[0].id}/bought`, {
+      costCfa: 135000, date: '2026-03-01',
+    });
+
+    const after = await api('GET', `/api/parties/${ids.parts}/statement`);
+    expect(Number(after.closingBalance)).toBe(before + 135000);
+    expect(after.lines.at(-1).kind).toBe('PARTS_CHARGE');
+
+    // And it is off the outstanding list.
+    const now = await api('GET', `/api/cars/${carId}/parts-needed`);
+    expect(now.find((p: { id: number }) => p.id === list[0].id).repairPartId).not.toBeNull();
+  });
+
+  it('refuses to buy a part with nowhere to charge it', async () => {
+    const list = await api('GET', `/api/cars/${carId}/parts-needed`);
+    const unpriced = list.find((p: { repairPartId: number | null }) => p.repairPartId === null);
+    await expect(
+      api('POST', `/api/parts-needed/${unpriced.id}/bought`, { costCfa: 50000 }),
+    ).rejects.toThrow(/which parts supplier/i);
+  });
+});
+
+describe('a shipment needs something to carry', () => {
+  it('refuses to be created when no car is waiting in the origin country', async () => {
+    // Every car in this database has already arrived by now.
+    await expect(
+      api('POST', '/api/shipments', {
+        reference: 'Empty container',
+        shippingCompanyId: ids.shipper,
+      }),
+    ).rejects.toThrow(/no cars waiting/i);
+  });
+});
+
 describe('the analysis pages', () => {
   it('separates suppliers, and counts repairs against the one whose car needed them', async () => {
     const damaged = await carInShowroom({

@@ -98,6 +98,14 @@ export async function shipmentRoutes(app: FastifyInstance) {
     if (!company || company.type !== PartyType.SHIPPING_COMPANY)
       throw notFound('Shipping company not found');
 
+    // A shipment with nothing to put in it is a record of nothing. There has to
+    // be at least one car sitting in the origin country before one can exist.
+    const waiting = await tx.car.count({ where: { status: CarStatus.PURCHASED, active: true } });
+    if (waiting === 0)
+      throw new AppError(
+        'There are no cars waiting to be shipped. Buy a car first, then group it into a shipment.',
+      );
+
     const shipment = await (async () => {
       const created = await tx.shipment.create({
         data: {

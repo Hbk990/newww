@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useApp, PageHeader } from '../App';
 import { api, fmt, fmtUsd } from '../lib/api';
 import { Card, Spinner, Alert, Stat, CountUp } from '../components/ui';
@@ -73,6 +73,10 @@ const monthLabel = (month: string) => {
 
 export default function Dashboard() {
   const { cfa } = useApp();
+  const navigate = useNavigate();
+  // Dismissed for this visit only. A warning about money should come back
+  // tomorrow if the money is still going.
+  const [hidden, setHidden] = useState<string[]>([]);
   const [data, setData] = useState<DashboardData | null>(null);
   const [trend, setTrend] = useState<TrendMonth[] | null>(null);
   const [stages, setStages] = useState<StageRow[] | null>(null);
@@ -100,21 +104,31 @@ export default function Dashboard() {
     <div className="page">
       <PageHeader title="Dashboard" sub="Where the business stands right now" />
 
-      {awaitingCondition > 0 && (
-        <Alert kind="warn">
+      {awaitingCondition > 0 && !hidden.includes('arrived') && (
+        <Alert
+          kind="warn"
+          onDismiss={() => setHidden([...hidden, 'arrived'])}
+          onAct={() => navigate('/cars?status=ARRIVED')}
+          actLabel="Set the condition"
+        >
           {awaitingCondition} car{awaitingCondition > 1 ? 's have' : ' has'} arrived and{' '}
           {awaitingCondition > 1 ? 'are' : 'is'} waiting for you to say whether{' '}
-          {awaitingCondition > 1 ? 'they are' : 'it is'} damaged.{' '}
-          <Link to="/cars?status=ARRIVED">Set the condition</Link>
+          {awaitingCondition > 1 ? 'they are' : 'it is'} damaged.
         </Alert>
       )}
 
-      {losing.length > 0 && (
-        <Alert kind="error">
+      {losing.length > 0 && !hidden.includes('losing') && (
+        <Alert
+          kind="error"
+          onDismiss={() => setHidden([...hidden, 'losing'])}
+          // One car: go to it, where the price can be changed. Several: the
+          // page that shows what went into all of them.
+          onAct={() => navigate(losing.length === 1 ? `/cars/${losing[0].carId}` : '/analysis')}
+          actLabel={losing.length === 1 ? 'Change its price' : 'See what went into them'}
+        >
           {losing.length === 1
             ? `${losing[0].label} now costs more than you are asking for it.`
-            : `${losing.length} cars now cost more than you are asking for them.`}{' '}
-          <Link to="/analysis">See what went into them</Link>
+            : `${losing.length} cars now cost more than you are asking for them.`}
         </Alert>
       )}
 

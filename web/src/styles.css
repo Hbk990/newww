@@ -1322,3 +1322,45 @@ kbd {
 .timeline .entry button.link { opacity: 0; transition: opacity 140ms var(--ease); }
 .timeline .entry:hover button.link,
 .timeline .entry button.link:focus-visible { opacity: 1; }
+
+/* An alert can be closed, and the ones worth acting on are clickable. */
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.alert .alert-body { flex: 1; min-width: 0; }
+.alert.actionable .alert-body { cursor: pointer; }
+.alert.actionable .alert-body:focus-visible { outline: none; box-shadow: var(--ring); border-radius: 4px; }
+.alert .alert-act {
+  font-weight: 700;
+  margin-left: 8px;
+  white-space: nowrap;
+  border-bottom: 1px solid currentColor;
+}
+.alert .alert-x {
+  flex: 0 0 auto;
+  background: transparent;
+  border: none;
+  color: inherit;
+  opacity: 0.55;
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 2px;
+  border-radius: 5px;
+}
+.alert .alert-x:hover { opacity: 1; background: transparent; box-shadow: none; }
+
+/* A part on the list that nobody has priced yet. */
+.warn-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--warning-bg);
+  color: var(--warning);
+  border: 1px solid var(--warning);
+}
