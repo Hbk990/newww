@@ -134,19 +134,49 @@ tiered pricing was intended. Confirm before v1: retail-only, or B2B tiers?
 
 ## Import plan
 
-1. Load `category_group` as 9 parent categories, `category` as 48 children.
-2. Promote the 226 `brand` strings to `brands` rows; refile Razer/HyperX products
-   by product type.
-3. One product row per CSV row; `slug` from name, deduped against the 13 collisions.
-4. Classify each `options_json` list into an axis kind by inspecting its labels
-   (`\d+GB` → capacity; a device pattern → device fit; a colour word → color;
-   otherwise `other`), flagging low-confidence cases for review.
-5. Normalize device labels into `device_brands` / `device_models`, splitting
-   `"17 Pro / 18 Pro"` into two fitment rows.
-6. Drop `["Standard"]`; build the color axis from the rest.
-7. Generate the variant matrix (~1,900 rows), collapsing the 22 duplicate
-   colour/option cases into one axis.
-8. Seed inventory at `on_hand = 0`, `policy = 'continue'`.
-9. Copy `image` to `product_images` position 0, append `images_json`.
-10. Report per-step counts and every skipped row. The import must be re-runnable
-    and idempotent, keyed on `sku`.
+The catalog is a **source list**, not the storefront: only hand-picked items go on
+sale. So the importer stages everything and creates nothing customer-visible.
+
+**Stage 1 — load all 1,155 rows into `source_products`.** Untouched CSV row in
+`raw`, with name, brand, category, group, cost, image and option/colour counts
+extracted into real columns so the staging catalog is searchable and sortable.
+Keyed on `(source, source_ref)`, so re-running the import is idempotent and a
+refreshed export updates costs in place. Mark on load:
+
+- the 4 **Vape** products `excluded = 'age-restricted'`
+- `DR-000894` (no price, no options) `needs_review = 'no price'`
+- the 67 brandless rows and 13 duplicate names `needs_review`
+- every row whose `options_json` axis could not be classified confidently
+
+**Stage 2 — classify the option axes** while staging, so a curator sees the
+proposed shape before promoting. Inspect each label list: `\d+GB` → capacity, a
+device pattern → device fit, a colour word → color, `Type-C|Lighting|Micro` →
+connector, else `other`. Low confidence sets `needs_review`.
+
+**Stage 3 — promote on demand.** Promoting one staged row is a transaction that:
+
+1. creates the `products` row (`status = 'draft'`), slug from name, deduped
+2. resolves or creates its `brands` row
+3. attaches its category (one `is_primary` row), refiling Razer/HyperX products
+   by product type rather than by brand
+4. drops the `["Standard"]` placeholder, builds the real option axes, and
+   generates the variant matrix — collapsing the 22 cases where colour and
+   option hold the same values into a single axis
+5. normalizes device labels into `device_models`, splitting `"17 Pro / 18 Pro"`
+   into two fitment rows, and fills `variant_device_fit` plus the
+   `product_device_fit` rollup
+6. copies the CSV price into `variants.cost_cents` and requires the curator to
+   set `price_cents` — **the retail price is never defaulted from cost**
+7. copies `image` to `product_images` position 0, appends `images_json`
+8. seeds inventory at `on_hand = 0`, `policy = 'continue'`
+9. records `promoted_product_id` and `promoted_at` on the staged row
+
+Promotion must be reversible (unpublish, not delete) and must report per-step
+counts and every skipped row.
+
+## Storefront consequence
+
+With only a curated subset live, most of the 48 categories will be empty at
+launch. Category listings, the mega-menu and the "Shop by device" pages must all
+be driven by "has published products", never by the category or device tree
+merely existing — otherwise the store shows dozens of dead-end pages.

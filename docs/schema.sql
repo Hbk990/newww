@@ -90,9 +90,9 @@ create table variants (
   product_id       uuid not null references products(id) on delete cascade,
   sku              text unique,
   title            text not null,             -- "M / Red", denormalized for display
-  price_cents      integer not null check (price_cents >= 0),
-  compare_at_cents integer check (compare_at_cents >= 0),   -- strikethrough price
-  currency         char(3) not null default 'USD',
+  price_cents      integer not null check (price_cents >= 0),   -- what the customer pays
+  cost_cents       integer check (cost_cents >= 0),          -- what you pay; from the source catalog
+  compare_at_cents integer check (compare_at_cents >= 0),    -- strikethrough price
   weight_grams     integer,                   -- needed for shipping rates
   image_id         uuid references product_images(id) on delete set null,
   position         integer not null default 0,
@@ -150,7 +150,6 @@ create table carts (
   id         uuid primary key default gen_random_uuid(),
   user_id    uuid references users(id) on delete set null,   -- null for guests
   token      text not null unique,          -- opaque id in an httpOnly cookie
-  currency   char(3) not null default 'USD',
   status     cart_status not null default 'active',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -525,20 +524,47 @@ create index on nav_items (menu_id, parent_id, position);
 
 -- ---------------------------------------------------------------- import
 
--- Lets the CSV import be re-run idempotently and keeps a trail back to the
--- source row for anything that needs manual review.
-create table import_records (
+-- The CSV is a SOURCE catalog (1,155 wholesale lines), not the storefront. Rows
+-- land here on import; a curator picks the ones that become retail products.
+-- Nothing here is customer-visible, so a row can sit unpromoted forever.
+--
+-- The searchable columns are extracted from `raw` on import so the admin can
+-- browse, filter and sort the staging catalog without querying into jsonb.
+create table source_products (
   id             uuid primary key default gen_random_uuid(),
   source         text not null,            -- 'DRPHONEcatalog20260910.csv'
-  source_ref     text not null,            -- original product_id / sku
-  product_id     uuid references products(id) on delete set null,
-  raw            jsonb not null,
+  source_ref     text not null,            -- original sku, e.g. 'DR-001202'
+  raw            jsonb not null,           -- the untouched CSV row
+
+  -- extracted for browsing
+  name           text not null,
+  brand_name     text,
+  category_name  text,
+  category_group text,
+  cost_cents     integer,                  -- the catalog price: what you pay
+  image_url      text,
+  option_count   integer not null default 0,
+  color_count    integer not null default 0,
+
+  -- curation state
+  promoted_product_id uuid references products(id) on delete set null,
+  promoted_at    timestamptz,
+  excluded       boolean not null default false,
+  excluded_reason text,                    -- 'age-restricted', 'no price', ...
   needs_review   boolean not null default false,
-  review_reason  text,                     -- 'ambiguous option axis', 'no price', ...
+  review_reason  text,                     -- 'ambiguous option axis', ...
+  note           text,                     -- curator's own note
+
   imported_at    timestamptz not null default now(),
   unique (source, source_ref)
 );
-create index on import_records (needs_review) where needs_review;
+create index on source_products (category_group, category_name);
+create index on source_products (brand_name);
+create index on source_products (promoted_product_id) where promoted_product_id is not null;
+create index on source_products (needs_review) where needs_review;
+-- The default admin view: everything still awaiting a decision.
+create index on source_products (imported_at desc)
+  where promoted_product_id is null and not excluded;
 
 -- Deferred FK: inventory_reservations is declared above carts in Part 1.
 alter table inventory_reservations
@@ -580,3 +606,23 @@ begin
       using errcode = 'check_violation';
   end if;
 end $$;
+
+-- ================================================================
+-- PART 4 — Store settings.
+-- Retail-only, single currency, single country for v1.
+-- ================================================================
+
+-- One row, enforced. The store's currency lives here rather than on every
+-- variant and cart: with a single currency those columns only create drift.
+-- orders and payments keep their own currency column because those are
+-- snapshots that must survive a future settings change and reconcile
+-- against Stripe.
+create table store_settings (
+  id               boolean primary key default true check (id),
+  currency         char(3) not null,
+  country          char(2) not null,        -- the one country we ship to
+  tax_rate_bps     integer not null default 0,  -- basis points; flat for v1
+  prices_include_tax boolean not null default false,
+  order_number_seq integer not null default 1000,
+  store_name       text not null
+);

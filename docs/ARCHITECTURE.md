@@ -24,10 +24,27 @@ Custom storefront + admin for **physical goods with variants**.
 ## Decisions that are load-bearing
 
 ### Money is integer minor units
-Every amount is `integer` cents plus an ISO currency code. No floats, no `decimal` in app code. `19.99` becomes `1999`. This one is not up for debate — float arithmetic on money produces off-by-a-cent bugs that surface in reconciliation months later.
+Every amount is `integer` cents. The store's single currency lives in `store_settings`; No floats, no `decimal` in app code. orders and payments still carry their own currency column, because those are snapshots that must reconcile against Stripe. `19.99` becomes `1999`. This one is not up for debate — float arithmetic on money produces off-by-a-cent bugs that surface in reconciliation months later.
 
 ### Product vs Variant
 The **variant** is the thing that has a price, a SKU, and stock. The **product** is a marketing wrapper (title, description, images, slug). A product with no options still has exactly one variant. Options (`Size`, `Color`) are modeled as `option_types` → `option_values`, with `variant_options` joining a variant to one value per type. This means the variant matrix is data, not code, and adding a third option later requires no migration.
+
+### The CSV is a source catalog, not the storefront
+The 1,155-line export is wholesale stock, and only hand-picked items go on sale
+retail. So the importer does **not** create products. Rows land in
+`source_products` — a browsable staging table with name, brand, category, cost
+and image extracted into real columns — and a curator promotes the ones they want,
+setting a retail price at that moment. An unpromoted row can sit there forever
+without being customer-visible, and re-running the import is safe because the
+table is keyed on `(source, source_ref)`.
+
+This is also why `variants` has both `price_cents` and `cost_cents`: the catalog
+price is what you pay, the retail price is what you charge, and the admin needs
+both to show you margin. Never display `cost_cents` on the storefront.
+
+A consequence for the storefront: most of the 48 categories will be empty at
+launch. Category pages and menus must be driven by "has published products", not
+by the category tree existing.
 
 ### Orders snapshot everything
 `order_items` copies the product title, variant title, SKU, and unit price at purchase time. It keeps a nullable FK to the variant for reporting, but never joins to it for display. Products get renamed, repriced, and deleted; a two-year-old invoice must still render exactly what the customer bought.
@@ -43,15 +60,29 @@ Stripe retries, and will deliver the same event twice. Every event's `provider_e
 
 ## Deliberately deferred
 
-Tax starts as a flat per-zone rate; swap in Stripe Tax or TaxJar before you sell across borders for real. Search starts as Postgres full-text and moves to Typesense/Meilisearch when the catalog outgrows it. No multi-currency, no multi-vendor, no i18n in v1 — each is a schema change, so they are noted here as known future work rather than pretended away.
+Retail only, one currency, one country — decided, not deferred. That kills
+multi-currency, customer groups and wholesale tiers from v1; the empty
+`tiers_json` column in the export suggests trade pricing was once intended, so if
+that comes back it is a real schema change (customer groups plus a per-tier price
+table), not a config flag.
+
+Tax is a flat rate in `store_settings`; swap in Stripe Tax before selling across
+borders. Search starts as Postgres full-text and moves to Typesense/Meilisearch
+when the catalog outgrows it. No multi-vendor and no i18n in v1.
+
+The Vape category (4 products, the only users of `flavors_json`) is excluded from
+the import: age-restricted and commonly refused by payment processors. Nothing in
+the schema prevents adding it later.
 
 ## Build order
 
-1. Schema + migrations, seeded with real-looking products
-2. Catalog and product detail (read-only storefront)
-3. Cart with reservations
-4. Stripe Checkout + webhook → order creation
-5. Admin: products, variants, inventory
-6. Admin: orders and fulfillment
-7. Accounts, order history, transactional email
-8. Discounts, shipping rates, analytics
+1. Schema + migrations
+2. CSV importer into `source_products` (all 1,155 rows, staging only)
+3. Admin curation view: browse staging, promote with a retail price
+4. Catalog and product detail (read-only storefront)
+5. Cart with reservations
+6. Stripe Checkout + webhook → order creation
+7. Admin: products, variants, inventory
+8. Admin: orders and fulfillment
+9. Accounts, order history, transactional email
+10. Discounts, shipping rates, analytics
