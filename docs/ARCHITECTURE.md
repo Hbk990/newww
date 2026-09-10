@@ -10,7 +10,7 @@ Custom storefront + admin for **physical goods with variants**.
 | Database | Postgres | Orders, variants, and inventory are deeply relational and need real transactions. Non-negotiable. |
 | ORM | Drizzle | SQL-shaped, typed, migrations are plain SQL you can read. Postgres row locking (`FOR UPDATE`) is reachable, which the inventory logic needs. Prisma is a fine swap if you prefer it. |
 | Payments | **Cash on Delivery only** | Stripe does not operate in Lebanon, and COD is the only method for v1. No gateway, no PCI scope, no card data, no payment webhooks — a large amount of the usual ecommerce complexity simply does not exist here. |
-| Auth | Auth.js v5 | Email+password and OAuth, sessions in Postgres. Guest checkout must work without an account. |
+| Auth | Hand-rolled cookie sessions + Google One Tap | A handful of staff and email/Google customers do not need Auth.js's machinery. Argon2id passwords, opaque session tokens stored hashed in Postgres, Google identity verified from an ID token. Guest checkout must keep working without an account. |
 | UI | Tailwind + shadcn/ui | Own the components; no theme lock-in. |
 | Images | Object storage (R2/S3) + `next/image` | Product photos are the bulk of page weight. |
 | Hosting | Vercel + managed Postgres (Neon/Supabase) | Use a connection pooler — serverless functions exhaust direct Postgres connections. Pick an EU region: it is the closest low-latency option to Lebanon. |
@@ -108,6 +108,54 @@ collection fee is passed to the customer.
 
 ### Order state is three independent fields
 `status` (pending/open/cancelled), `payment_status` (unpaid/authorized/paid/partially_refunded/refunded), and `fulfillment_status` (unfulfilled/partial/fulfilled). One combined enum collapses under the first partial refund of a partially shipped order.
+
+## Authentication
+
+Server-side sessions in Postgres, not a signed stateless cookie. A JWT cannot be
+revoked, and both "sign out on all devices" and locking out a compromised staff
+account need a row to delete. That is the whole reason for the choice.
+
+**The cookie holds an opaque random token; the database holds its SHA-256.** A
+leaked backup then contains no usable sessions. SHA-256 rather than Argon2 here
+because the token is 256 bits of randomness — there is nothing to brute-force,
+and every request would otherwise pay for a deliberately slow hash. Passwords
+are the opposite case and use Argon2id.
+
+**Two ways in, one account.** Email plus password, and Google One Tap. Google
+Identity Services is free at any volume and returns an ID token we verify
+against Google's JWKS — no redirect flow, no refresh tokens, because we only
+ever want identity. `userIdentities` is a separate table rather than a
+`google_id` column so someone who registered by email and later clicks Sign in
+with Google lands in the same account instead of a duplicate. Identity is keyed
+on Google's `sub`, never on email: people change addresses, and `sub` is the
+only durable handle.
+
+**Username is mandatory in the app, nullable in the database.** Google gives an
+email and a display name, never a username, so a Google account exists for the
+moment between verifying the ID token and the person choosing one. The
+alternatives are worse — holding a half-authenticated identity in a cookie, or
+generating a placeholder that leaks into URLs and then has to be changed. The
+row is created without one and every authenticated route is gated until it is
+set, so anything reading `username` must handle null.
+
+**Email verification is mandatory for email registration and skipped for
+Google.** Google's ID token carries `email_verified`; emailing a code to confirm
+what Google already confirmed proves nothing and costs sign-ups.
+
+**A six-digit code is protected by attempts and expiry, not by its hash.** Ten
+to the sixth is exhaustible instantly by anyone holding the database, so the
+hash only keeps codes out of backups and logs in usable form. The controls are
+the attempt counter, a ten-minute expiry, and rate limiting on the endpoint.
+
+**Case-insensitive uniqueness is enforced by the database**, on `lower(email)`
+and `lower(username)`. Relying on the application to lowercase first means one
+missed path creates `Ali` and `ali` as separate accounts — and lets a victim's
+address be re-registered in different case, which is an account-takeover
+vector, not just a support annoyance.
+
+**Throttling counts attempts per identifier and per IP.** They are different
+attacks: many passwords against one account, versus one common password against
+many accounts. Throttling by account alone misses the second completely.
 
 ## Keeping it fast
 

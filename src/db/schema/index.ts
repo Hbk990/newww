@@ -4,6 +4,7 @@
  */
 export * from "./enums";
 export * from "./identity";
+export * from "./auth";
 export * from "./taxonomy";
 export * from "./catalog";
 export * from "./devices";

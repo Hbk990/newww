@@ -57,6 +57,13 @@
       "when": 1789083699369,
       "tag": "0007_decision_functions",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789084360161,
+      "tag": "0008_auth",
+      "breakpoints": true
     }
   ]
 }

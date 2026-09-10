@@ -141,3 +141,11 @@ export const notificationStatus = pgEnum("notification_status", [
 ]);
 
 export const stockCountStatus = pgEnum("stock_count_status", ["open", "closed"]);
+
+/** Third-party login providers. Google only, and free at any volume. */
+export const authProvider = pgEnum("auth_provider", ["google"]);
+
+export const verificationPurpose = pgEnum("verification_purpose", [
+  "email_verify",
+  "password_reset",
+]);
