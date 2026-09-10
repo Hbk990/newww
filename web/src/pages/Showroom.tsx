@@ -190,7 +190,7 @@ export default function Showroom() {
                       {car.daysInStock ?? '—'}
                     </td>
                     <td className="num">
-                      <div className="row" style={{ justifyContent: 'flex-end', gap: 6 }}>
+                      <div className="row" style={{ justifyContent: 'flex-end', gap: 6, flexWrap: 'nowrap' }}>
                         <div className="actions">
                           <button className="small" onClick={() => setSelling(car)}>
                             Sell

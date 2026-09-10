@@ -131,7 +131,7 @@ export default function Sales() {
                     </td>
                     <td className="num">{sale.channel === 'ORIGIN' ? 'Settled with supplier' : Number(sale.remaining) > 0 ? fmt(sale.remaining) : '—'}</td>
                     <td className="num">
-                      <div className="row" style={{ justifyContent: 'flex-end', gap: 6 }}>
+                      <div className="row" style={{ justifyContent: 'flex-end', gap: 6, flexWrap: 'nowrap' }}>
                         {sale.channel === 'LOCAL' && Number(sale.remaining) > 0 && (
                           <div className="actions">
                             <button className="small" onClick={() => setPaying(sale)}>
