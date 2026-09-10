@@ -303,10 +303,59 @@ model needs the internet.
 
 ---
 
+## Practice data: a full showroom
+
+The small demo is three cars. To see how the screens behave with a real amount
+of stock:
+
+```powershell
+npm run db:seed:large
+```
+
+That loads **50 cars standing in the showroom** and the history behind them:
+
+- **5 suppliers** — 3 American, 2 Canadian (both invoicing tax, so the tax cap
+  and the refunds list have something in them)
+- **5 shipping companies** and **11 shipments**, each with its own locked rate
+  and its own quoted-against-invoiced difference
+- **5 money transfer companies**, plus your cash box
+- the garage: three workers and two parts shops, with the repairs on the cars
+  that arrived damaged
+- **14 cars already sold** across the last ten months, some paid in full and
+  some still owing, so the monthly report and the analysis pages are not empty
+- 3 cars held for a buyer with a deposit
+- rent, salary and bills every month
+
+Every figure comes from the same money code the application itself uses — the
+tax cap, the equal freight split, the rate locked at arrival — so what the
+screens show is arithmetic you can check by hand.
+
+Every practice chassis number starts with **TEST5**, so this data can always be
+told apart from a real car at a glance.
+
+```powershell
+npm run db:seed:large            # add it to whatever is there
+npm run db:seed:large -- --wipe  # erase every car and account first, then load it
+```
+
+Run it twice without `--wipe` and it stops and tells you rather than making 128
+cars.
+
+**Before you enter your first real car**, clear it out:
+
+```powershell
+npm run db:seed:large -- --wipe
+```
+
+That erases cars, accounts and movements — it does **not** touch your login.
+
+---
+
 ## Starting over
 
 ```powershell
-npm run db:seed:demo -- --wipe    # fresh practice data, keeps your login
+npm run db:seed:demo -- --wipe    # the small three-car example, keeps your login
+npm run db:seed:large -- --wipe   # the full 50-car showroom, keeps your login
 npm run setup -- --fresh          # erase the database completely and rebuild
 ```
 
@@ -316,8 +365,9 @@ npm run setup -- --fresh          # erase the database completely and rebuild
 npm test
 ```
 
-65 tests: the money engine against hand-computed figures, and the whole business
-driven through the real API and database.
+144 tests: the money engine against hand-computed figures, and the whole
+business driven through the real API and database. They run against a separate
+`_test` database, so your own data is never touched.
 
 ---
 

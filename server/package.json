@@ -15,6 +15,7 @@
     "generate": "prisma generate",
     "seed:vpic": "tsx prisma/seed-vpic.ts",
     "seed:demo": "tsx prisma/seed-demo.ts",
+    "seed:large": "tsx prisma/seed-large.ts",
     "create:user": "tsx scripts/create-user.ts",
     "test:unit": "vitest run --config vitest.unit.config.ts",
     "ensure:cashbox": "tsx scripts/ensure-cash-box.ts"

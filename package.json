@@ -18,6 +18,7 @@
     "db:migrate": "npm run db:deploy --workspace=server",
     "db:seed:vpic": "npm run seed:vpic --workspace=server",
     "db:seed:demo": "npm run seed:demo --workspace=server",
+    "db:seed:large": "npm run seed:large --workspace=server",
     "create:user": "npm run create:user --workspace=server",
     "catalog:download": "node --import tsx server/prisma/download-vpic.ts",
     "catalog:import": "node --import tsx server/prisma/seed-vpic.ts",
