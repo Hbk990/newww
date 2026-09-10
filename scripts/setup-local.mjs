@@ -12,6 +12,7 @@
  *   --db "mysql://user:password@127.0.0.1:3306/carshowroom"   database to use
  *   --user NAME --password PASS                               the login to create
  *   --no-demo                                                 skip the practice data
+ *   --big                                                     50 cars instead of 3
  *   --fresh                                                   ERASE and start over
  */
 import { execFileSync } from 'node:child_process';
@@ -199,6 +200,8 @@ try {
 
 // --- 5. Practice data -------------------------------------------------------
 
+const big = has('big');
+
 if (!has('no-demo')) {
   step('5. Practice data');
   // Never overwrite data that is already there — it might be real.
@@ -206,9 +209,11 @@ if (!has('no-demo')) {
   const existing = Number(cars);
   if (existing > 0) {
     warn(`There are already ${existing} cars — leaving your data alone.`);
-    say('    To replace it with fresh practice data: npm run db:seed:demo -- --wipe');
+    say(`    To replace it with fresh practice data: npm run db:seed:${big ? 'large' : 'demo'} -- --wipe`);
   } else {
-    run('npx', ['tsx', 'prisma/seed-demo.ts']);
+    // --big loads a full showroom: 50 cars, five suppliers, five shippers,
+    // five transfer companies and the sales behind them.
+    run('npx', ['tsx', big ? 'prisma/seed-large.ts' : 'prisma/seed-demo.ts']);
   }
 }
 
@@ -248,13 +253,26 @@ say(`
       password:  ${password}
 
   ${flag('password') ? '' : 'That is a default password — fine for testing on your own\n  machine, but change it before this touches real data.\n'}
-  The practice data has three cars mid-journey:
+${
+  has('no-demo')
+    ? '  The system is empty — start by adding a supplier under Accounts.\n'
+    : big
+      ? `  The practice data is a full showroom:
+    · 50 cars for sale, 14 already sold, 3 held with a deposit
+    · 5 suppliers (3 American, 2 Canadian), 5 shippers, 5 transfer companies
+
+  Every practice chassis number starts with TEST5, so it can never be
+  mistaken for a real car. Clear it with:
+      npm run db:seed:large -- --wipe
+`
+      : `  The practice data has three cars mid-journey:
     · Mercedes CLA 300 — in the garage, cost so far 7,550,000
     · Toyota Camry and RAV4 — in the showroom
 
   Try finishing the Mercedes repair and selling it at 9,000,000.
   You should see a profit of exactly 1,450,000.
-
+`
+}
   Every figure is explained in docs/money-rules.md
   ──────────────────────────────────────────────
 `);
