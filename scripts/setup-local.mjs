@@ -19,7 +19,7 @@ import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline/promises';
 
@@ -99,7 +99,10 @@ const attempt = (command, args, cwd = serverDir, env = {}) =>
       cwd,
       stdio: ['inherit', 'pipe', 'pipe'],
       env: { ...process.env, ...env },
-      shell: process.platform === 'win32',
+      // Windows needs a shell to run npm and npx, which are .cmd files. It must
+      // not get one for a full path like C:\Program Files\nodejs\node.exe:
+      // the shell splits that at the space and reports 'C:\Program' missing.
+      shell: process.platform === 'win32' && !isAbsolute(command),
     });
     const tee = (stream, out) =>
       stream?.on('data', (chunk) => {
