@@ -196,9 +196,14 @@ Then, by symptom:
     files while they are open. Press Ctrl+C where "npm run dev"
     is running, then try again.
 
-It asks for a code from your authenticator and you cannot give one
-    npm run reset:2fa -- owner
-    Then sign in with the password and set it up again in Settings.
+It asks for a code from your authenticator app
+    Two-factor is switched on for that login. A fresh install never has
+    it on, and setting the password from the console switches it off,
+    so this only happens on a database where somebody turned it on in
+    Settings. Either set a new password:
+        npm run create:user -- owner "a-password-12-chars+"
+    or keep the password you have and just switch two-factor off:
+        npm run reset:2fa -- owner
 
 Anything else: the PowerShell window prints the real reason.
 That message is what to go on.

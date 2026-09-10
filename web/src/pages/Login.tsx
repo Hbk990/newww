@@ -14,21 +14,29 @@ export default function Login({ onSignedIn }: { onSignedIn: (session: Session) =
   const [needsCode, setNeedsCode] = useState(false);
 
   const { busy, error, setError, run } = useSubmit(async () => {
-    const session = await api.post<Session>('/api/auth/login', {
-      username,
-      password,
-      token: token || undefined,
-    });
-    onSignedIn(session);
-    return session;
+    try {
+      const session = await api.post<Session>('/api/auth/login', {
+        username,
+        password,
+        token: token || undefined,
+      });
+      onSignedIn(session);
+      return session;
+    } catch (failure) {
+      // Only the server knows whether this login has two-factor switched on,
+      // and it says so in this one message. Deciding it here from a failed
+      // attempt put an authenticator box in front of people who had never
+      // switched two-factor on, so a mistyped password looked like a lost
+      // phone — and left them believing the system was demanding a code.
+      if (failure instanceof Error && /6-digit code/i.test(failure.message)) setNeedsCode(true);
+      throw failure;
+    }
   });
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    const result = await run();
-    // The server asks for the 6-digit code only once the password is right.
-    if (!result) setNeedsCode((current) => current || Boolean(password));
+    await run();
   };
 
   return (

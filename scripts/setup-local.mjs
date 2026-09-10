@@ -47,13 +47,31 @@ const fail = (message) => {
 /** Never print a database password to the screen or a log. */
 const redact = (url) => url.replace(/\/\/([^:]+):[^@]*@/, '//$1:****@');
 
-const run = (command, args, cwd = serverDir, env = {}) =>
+/** Runs a step and lets the caller deal with a failure. */
+const tryRun = (command, args, cwd = serverDir, env = {}) =>
   execFileSync(command, args, {
     cwd,
     stdio: 'inherit',
     env: { ...process.env, ...env },
     shell: process.platform === 'win32',
   });
+
+/**
+ * Runs a step that must succeed. The step prints its own reason as it goes,
+ * so a Node stack trace on top of it only buries the one line worth reading.
+ */
+const run = (command, args, cwd = serverDir, env = {}) => {
+  try {
+    return tryRun(command, args, cwd, env);
+  } catch {
+    fail(
+      `This step stopped:  ${[command, ...args].join(' ')}\n\n` +
+        '  Its own error message is printed above this box — that is the one\n' +
+        '  that says why. Everything below it is just Node reporting that the\n' +
+        '  step failed.',
+    );
+  }
+};
 
 // ---------------------------------------------------------------------------
 
@@ -206,7 +224,7 @@ ok('Tables created');
 
 step('4. Car brands and models');
 try {
-  run('npx', ['tsx', 'prisma/seed-vpic.ts']);
+  tryRun('npx', ['tsx', 'prisma/seed-vpic.ts']);
 } catch {
   warn('Could not load the full list — falling back to the bundled one');
   run('npx', ['tsx', 'prisma/seed-vpic.ts', '--offline']);
@@ -217,6 +235,22 @@ try {
 const big = has('big');
 
 /** The chassis numbers the practice data uses, and nothing else ever does. */
+/**
+ * Practice data is a convenience; the login is not. A seeder that fails must
+ * never stop setup before the login exists, or you are left with a system you
+ * cannot sign in to and no obvious way back.
+ */
+const loadPractice = (seeder, extra) => {
+  try {
+    tryRun('npx', ['tsx', seeder, ...extra]);
+  } catch {
+    warn('The practice data did not load. Its reason is printed above.');
+    warn('Setup is carrying on — the system itself is fine, it just has no');
+    warn('practice cars in it. Load them later with:');
+    say(`      npm run db:seed:${seeder.includes('large') ? 'large' : 'demo'} -- --wipe`);
+  }
+};
+
 const DEMO_VINS = ['WDDSJ4EB0KN712345', '4T1B11HK5LU123456', '2T3P1RFV8MC123456'];
 const isPractice = (vin) => DEMO_VINS.includes(vin) || String(vin).startsWith('TEST5');
 
@@ -227,12 +261,12 @@ if (!has('no-demo')) {
   const seeder = big ? 'prisma/seed-large.ts' : 'prisma/seed-demo.ts';
 
   if (vins.length === 0) {
-    run('npx', ['tsx', seeder]);
+    loadPractice(seeder, []);
   } else if (vins.every(isPractice)) {
     // Only practice cars are there, so swapping them for the set you asked for
     // loses nothing. Doing it by hand every time was needless work.
     warn(`Replacing the ${vins.length} practice cars that were already here.`);
-    run('npx', ['tsx', seeder, '--wipe']);
+    loadPractice(seeder, ['--wipe']);
   } else {
     // Real cars. Never touch them.
     warn(`There are already ${vins.length} cars, and some are not practice data — leaving them alone.`);
