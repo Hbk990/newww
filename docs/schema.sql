@@ -48,9 +48,11 @@ create table products (
   id           uuid primary key default gen_random_uuid(),
   slug         text not null unique,
   title        text not null,
-  description  text,
+  short_description text,                  -- one line, shown on cards and in listings
+  description_html  text,                  -- the long copy, sanitized on write
   status       product_status not null default 'draft',
-  vendor       text,
+  meta_title       text,                   -- SEO overrides; fall back to title
+  meta_description text,
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
   published_at timestamptz
@@ -524,12 +526,15 @@ create index on nav_items (menu_id, parent_id, position);
 
 -- ---------------------------------------------------------------- import
 
--- The CSV is a SOURCE catalog (1,155 wholesale lines), not the storefront. Rows
--- land here on import; a curator picks the ones that become retail products.
--- Nothing here is customer-visible, so a row can sit unpromoted forever.
+-- Reference copy of the wholesale catalog export. Products are created one at a
+-- time by hand, so nothing here is ever promoted automatically: this table exists
+-- so the admin's "new product" form can search 1,155 known lines and prefill
+-- name, brand, category, cost and image instead of retyping them. The CSV's own
+-- data is known to be incomplete and partly wrong, so every prefilled field is
+-- editable and nothing here is customer-visible.
 --
--- The searchable columns are extracted from `raw` on import so the admin can
--- browse, filter and sort the staging catalog without querying into jsonb.
+-- The searchable columns are extracted from `raw` on load so the lookup can
+-- filter and sort without querying into jsonb.
 create table source_products (
   id             uuid primary key default gen_random_uuid(),
   source         text not null,            -- 'DRPHONEcatalog20260910.csv'
@@ -546,7 +551,8 @@ create table source_products (
   option_count   integer not null default 0,
   color_count    integer not null default 0,
 
-  -- curation state
+  -- set when a hand-created product was prefilled from this line, so the
+  -- lookup can show what has already been used
   promoted_product_id uuid references products(id) on delete set null,
   promoted_at    timestamptz,
   excluded       boolean not null default false,
@@ -562,7 +568,7 @@ create index on source_products (category_group, category_name);
 create index on source_products (brand_name);
 create index on source_products (promoted_product_id) where promoted_product_id is not null;
 create index on source_products (needs_review) where needs_review;
--- The default admin view: everything still awaiting a decision.
+-- The default lookup view: lines not yet used for a product.
 create index on source_products (imported_at desc)
   where promoted_product_id is null and not excluded;
 

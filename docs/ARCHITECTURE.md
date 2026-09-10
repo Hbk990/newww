@@ -29,22 +29,38 @@ Every amount is `integer` cents. The store's single currency lives in `store_set
 ### Product vs Variant
 The **variant** is the thing that has a price, a SKU, and stock. The **product** is a marketing wrapper (title, description, images, slug). A product with no options still has exactly one variant. Options (`Size`, `Color`) are modeled as `option_types` → `option_values`, with `variant_options` joining a variant to one value per type. This means the variant matrix is data, not code, and adding a third option later requires no migration.
 
-### The CSV is a source catalog, not the storefront
-The 1,155-line export is wholesale stock, and only hand-picked items go on sale
-retail. So the importer does **not** create products. Rows land in
-`source_products` — a browsable staging table with name, brand, category, cost
-and image extracted into real columns — and a curator promotes the ones they want,
-setting a retail price at that moment. An unpromoted row can sit there forever
-without being customer-visible, and re-running the import is safe because the
-table is keyed on `(source, source_ref)`.
+### The CSV is reference data, not an import source
+The 1,155-line export is wholesale stock with known gaps: no real quantities,
+descriptions on 2% of rows, and some fields simply wrong. Products will be
+created **one at a time by hand**, with quantities and copy written as they go.
 
-This is also why `variants` has both `price_cents` and `cost_cents`: the catalog
-price is what you pay, the retail price is what you charge, and the admin needs
-both to show you margin. Never display `cost_cents` on the storefront.
+So there is no bulk product importer. What the export is genuinely good for is
+*reference data*, and that gets seeded:
 
-A consequence for the storefront: most of the 48 categories will be empty at
-launch. Category pages and menus must be driven by "has published products", not
-by the category tree existing.
+- **48 categories under 9 groups** — the taxonomy, minus the fixes below
+- **226 brands** — as real `brands` rows with their own pages
+- **~101 device models** — normalized into `device_brands` / `device_models`, the
+  vocabulary behind "Shop by device"
+- **the 1,155 lines themselves** into `source_products`, purely so the admin's
+  new-product form can search them and prefill name, brand, category, cost and
+  image rather than retyping. Every prefilled field stays editable, because the
+  source data is not trusted.
+
+This makes the **admin product form the first thing worth building**, not the
+storefront: nothing can be displayed until products exist, and they arrive one
+by one. It needs to be fast to use — variant matrix generation, image upload,
+device fitment picker, quantity, and price with margin shown against cost.
+
+`variants` carries both `price_cents` and `cost_cents` for that reason: cost from
+the wholesale line, retail price set by hand. Never expose `cost_cents` on the
+storefront.
+
+Two consequences for the storefront: category pages, menus and device pages must
+be driven by "has published products", never by the tree existing, or the store
+will show dozens of dead ends while the catalog fills up. And because real
+quantities are coming, inventory tracks properly from day one —
+`track = true, policy = 'deny'`, the schema defaults — rather than the
+always-in-stock behaviour of the current site.
 
 ### Orders snapshot everything
 `order_items` copies the product title, variant title, SKU, and unit price at purchase time. It keeps a nullable FK to the variant for reporting, but never joins to it for display. Products get renamed, repriced, and deleted; a two-year-old invoice must still render exactly what the customer bought.
@@ -77,8 +93,8 @@ the schema prevents adding it later.
 ## Build order
 
 1. Schema + migrations
-2. CSV importer into `source_products` (all 1,155 rows, staging only)
-3. Admin curation view: browse staging, promote with a retail price
+2. Seed reference data: categories, brands, device models, and the source lines
+3. Admin product form — create a product with variants, quantity, price, images
 4. Catalog and product detail (read-only storefront)
 5. Cart with reservations
 6. Stripe Checkout + webhook → order creation

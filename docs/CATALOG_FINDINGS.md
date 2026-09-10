@@ -132,51 +132,53 @@ an integer number of cents.
 The low price points and the unused `tiers_json` column both suggest wholesale or
 tiered pricing was intended. Confirm before v1: retail-only, or B2B tiers?
 
-## Import plan
+## How this export gets used
 
-The catalog is a **source list**, not the storefront: only hand-picked items go on
-sale. So the importer stages everything and creates nothing customer-visible.
+The CSV is **reference data, not an import source.** Its quantities are absent,
+its descriptions cover 2% of rows, and some fields are wrong. Products are
+created one at a time by hand, with quantities and copy written as they go. So
+nothing here becomes a live product automatically.
 
-**Stage 1 — load all 1,155 rows into `source_products`.** Untouched CSV row in
-`raw`, with name, brand, category, group, cost, image and option/colour counts
-extracted into real columns so the staging catalog is searchable and sortable.
-Keyed on `(source, source_ref)`, so re-running the import is idempotent and a
-refreshed export updates costs in place. Mark on load:
+**Seed from the export:**
 
-- the 4 **Vape** products `excluded = 'age-restricted'`
-- `DR-000894` (no price, no options) `needs_review = 'no price'`
-- the 67 brandless rows and 13 duplicate names `needs_review`
-- every row whose `options_json` axis could not be classified confidently
+1. **Taxonomy** — 9 groups as parent categories, 48 as children, applying the
+   fixes below.
+2. **Brands** — the 226 brand strings as real `brands` rows.
+3. **Device models** — normalize the 101 free-text fit labels into
+   `device_brands` / `device_models`, splitting `"17 Pro / 18 Pro"` into two
+   models. This is the vocabulary behind "Shop by device" and is worth getting
+   right once.
+4. **The 1,155 lines** into `source_products`, as a lookup only: the admin's
+   new-product form searches it and prefills name, brand, category, cost and
+   image. Every field stays editable. Mark the 4 Vape lines excluded
+   (age-restricted) and flag `DR-000894` (no price), the 67 brandless lines and
+   the 13 duplicate names for review.
 
-**Stage 2 — classify the option axes** while staging, so a curator sees the
-proposed shape before promoting. Inspect each label list: `\d+GB` → capacity, a
-device pattern → device fit, a colour word → color, `Type-C|Lighting|Micro` →
-connector, else `other`. Low confidence sets `needs_review`.
+**Taxonomy fixes to apply while seeding**, not later:
 
-**Stage 3 — promote on demand.** Promoting one staged row is a transaction that:
+- Drop the `Razer` and `HyperX` categories. They are brands; their 57 products
+  are Headphones, Microphones and Keyboard & Mouse. Brands get their own pages
+  instead.
+- Split `Mix Product` (90 lines) into real categories — humidifiers, night
+  lights, walkie-talkies, seat cushions, camping chairs, makeup mirrors are all
+  in there. Nobody browses a junk drawer, and it cannot be filtered.
+- Decide where `Tablet` (4, currently under `Other`) belongs.
 
-1. creates the `products` row (`status = 'draft'`), slug from name, deduped
-2. resolves or creates its `brands` row
-3. attaches its category (one `is_primary` row), refiling Razer/HyperX products
-   by product type rather than by brand
-4. drops the `["Standard"]` placeholder, builds the real option axes, and
-   generates the variant matrix — collapsing the 22 cases where colour and
-   option hold the same values into a single axis
-5. normalizes device labels into `device_models`, splitting `"17 Pro / 18 Pro"`
-   into two fitment rows, and fills `variant_device_fit` plus the
-   `product_device_fit` rollup
-6. copies the CSV price into `variants.cost_cents` and requires the curator to
-   set `price_cents` — **the retail price is never defaulted from cost**
-7. copies `image` to `product_images` position 0, appends `images_json`
-8. seeds inventory at `on_hand = 0`, `policy = 'continue'`
-9. records `promoted_product_id` and `promoted_at` on the staged row
+**Per-product, entered by hand:** quantity, retail price, description, extra
+images, option axes, and device fitment. The option-axis analysis above says what
+the form has to support: a colour swatch picker, a capacity dropdown, a connector
+choice, a device-fit multi-select, and a two-axis matrix for the cases like
+`DR-001202` (15 colours x 4 fits) that a flat list cannot express.
 
-Promotion must be reversible (unpublish, not delete) and must report per-step
-counts and every skipped row.
+## What this means for the build order
 
-## Storefront consequence
+The **admin product form is the first thing worth building** — before any
+storefront page. Nothing can be displayed until products exist, and they arrive
+one at a time, so the form's speed is the constraint on launch. It needs variant
+matrix generation, bulk quantity entry across variants, image upload, a device
+fitment picker, and margin shown against the wholesale cost.
 
-With only a curated subset live, most of the 48 categories will be empty at
-launch. Category listings, the mega-menu and the "Shop by device" pages must all
-be driven by "has published products", never by the category or device tree
-merely existing — otherwise the store shows dozens of dead-end pages.
+Because real quantities are coming, inventory tracks properly from the start
+(`track = true`, `policy = 'deny'`) rather than the always-in-stock behaviour of
+the current site. Category pages, menus and device pages must be driven by "has
+published products", or the store shows dead ends while the catalog fills up.
