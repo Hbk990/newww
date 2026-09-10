@@ -14,9 +14,11 @@ import ShipmentDetail from './pages/ShipmentDetail';
 import Garage from './pages/Garage';
 import Showroom from './pages/Showroom';
 import Sales from './pages/Sales';
+import Receipt from './pages/Receipt';
 import Money from './pages/Money';
 import Expenses from './pages/Expenses';
 import Reports from './pages/Reports';
+import Analysis from './pages/Analysis';
 import SettingsPage from './pages/Settings';
 
 interface Session {
@@ -88,9 +90,11 @@ export default function App() {
               <Route path="/garage" element={<Garage />} />
               <Route path="/showroom" element={<Showroom />} />
               <Route path="/sales" element={<Sales />} />
+              <Route path="/sales/:id/receipt" element={<Receipt />} />
               <Route path="/money" element={<Money />} />
               <Route path="/expenses" element={<Expenses />} />
               <Route path="/reports" element={<Reports />} />
+              <Route path="/analysis" element={<Analysis />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
@@ -129,6 +133,7 @@ function Sidebar({ businessName, onSignOut }: { businessName: string; onSignOut:
       {item('/money', 'Payments')}
       {item('/expenses', 'Expenses')}
       {item('/reports', 'Reports')}
+      {item('/analysis', 'Analysis')}
 
       <div className="group">System</div>
       {item('/settings', 'Settings')}

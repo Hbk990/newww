@@ -7,3 +7,6 @@ dist/
 backups/
 server/prisma/vpic-cache.json
 *.tsbuildinfo
+
+# Uploaded car photos live on disk, never in the repository or a backup zip.
+server/uploads/

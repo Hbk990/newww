@@ -153,3 +153,30 @@ export function useSubmit<T>(action: () => Promise<T>) {
 
   return { busy, error, setError, run };
 }
+
+/**
+ * One number, given room. The label always says which currency and which
+ * direction, because a bare number on a screen is how people misread money.
+ */
+export function Stat({
+  label,
+  value,
+  hint,
+  negative,
+  tone,
+}: {
+  label: string;
+  value: string;
+  hint?: ReactNode;
+  negative?: boolean;
+  tone?: 'good' | 'bad';
+}) {
+  const className = negative || tone === 'bad' ? ' neg' : tone === 'good' ? ' pos' : '';
+  return (
+    <div className="stat">
+      <div className="label">{label}</div>
+      <div className={`value${className}`}>{value}</div>
+      {hint && <div className="hint">{hint}</div>}
+    </div>
+  );
+}

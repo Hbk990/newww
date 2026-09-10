@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { PageHeader } from '../App';
+import { PageHeader, useApp } from '../App';
 import { api, fmt, fmtDate, type Statement } from '../lib/api';
 import { Alert, Balance, Card, Empty, Spinner } from '../components/ui';
 
@@ -27,6 +27,7 @@ const KIND_LABELS: Record<string, string> = {
 
 export default function StatementPage() {
   const { id } = useParams();
+  const { settings } = useApp();
   const [data, setData] = useState<Statement | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,6 +59,9 @@ export default function StatementPage() {
 
   return (
     <>
+      {/* On paper the printed header below carries the name and the balance,
+          so the screen header and the tiles would only repeat them. */}
+      <div className="no-print">
       <PageHeader
         title={data.party.name}
         sub={
@@ -67,13 +71,38 @@ export default function StatementPage() {
           </>
         }
         action={
-          <a href={`/api/reports/export/statement/${id}`}>
-            <button className="secondary">Download Excel</button>
-          </a>
+          <div className="row">
+            <div className="actions">
+              <button className="secondary" onClick={() => window.print()}>
+                Print
+              </button>
+            </div>
+            <div className="actions">
+              <a href={`/api/reports/export/statement/${id}`}>
+                <button className="secondary">Download Excel</button>
+              </a>
+            </div>
+          </div>
         }
       />
+      </div>
 
-      <div className="grid cols-3">
+      {/* Only on paper: a statement handed to someone has to say whose it is. */}
+      <div className="print-only doc-head">
+        <div>
+          <h1>{settings.businessName}</h1>
+          <div className="small muted">Account statement — {data.party.name}</div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div className="doc-title">{data.meaning.label}</div>
+          <div className="strong">
+            {fmt(data.closingBalance)} {currency}
+          </div>
+          <div className="small muted">{data.balanceLabel}</div>
+        </div>
+      </div>
+
+      <div className="grid cols-3 no-print">
         <div className="stat">
           <div className="label">{data.meaning.label}</div>
           <div className="value">
@@ -104,7 +133,7 @@ export default function StatementPage() {
                   <th>Description</th>
                   <th className="num">Amount</th>
                   <th className="num">Balance</th>
-                  <th />
+                  <th className="no-print" />
                 </tr>
               </thead>
               <tbody>
@@ -115,7 +144,7 @@ export default function StatementPage() {
                     <td className="small">{line.description}</td>
                     <td className={`num ${Number(line.amount) < 0 ? 'pos' : ''}`}>{fmt(line.amount)}</td>
                     <td className="num strong">{fmt(line.runningBalance)}</td>
-                    <td className="num">
+                    <td className="num no-print">
                       {line.kind !== 'REVERSAL' && (
                         <button className="link small" onClick={() => void reverse(line.id)}>
                           Reverse

@@ -1,10 +1,12 @@
 import { existsSync } from 'node:fs';
+import { mkdir } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import Fastify from 'fastify';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
+import multipart from '@fastify/multipart';
 import { ZodError } from 'zod';
 import { env } from './lib/env.js';
 import { AppError } from './lib/errors.js';
@@ -20,6 +22,8 @@ import { treasuryRoutes } from './routes/treasury.routes.js';
 import { reportRoutes } from './routes/reports.routes.js';
 import { settingsRoutes } from './routes/settings.routes.js';
 import { adjustmentRoutes } from './routes/adjustments.routes.js';
+import { photoRoutes, UPLOAD_DIR } from './routes/photos.routes.js';
+import { reservationRoutes } from './routes/reservations.routes.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -40,6 +44,15 @@ export async function buildApp() {
 
   await app.register(cookie, { secret: env.sessionSecret });
   await app.register(rateLimit, { global: false, max: 300, timeWindow: '1 minute' });
+  await app.register(multipart, { limits: { fileSize: 8 * 1024 * 1024, files: 1 } });
+
+  // Uploaded photos are served from their own path, signed in only.
+  await mkdir(UPLOAD_DIR, { recursive: true });
+  await app.register(fastifyStatic, {
+    root: UPLOAD_DIR,
+    prefix: '/api/photos/file/',
+    decorateReply: false,
+  });
 
   // Resolve the session on every request, then refuse anything not public.
   app.addHook('preHandler', async (request) => {
@@ -97,6 +110,8 @@ export async function buildApp() {
   await app.register(reportRoutes);
   await app.register(settingsRoutes);
   await app.register(adjustmentRoutes);
+  await app.register(photoRoutes);
+  await app.register(reservationRoutes);
 
   // In production the API also serves the built interface, so the whole system
   // is one process behind one certificate — no CORS, no second deployment.

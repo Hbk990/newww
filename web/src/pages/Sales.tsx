@@ -131,11 +131,22 @@ export default function Sales() {
                     </td>
                     <td className="num">{sale.channel === 'ORIGIN' ? 'Settled with supplier' : Number(sale.remaining) > 0 ? fmt(sale.remaining) : '—'}</td>
                     <td className="num">
-                      {sale.channel === 'LOCAL' && Number(sale.remaining) > 0 && (
-                        <button className="small" onClick={() => setPaying(sale)}>
-                          Payment
-                        </button>
-                      )}
+                      <div className="row" style={{ justifyContent: 'flex-end', gap: 6 }}>
+                        {sale.channel === 'LOCAL' && Number(sale.remaining) > 0 && (
+                          <div className="actions">
+                            <button className="small" onClick={() => setPaying(sale)}>
+                              Payment
+                            </button>
+                          </div>
+                        )}
+                        {sale.channel === 'LOCAL' && (
+                          <div className="actions">
+                            <Link to={`/sales/${sale.id}/receipt`}>
+                              <button className="small secondary">Receipt</button>
+                            </Link>
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

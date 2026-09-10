@@ -4,16 +4,21 @@ import { PageHeader, useApp } from '../App';
 import { api, fmt, todayIso, type Car, type Party } from '../lib/api';
 import { Alert, Card, Empty, Field, Modal, Spinner, useSubmit } from '../components/ui';
 import { MoneyInput } from '../components/MoneyInput';
+import { PhotoThumb } from '../components/Photos';
+import { CancelReservationModal, ReserveModal } from '../components/ReserveModal';
 
 export default function Showroom() {
   const { cfa } = useApp();
   const [cars, setCars] = useState<Car[] | null>(null);
   const [selling, setSelling] = useState<Car | null>(null);
+  const [reserving, setReserving] = useState<Car | null>(null);
+  const [cancelling, setCancelling] = useState<Car | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [condition, setCondition] = useState<'all' | 'clean' | 'repaired'>('all');
   const [priced, setPriced] = useState<'all' | 'priced' | 'unpriced'>('all');
+  const [held, setHeld] = useState<'all' | 'held' | 'free'>('all');
   const [sort, setSort] = useState<'oldest' | 'newest' | 'cost' | 'price' | 'profit'>('oldest');
 
   const load = () =>
@@ -32,6 +37,7 @@ export default function Showroom() {
     .filter((car) =>
       priced === 'all' ? true : priced === 'priced' ? Boolean(car.askingPriceCfa) : !car.askingPriceCfa,
     )
+    .filter((car) => (held === 'all' ? true : held === 'held' ? Boolean(car.reservation) : !car.reservation))
     .sort((a, b) => {
       switch (sort) {
         case 'newest':
@@ -51,6 +57,8 @@ export default function Showroom() {
   const askingTotal = shown.reduce((sum, car) => sum + Number(car.askingPriceCfa ?? 0), 0);
   const unpriced = (cars ?? []).filter((car) => !car.askingPriceCfa).length;
   const sittingLong = (cars ?? []).filter((car) => (car.daysInStock ?? 0) >= 60).length;
+  const reserved = (cars ?? []).filter((car) => car.reservation);
+  const depositsHeld = reserved.reduce((sum, car) => sum + Number(car.reservation?.depositCfa ?? 0), 0);
 
   return (
     <>
@@ -67,6 +75,12 @@ export default function Showroom() {
         <Alert kind="warn">
           {sittingLong} car{sittingLong > 1 ? 's have' : ' has'} been in the showroom for 60 days or
           more. Money sitting still.
+        </Alert>
+      )}
+      {reserved.length > 0 && (
+        <Alert kind="info">
+          {reserved.length} car{reserved.length > 1 ? 's are' : ' is'} held for a buyer —{' '}
+          {fmt(depositsHeld.toFixed(0))} {cfa} of deposits already in your accounts.
         </Alert>
       )}
       {unpriced > 0 && (
@@ -104,6 +118,13 @@ export default function Showroom() {
                 <option value="unpriced">No asking price yet</option>
               </select>
             </div>
+            <div style={{ flex: '0 0 200px' }}>
+              <select value={held} onChange={(e) => setHeld(e.target.value as typeof held)}>
+                <option value="all">Held or free</option>
+                <option value="held">Held with a deposit</option>
+                <option value="free">Nobody is holding it</option>
+              </select>
+            </div>
             <div style={{ flex: '0 0 210px' }}>
               <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
                 <option value="oldest">Longest in stock first</option>
@@ -128,6 +149,7 @@ export default function Showroom() {
             <table>
               <thead>
                 <tr>
+                  <th style={{ width: 62 }} />
                   <th>Car</th>
                   <th className="num">Landed cost</th>
                   <th className="num">Asking price</th>
@@ -139,6 +161,11 @@ export default function Showroom() {
               <tbody>
                 {shown.map((car) => (
                   <tr key={car.id}>
+                    <td>
+                      <Link to={`/cars/${car.id}`}>
+                        <PhotoThumb photo={car.photo ?? null} />
+                      </Link>
+                    </td>
                     <td className="strong">
                       <Link to={`/cars/${car.id}`}>
                         {car.year} {car.makeName} {car.modelName}
@@ -147,6 +174,12 @@ export default function Showroom() {
                         {car.color} · {car.vin}
                         {car.damaged && ' · was repaired'}
                       </div>
+                      {car.reservation && (
+                        <div className="small">
+                          <span className="badge amber">Held</span>{' '}
+                          {car.reservation.customerName} paid {fmt(car.reservation.depositCfa)} {cfa}
+                        </div>
+                      )}
                     </td>
                     <td className="num">{fmt(car.costs.landedCostCfa)}</td>
                     <td className="num">{fmt(car.askingPriceCfa)}</td>
@@ -157,9 +190,24 @@ export default function Showroom() {
                       {car.daysInStock ?? '—'}
                     </td>
                     <td className="num">
-                      <button className="small" onClick={() => setSelling(car)}>
-                        Sell
-                      </button>
+                      <div className="row" style={{ justifyContent: 'flex-end', gap: 6 }}>
+                        <div className="actions">
+                          <button className="small" onClick={() => setSelling(car)}>
+                            Sell
+                          </button>
+                        </div>
+                        <div className="actions">
+                          {car.reservation ? (
+                            <button className="small secondary" onClick={() => setCancelling(car)}>
+                              Release
+                            </button>
+                          ) : (
+                            <button className="small secondary" onClick={() => setReserving(car)}>
+                              Hold
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -174,6 +222,30 @@ export default function Showroom() {
           </>
           )}
         </Card>
+      )}
+
+      {reserving && (
+        <ReserveModal
+          car={reserving}
+          onClose={() => setReserving(null)}
+          onDone={(text) => {
+            setReserving(null);
+            setMessage(text);
+            void load();
+          }}
+        />
+      )}
+
+      {cancelling?.reservation && (
+        <CancelReservationModal
+          reservation={cancelling.reservation}
+          onClose={() => setCancelling(null)}
+          onDone={(text) => {
+            setCancelling(null);
+            setMessage(text);
+            void load();
+          }}
+        />
       )}
 
       {selling && (
@@ -204,8 +276,8 @@ function SellModal({
   const [customers, setCustomers] = useState<Party[]>([]);
   const [price, setPrice] = useState(car.askingPriceCfa ?? '');
   const [saleDate, setSaleDate] = useState(todayIso());
-  const [buyerName, setBuyerName] = useState('');
-  const [buyerMobile, setBuyerMobile] = useState('');
+  const [buyerName, setBuyerName] = useState(car.reservation?.customerName ?? '');
+  const [buyerMobile, setBuyerMobile] = useState(car.reservation?.customerMobile ?? '');
   const [initialPayment, setInitialPayment] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [accounts, setAccounts] = useState<Party[]>([]);
@@ -235,7 +307,9 @@ function SellModal({
 
   const cost = Number(car.costs.landedCostCfa ?? 0);
   const profit = Number(price || 0) - cost;
-  const remaining = Number(price || 0) - Number(initialPayment || 0);
+  // A deposit already paid is part of the price and is already in an account.
+  const deposit = Number(car.reservation?.depositCfa ?? 0);
+  const remaining = Number(price || 0) - Number(initialPayment || 0) - deposit;
 
   return (
     <Modal title={`Sell the ${car.year} ${car.makeName} ${car.modelName}`} onClose={onClose}>
@@ -256,6 +330,13 @@ function SellModal({
           <strong>
             {profit >= 0 ? 'profit' : 'loss'} {fmt(Math.abs(profit))} {cfa}
           </strong>
+        </Alert>
+      )}
+
+      {car.reservation && (
+        <Alert kind="info">
+          {car.reservation.customerName} already paid {fmt(car.reservation.depositCfa)} {cfa} to hold this car.
+          That money is in your account — do not enter it again below. It counts towards the price by itself.
         </Alert>
       )}
 
@@ -293,7 +374,7 @@ function SellModal({
         </Field>
       )}
 
-      {Number(initialPayment) > 0 && remaining > 0 && (
+      {(Number(initialPayment) > 0 || deposit > 0) && remaining > 0 && (
         <Alert kind="warn">
           {fmt(remaining)} {cfa} will still be owed. This sale goes on the “Still owing” list until it
           is paid off, then moves to “Paid in full” by itself.

@@ -135,6 +135,7 @@ model Party {
   transfersTo       Transaction[]      @relation("Counterparty")
   sales             Sale[]
   saleReceipts      SalePayment[]      @relation("SaleReceipts")
+  reservationDeposits Reservation[]    @relation("ReservationDeposits")
   costAdjustments   CostAdjustment[]   @relation("CostAdjustments")
 
   @@index([type, active])
@@ -155,6 +156,8 @@ enum LedgerKind {
   ORIGIN_SALE_PROCEEDS
   DEPOSIT
   SALE_RECEIPT
+  RESERVATION_DEPOSIT
+  RESERVATION_REFUND
   TRANSFER_IN
   TRANSFER_OUT
   WIRE_OUT
@@ -221,6 +224,73 @@ model CarModel {
 // Cars
 // ---------------------------------------------------------------------------
 
+/// Where a photo belongs in the car's story.
+enum PhotoKind {
+  PURCHASE // what the seller sent you
+  ARRIVAL // condition when it landed — your evidence in a dispute
+  REPAIR // work done in the garage
+  SHOWROOM // how it looks ready to sell
+}
+
+model CarPhoto {
+  id        Int       @id @default(autoincrement())
+  carId     Int
+  /// File name on disk under the uploads directory. Never a full path.
+  fileName  String
+  kind      PhotoKind @default(SHOWROOM)
+  caption   String?   @db.Text
+  bytes     Int
+  createdAt DateTime  @default(now())
+  createdBy Int?
+
+  car Car @relation(fields: [carId], references: [id])
+
+  @@index([carId])
+}
+
+/// Money taken to hold a car before the sale is done.
+///
+/// The cash is real and in your hands, so it goes into an account immediately —
+/// but the car is not sold yet, so it is not revenue. It sits against the
+/// reservation until the sale completes (when it counts towards the price),
+/// the buyer walks away and you refund it, or he walks away and you keep it.
+model Reservation {
+  id           Int               @id @default(autoincrement())
+  carId        Int
+  customerName String
+  customerMobile String?
+  depositCfa   Decimal           @db.Decimal(18, 4)
+  date         DateTime
+  note         String?           @db.Text
+  status       ReservationStatus @default(ACTIVE)
+
+  /// Where the deposit money landed.
+  destinationAccountId Int?
+  ledgerEntryId        Int? @unique
+
+  /// How it ended.
+  closedAt     DateTime?
+  closedReason String?   @db.Text
+  /// The refund's ledger line, when the money was given back.
+  refundEntryId Int? @unique
+
+  createdAt DateTime @default(now())
+  createdBy Int?
+
+  car                Car    @relation(fields: [carId], references: [id])
+  destinationAccount Party? @relation("ReservationDeposits", fields: [destinationAccountId], references: [id])
+
+  @@index([carId])
+  @@index([status])
+}
+
+enum ReservationStatus {
+  ACTIVE // holding the car
+  CONVERTED // the sale went through
+  REFUNDED // buyer walked away, money returned
+  FORFEITED // buyer walked away, deposit kept
+}
+
 enum CarStatus {
   PURCHASED // bought, still in origin country
   SHIPPED // on a shipment that has sailed
@@ -277,6 +347,8 @@ model Car {
   arrivalCostCfa    Decimal? @db.Decimal(18, 4) // sum of the four above — never recomputed
   arrivedAt         DateTime?
 
+  /// What you expect to sell it for. Set at purchase or any time after, and
+  /// used to warn you when repairs push the cost past it.
   askingPriceCfa Decimal?  @db.Decimal(18, 4)
   showroomAt     DateTime?
 
@@ -293,6 +365,8 @@ model Car {
   sale            Sale?
   ledger          LedgerEntry[]
   costAdjustments CostAdjustment[]
+  photos          CarPhoto[]
+  reservations    Reservation[]
 
   @@index([status])
   @@index([supplierId])
@@ -324,8 +398,11 @@ enum ShipmentStatus {
 
 model Shipment {
   id                Int            @id @default(autoincrement())
-  reference         String // container no. / booking ref
+  reference         String // what you call this shipment
   shippingCompanyId Int
+  /// What you were quoted when the cars left. Compared with the real invoice
+  /// on arrival, so a shipper who quotes low and bills high becomes visible.
+  estimatedFreightUsd Decimal?     @db.Decimal(18, 4)
   freightCostUsd    Decimal        @db.Decimal(18, 4)
   cfaRate           Decimal?       @db.Decimal(18, 6) // set once on arrival, then frozen
   departureDate     DateTime?
@@ -477,6 +554,8 @@ enum TransactionType {
   PAY_OVERHEAD // CFA — rent, salary, misc
   SALE_RECEIPT // a customer's payment arriving in the cash box
   ACCOUNT_TRANSFER // moving my own money between my own accounts
+  RESERVATION_DEPOSIT // money taken to hold a car
+  RESERVATION_REFUND // that money given back
 }
 
 model Transaction {

@@ -87,6 +87,7 @@ export async function shipmentRoutes(app: FastifyInstance) {
         shippingCompanyId: z.coerce.number(),
         /** Usually left until arrival, when the invoice is known. */
         freightCostUsd: money.optional().default(0),
+        estimatedFreightUsd: money.optional(),
         departureDate: z.coerce.date().optional().nullable(),
         note: z.string().optional().nullable(),
         carIds: z.array(z.coerce.number()).optional().default([]),
@@ -103,6 +104,10 @@ export async function shipmentRoutes(app: FastifyInstance) {
           reference: input.reference.trim(),
           shippingCompanyId: input.shippingCompanyId,
           freightCostUsd: new Prisma.Decimal(input.freightCostUsd),
+          estimatedFreightUsd:
+            input.estimatedFreightUsd === undefined
+              ? null
+              : new Prisma.Decimal(input.estimatedFreightUsd),
           departureDate: input.departureDate ?? null,
           note: input.note || null,
         },
@@ -470,6 +475,8 @@ export async function shipmentRoutes(app: FastifyInstance) {
         /** ...or start a new one with this name and company. */
         reference: z.string().optional(),
         shippingCompanyId: z.coerce.number().optional(),
+        /** What the shipper quoted. Compared with his invoice on arrival. */
+        estimatedFreightUsd: money.optional(),
         departureDate: z.coerce.date().optional().nullable(),
         /** Other cars loaded at the same time. */
         alsoCarIds: z.array(z.coerce.number()).optional().default([]),
@@ -509,7 +516,11 @@ export async function shipmentRoutes(app: FastifyInstance) {
         data: {
           reference: input.reference.trim(),
           shippingCompanyId: company.id,
-          freightCostUsd: new Prisma.Decimal(0), // entered when it arrives
+          estimatedFreightUsd:
+            input.estimatedFreightUsd === undefined
+              ? null
+              : new Prisma.Decimal(input.estimatedFreightUsd),
+          freightCostUsd: new Prisma.Decimal(0), // the real invoice comes on arrival
           departureDate,
           note: input.note || null,
         },

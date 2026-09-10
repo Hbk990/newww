@@ -189,6 +189,37 @@ history is added to, never rewritten.
 
 ---
 
+## Rule 11 — A deposit is cash you hold, not money you have earned
+
+A buyer puts something down to hold a car until he comes back with the rest.
+
+The money is real and it is in your hands the moment he hands it over, so it
+goes into an account straight away, exactly like any other receipt. What it is
+**not** is profit: the car has not been sold, and nothing about its cost has
+happened yet.
+
+So a deposit does three things and no more:
+
+- it adds to the balance of the account it went into
+- it holds that car — the system will not sell it to anybody else while the
+  deposit stands
+- it counts towards the price when the sale is finally recorded, **without the
+  cash being taken a second time**
+
+It ends in one of three ways:
+
+| What happens | What the system does |
+|---|---|
+| He buys the car | The deposit becomes part of the payments on that sale. The money already in the account is not re-entered. |
+| He walks away and you give it back | A line takes the money back out of the account it went into. |
+| He walks away and you keep it | The money stays where it is, and it is reported as income — never left in the cash box with nothing to explain it. |
+
+The car cannot be sold to a different buyer while a deposit is standing on it.
+Release the deposit first — refunded or kept — and then sell it. That is the
+system refusing to let a car be promised to two people at once.
+
+---
+
 ---
 
 ## Rounding

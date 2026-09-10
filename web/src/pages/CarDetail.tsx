@@ -4,6 +4,7 @@ import { PageHeader, useApp } from '../App';
 import { api, fmt, fmtDate, fmtUsd, todayIso, type Car, type CarStatus } from '../lib/api';
 import { Alert, Card, Field, Spinner, StatusBadge, useSubmit } from '../components/ui';
 import { CarAction } from '../components/CarActions';
+import { PhotoGallery } from '../components/Photos';
 import { MoneyInput } from '../components/MoneyInput';
 
 interface Adjustment {
@@ -19,7 +20,15 @@ interface CarDetailData extends Car {
   originExpenses: { id: number; amountUsd: string; note: string | null; date: string }[];
   repairJobs: { id: number; serviceType: string; labourCostCfa: string; description: string | null; worker: { name: string } }[];
   repairParts: { id: number; description: string; costCfa: string; partsSupplier: { name: string } }[];
-  sale: { id: number; price: string; currency: string; saleDate: string; buyerName: string; payments: { amount: string }[] } | null;
+  sale: {
+    id: number;
+    channel: 'LOCAL' | 'ORIGIN';
+    price: string;
+    currency: string;
+    saleDate: string;
+    buyerName: string;
+    payments: { amount: string }[];
+  } | null;
   shipment: { id: number; reference: string; status: string; cfaRate: string | null } | null;
   supplier: { id: number; name: string; country: string | null };
   taxUsd: string;
@@ -271,6 +280,14 @@ export default function CarDetail() {
             </Card>
           )}
 
+          <Card title="Photos">
+            <p className="small muted" style={{ marginTop: 0 }}>
+              Photograph every car the day it arrives. Weeks later, when a supplier or a shipper says
+              it left him perfect, these are the only answer.
+            </p>
+            <PhotoGallery carId={car.id} sold={car.status === 'SOLD' || car.status === 'SOLD_IN_ORIGIN'} />
+          </Card>
+
           {car.sale && (
             <Card title="Sold">
               <p style={{ marginTop: 0 }}>
@@ -281,6 +298,11 @@ export default function CarDetail() {
                 <p className="strong">
                   Profit: {fmt(Number(car.sale.price) - Number(costs.landedCostCfa))} {cfa}
                 </p>
+              )}
+              {car.sale.channel !== 'ORIGIN' && (
+                <Link to={`/sales/${car.sale.id}/receipt`}>
+                  <button className="secondary small">Print the buyer's receipt</button>
+                </Link>
               )}
             </Card>
           )}

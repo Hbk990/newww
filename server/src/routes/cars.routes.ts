@@ -91,11 +91,12 @@ export async function carRoutes(app: FastifyInstance) {
         repairJobs: true,
         repairParts: true, costAdjustments: true,
         sale: { select: { id: true, price: true, currency: true, saleDate: true } },
+        photos: { orderBy: { id: 'asc' }, take: 1 },
       },
       orderBy: { purchaseDate: 'desc' },
     });
 
-    return cars.map((car) => ({ ...car, costs: costBreakdown(car), label: carLabel(car) }));
+    return cars.map((car) => ({ ...car, costs: costBreakdown(car), label: carLabel(car), photo: car.photos[0] ?? null }));
   });
 
   app.get('/api/cars/:id', async (request) => {
@@ -111,6 +112,9 @@ export async function carRoutes(app: FastifyInstance) {
         repairParts: { include: { partsSupplier: { select: { id: true, name: true } } } },
         sale: { include: { payments: true } },
         ledger: { orderBy: { id: 'asc' } },
+        photos: { orderBy: { id: 'asc' } },
+        reservations: { orderBy: { id: 'desc' } },
+        costAdjustments: { orderBy: { id: 'asc' } },
       },
     });
     return { ...full, costs: costBreakdown(car), label: carLabel(car) };

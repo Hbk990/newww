@@ -7,9 +7,51 @@ import { D, profitOf } from '../lib/money.js';
 import { cfaCode } from '../lib/settings.js';
 import { carLabel, costBreakdown } from '../services/cars.js';
 import { dashboard, fxDifferenceForSupplier, monthlyReport } from '../services/reports.js';
+import {
+  accountTotals,
+  carsAtRisk,
+  depositSummary,
+  freightAccuracy,
+  monthlyTrend,
+  profitBySupplier,
+  rateHistory,
+  stockByStage,
+} from '../services/analysis.js';
 
 export async function reportRoutes(app: FastifyInstance) {
   app.get('/api/reports/dashboard', async () => dashboard());
+
+  /** Which supplier actually makes money once everything is counted. */
+  app.get('/api/reports/by-supplier', async (request) => {
+    const { from, to } = z
+      .object({ from: z.coerce.date().optional(), to: z.coerce.date().optional() })
+      .parse(request.query);
+    return profitBySupplier(from, to);
+  });
+
+  /** What each shipper quoted against what he billed. */
+  app.get('/api/reports/freight-accuracy', async () => freightAccuracy());
+
+  /** Every rate actually paid, over time. */
+  app.get('/api/reports/rate-history', async () => rateHistory());
+
+  /** Cars whose cost has passed, or nearly passed, what they can sell for. */
+  app.get('/api/reports/at-risk', async () => carsAtRisk());
+
+  /** Twelve months of sales, cost and profit. */
+  app.get('/api/reports/trend', async (request) => {
+    const { months } = z.object({ months: z.coerce.number().min(3).max(24).default(12) }).parse(request.query);
+    return monthlyTrend(months);
+  });
+
+  /** Where money is tied up, by stage. */
+  app.get('/api/reports/stock-by-stage', async () => stockByStage());
+
+  /** Deposits held, and deposits kept when buyers walked away. */
+  app.get('/api/reports/deposits', async () => depositSummary());
+
+  /** Everything owed or held, in one call for the dashboard. */
+  app.get('/api/reports/account-totals', async () => accountTotals());
 
   app.get('/api/reports/monthly', async (request) => {
     const now = new Date();

@@ -161,6 +161,29 @@ export interface Car {
   daysInStock?: number | null;
   daysInGarage?: number | null;
   potentialProfitCfa?: string | null;
+  /** The first photo, for the list. */
+  photo?: { id: number; fileName: string } | null;
+  /** A buyer's deposit currently holding this car, if there is one. */
+  reservation?: Reservation | null;
+}
+
+export type ReservationStatus = 'ACTIVE' | 'CONVERTED' | 'REFUNDED' | 'FORFEITED';
+
+export interface Reservation {
+  id: number;
+  carId: number;
+  customerName: string;
+  customerMobile: string | null;
+  depositCfa: string;
+  date: string;
+  note: string | null;
+  status: ReservationStatus;
+  destinationAccountId: number | null;
+  closedAt: string | null;
+  closedReason: string | null;
+  daysHeld?: number;
+  car?: { id: number; year: number; makeName: string; modelName: string; vin: string; askingPriceCfa: string | null };
+  destinationAccount?: { id: number; name: string } | null;
 }
 
 export interface Shipment {

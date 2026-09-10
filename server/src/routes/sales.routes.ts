@@ -9,6 +9,7 @@ import { cfaCode } from '../lib/settings.js';
 import { D, profitOf, roundCfa, roundUsd, sum } from '../lib/money.js';
 import { post, type PostableEntry } from '../services/ledger.js';
 import { carLabel, costBreakdown, getCarWithCosts } from '../services/cars.js';
+import { ReservationStatus } from '@prisma/client';
 import { postSaleReceipt, resolveReceiptAccount } from '../services/receipts.js';
 
 const money = z.coerce.number().positive('The amount must be more than zero');
@@ -38,6 +39,8 @@ export async function saleRoutes(app: FastifyInstance) {
         originExpenses: true,
         repairJobs: true,
         repairParts: true, costAdjustments: true,
+        photos: { orderBy: { id: 'asc' }, take: 1 },
+        reservations: { where: { status: 'ACTIVE' } },
       },
       orderBy: { showroomAt: 'asc' },
     });
@@ -54,8 +57,46 @@ export async function saleRoutes(app: FastifyInstance) {
           : null,
         potentialProfitCfa:
           asking && costs.landedCostCfa ? roundCfa(D(asking.toString()).minus(costs.landedCostCfa)) : null,
+        photo: car.photos[0] ?? null,
+        reservation: car.reservations[0] ?? null,
       };
     });
+  });
+
+  /** One sale, with everything a printed receipt needs on it. */
+  app.get('/api/sales/:id', async (request) => {
+    const { id } = z.object({ id: z.coerce.number() }).parse(request.params);
+    const sale = await prisma.sale.findUnique({
+      where: { id },
+      include: {
+        payments: { orderBy: { date: 'asc' } },
+        customer: { select: { id: true, name: true, mobile: true } },
+        car: {
+          include: {
+            supplier: { select: { id: true, name: true } },
+            originExpenses: true,
+            repairJobs: true,
+            repairParts: true,
+            costAdjustments: true,
+          },
+        },
+      },
+    });
+    if (!sale) throw notFound('Sale not found');
+
+    const costs = costBreakdown(sale.car);
+    const paid =
+      sale.channel === SaleChannel.ORIGIN
+        ? roundUsd(sale.price.toString())
+        : roundCfa(sum(sale.payments.map((p) => p.amount.toString())));
+    return {
+      ...sale,
+      label: carLabel(sale.car),
+      costs,
+      paid,
+      remaining: D(sale.price.toString()).minus(paid),
+      settled: sale.channel === SaleChannel.ORIGIN || D(sale.price.toString()).minus(paid).lte(0),
+    };
   });
 
   app.get('/api/sales', async (request) => {
@@ -163,6 +204,22 @@ export async function saleRoutes(app: FastifyInstance) {
       );
     }
 
+    const reservation =
+      input.channel === SaleChannel.LOCAL
+        ? await tx.reservation.findFirst({ where: { carId: id, status: ReservationStatus.ACTIVE } })
+        : null;
+    if (reservation) {
+      const held = reservation.customerName.trim().toLowerCase();
+      if (input.buyerName.trim().toLowerCase() !== held)
+        throw new AppError(
+          `${reservation.customerName} is holding this car with a deposit of ${reservation.depositCfa}. Sell it to him, or cancel that reservation first.`,
+        );
+      if (new Prisma.Decimal(input.price).lt(reservation.depositCfa))
+        throw new AppError(
+          `The price is less than the ${reservation.depositCfa} deposit already taken. Check the price.`,
+        );
+    }
+
     if (input.customerId) {
       const customer = await tx.party.findUnique({ where: { id: input.customerId } });
       if (!customer || customer.type !== PartyType.CUSTOMER) throw notFound('Customer not found');
@@ -249,6 +306,44 @@ export async function saleRoutes(app: FastifyInstance) {
           });
         }
         await post(tx, entries, request.user?.id);
+      }
+
+      // A deposit already taken is money on this sale. It is recorded as a
+      // payment pointing at the ledger line it created when it was handed over,
+      // so it counts towards the price without the cash being counted twice.
+      if (reservation) {
+        await tx.salePayment.create({
+          data: {
+            saleId: created.id,
+            amount: reservation.depositCfa,
+            date: reservation.date,
+            method: 'deposit',
+            note: `Deposit taken on ${reservation.date.toISOString().slice(0, 10)}`,
+            destinationAccountId: reservation.destinationAccountId,
+            ledgerEntryId: reservation.ledgerEntryId,
+          },
+        });
+        await tx.reservation.update({
+          where: { id: reservation.id },
+          data: { status: ReservationStatus.CONVERTED, closedAt: input.saleDate },
+        });
+        if (input.customerId) {
+          await post(
+            tx,
+            [
+              {
+                partyId: input.customerId,
+                date: reservation.date,
+                kind: LedgerKind.SALE_PAYMENT,
+                amount: reservation.depositCfa.negated(),
+                description: `Deposit already taken — ${carLabel(car)}`,
+                carId: id,
+                saleId: created.id,
+              },
+            ],
+            request.user?.id,
+          );
+        }
       }
 
       // The money is in your hands the moment the car leaves, so it is credited
