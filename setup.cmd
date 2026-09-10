@@ -23,7 +23,7 @@ if errorlevel 1 goto nodocker
 
 echo.
 echo   [2/3] Installing - this takes a few minutes
-call npm ci
+call npm ci --include=dev
 if errorlevel 1 goto failed
 
 echo.

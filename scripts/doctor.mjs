@@ -65,6 +65,25 @@ if (!existsSync(join(root, 'node_modules'))) {
   problem('Nothing is installed yet', 'Run: npm ci');
 } else {
   ok('node_modules is present');
+
+  // The tools the steps are run with. A machine with NODE_ENV=production set
+  // makes npm skip every one of these, and the failure that follows names a
+  // missing package rather than the setting that removed it.
+  for (const tool of ['tsx', 'prisma', 'vite']) {
+    try {
+      require.resolve(`${tool}/package.json`);
+      ok(`${tool} is installed`);
+    } catch {
+      problem(
+        `${tool} is not installed - every step that needs it will fail`,
+        'Run: npm ci --include=dev',
+      );
+      if (process.env.NODE_ENV === 'production')
+        note('NODE_ENV is set to "production" on this machine, which is what makes npm skip it.');
+    }
+  }
+  if (process.env.NODE_ENV) ok(`NODE_ENV is "${process.env.NODE_ENV}"`);
+
   try {
     const client = await import('@prisma/client');
     if (typeof client.CarStatus === 'object') ok('The database client is built and matches the code');

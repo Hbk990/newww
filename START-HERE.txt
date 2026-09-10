@@ -77,7 +77,7 @@ window, and choose "Open PowerShell window here". That way the
 path is right without typing it.
 
     docker run --name showroom-db -e MYSQL_ROOT_PASSWORD=devpassword -p 3307:3306 -d mysql:8
-    npm ci
+    npm ci --include=dev
     npm run setup -- --big --db "mysql://root:devpassword@127.0.0.1:3307/carshowroom"
     npm run dev
 
@@ -173,6 +173,12 @@ Then, by symptom:
 
 "'npm' is not recognized"
     Node.js is not installed, or you did not reopen PowerShell.
+
+"Cannot find package 'tsx'"  (or prisma, or vite)
+    The tools were not installed. Almost always npm ci was never
+    finished in this folder, or NODE_ENV is set to "production" on
+    this PC, which makes npm skip them. Both are fixed by:
+        npm ci --include=dev
 
 "Could not read package.json ... C:\Users\<you>\package.json"
     The command ran in the wrong folder. This is what setup.cmd
