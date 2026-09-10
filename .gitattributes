@@ -1,0 +1,3 @@
+# Windows batch files must keep Windows line endings, whatever the machine
+# they are checked out on does by default.
+*.cmd text eol=crlf
