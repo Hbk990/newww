@@ -8,7 +8,7 @@
     "web"
   ],
   "scripts": {
-    "postinstall": "npm run generate --workspace=server",
+    "postinstall": "node server/scripts/ensure-client.mjs --soft",
     "setup": "node scripts/setup-local.mjs",
     "dev": "concurrently -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:web\"",
     "dev:api": "npm run dev --workspace=server",
@@ -21,6 +21,7 @@
     "db:seed:demo": "npm run seed:demo --workspace=server --",
     "db:seed:large": "npm run seed:large --workspace=server --",
     "create:user": "npm run create:user --workspace=server --",
+    "reset:2fa": "npm run reset:2fa --workspace=server --",
     "catalog:download": "node --import tsx server/prisma/download-vpic.ts",
     "catalog:import": "node --import tsx server/prisma/seed-vpic.ts",
     "ensure:cashbox": "npm run ensure:cashbox --workspace=server"

@@ -76,6 +76,14 @@ cd /opt/showroom/server
 npm run create:user -- yourname "a-long-passphrase-you-will-remember"
 ```
 
+If the phone holding your authenticator is ever lost, two-factor can be switched
+off from the server itself — sign in with the password, then set it up again on
+the new phone from Settings:
+
+```bash
+npm run reset:2fa -- yourname
+```
+
 ## 4. Keep it running
 
 `/etc/systemd/system/showroom.service`:

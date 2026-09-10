@@ -21,7 +21,9 @@ import {
 import { prisma, Prisma } from '../src/lib/db.js';
 import { arrivalCostSnapshot, splitFreightEqually, splitTax, wireCfaCost } from '../src/lib/money.js';
 
-const wipe = process.argv.includes('--wipe');
+// npm swallows a bare --wipe as one of its own options, so honour both the
+// argument and the setting it turns into. Typing it either way should work.
+const wipe = process.argv.includes('--wipe') || process.env.npm_config_wipe === 'true';
 const D = (v: number | string) => new Prisma.Decimal(v);
 
 if (wipe) {

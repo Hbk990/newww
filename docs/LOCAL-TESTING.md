@@ -394,14 +394,35 @@ Get-Process -Id (Get-NetTCPConnection -LocalPort 3306 -State Listen).OwningProce
 ```
 
 **"does not provide an export named 'CarStatus'"** (or any other name) — the
-code's picture of the database has not been built yet. Build it and try again:
+code's picture of the database has not been built yet. Every command builds it
+now, so this only happens on an older copy. Build it by hand:
 
 ```powershell
 npm run generate --workspace=server
 ```
 
-`npm ci` and `npm run db:migrate` now do this for you, so this only happens on
-an older copy.
+**"Could not build the code's picture of the database" / `EPERM` while
+generating** — the application is running and Windows will not let its files be
+replaced while they are open. Press Ctrl+C in the terminal running
+`npm run dev`, run the command again, then start it back up.
+
+**"http proxy error: /api/auth/me — ECONNREFUSED 127.0.0.1:4000"** — the screens
+are running but the part that holds the data is not; it stopped or never
+started. Look at the same terminal, above these lines, for the real error, or
+run the two halves apart so nothing is buried:
+
+```powershell
+npm run dev:api      # in one terminal — read any error here
+npm run dev:web      # in a second terminal
+```
+
+**It asks for a code from the authenticator and you cannot produce one** —
+switch two-factor off, sign in with the password, then set it up again from
+Settings with the phone you have now:
+
+```powershell
+npm run reset:2fa -- owner
+```
 
 **"Port 4000 (or 5173) is already in use"** — something else is using it, or an
 old copy is still running. Close the other terminal, or restart your computer.
