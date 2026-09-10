@@ -2,6 +2,7 @@ import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 
 import { env } from "@/env";
+import * as schema from "./schema";
 
 /**
  * Postgres connection.
@@ -23,5 +24,9 @@ const client = globalForDb.client ?? postgres(env.databaseUrl, { max: 1 });
 
 if (!env.isProduction) globalForDb.client = client;
 
-export const db = drizzle(client);
+/**
+ * `casing` must match drizzle.config.ts, or the runtime will query
+ * `shortDescription` while the migration created `short_description`.
+ */
+export const db = drizzle(client, { schema, casing: "snake_case" });
 export { client };

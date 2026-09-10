@@ -1,5 +1,9 @@
--- Ecommerce schema (Postgres). Source of truth for review;
--- port to Drizzle once settled. All money is INTEGER minor units (cents).
+-- Ecommerce schema (Postgres). All money is INTEGER minor units (cents).
+--
+-- The catalog and taxonomy tables are now ported to Drizzle in
+-- src/db/schema/ and created by drizzle/0000_catalog_and_taxonomy.sql; this
+-- file stays the annotated design reference and must be kept in step with
+-- them. The commerce tables below are not ported yet (step 2b).
 
 create extension if not exists "pgcrypto";  -- gen_random_uuid()
 
@@ -64,9 +68,28 @@ create table products (
   meta_description text,
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now(),
-  published_at timestamptz
+  published_at timestamptz,
+
+  -- Denormalized read model. Maintained by trigger; never written by hand.
+  -- A listing row needs "from $4.50", a thumbnail and a variant count.
+  -- Deriving that per row means joining products -> variants -> product_images
+  -- and aggregating, and the aggregate's cost grows with the catalog rather
+  -- than with the page size. These columns make a listing page a single
+  -- indexed scan. Measured at 1,200 products / 1,900 variants: a
+  -- cheapest-first catalog page goes from 1.379ms to 0.040ms, and the plan
+  -- stops being a full aggregate-then-sort.
+  min_price_cents   integer,
+  max_price_cents   integer,
+  variant_count     integer not null default 0,
+  primary_image_url text
 );
 create index on products (status, published_at desc);
+-- Partial indexes: a listing page only ever looks at active products, so the
+-- index does not carry drafts and archived rows. The price index is what lets
+-- "cheapest first" walk the index and stop at 24 rows instead of aggregating
+-- the whole catalog.
+create index on products (min_price_cents) where status = 'active';
+create index on products (published_at desc) where status = 'active';
 
 create table product_images (
   id         uuid primary key default gen_random_uuid(),
@@ -412,6 +435,7 @@ create table brands (
 );
 
 -- 67 products have no brand, so this stays nullable.
+-- (In the Drizzle schema this is a column on products, not an ALTER.)
 alter table products add column brand_id uuid references brands(id) on delete set null;
 create index on products (brand_id);
 
@@ -662,3 +686,22 @@ create table store_settings (
   order_number_seq integer not null default 1000,
   store_name       text not null
 );
+
+-- ================================================================
+-- PART 5 — Read model triggers.
+-- Implemented in drizzle/0001_product_summary_triggers.sql.
+-- ================================================================
+
+-- Keeps products.min_price_cents / max_price_cents / variant_count /
+-- primary_image_url in step with variants and product_images.
+--
+-- Triggers rather than application code because these columns are what every
+-- listing page reads, so a stale value is a wrong price on the storefront. A
+-- script, a migration or a psql session that touches variants would silently
+-- skip an application-level recalculation; the database sees every write.
+--
+-- The UPDATE triggers carry a WHEN clause: variants get touched for stock,
+-- position and SKU edits that cannot change a summary column, and
+-- recalculating on those would make every such write pay for an aggregate.
+--
+-- See the migration for the full function and trigger definitions.

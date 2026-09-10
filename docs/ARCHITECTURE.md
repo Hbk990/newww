@@ -109,6 +109,53 @@ collection fee is passed to the customer.
 ### Order state is three independent fields
 `status` (pending/open/cancelled), `payment_status` (unpaid/authorized/paid/partially_refunded/refunded), and `fulfillment_status` (unfulfilled/partial/fulfilled). One combined enum collapses under the first partial refund of a partially shipped order.
 
+## Keeping it fast
+
+Speed here is mostly a data-access problem, not a rendering one. Four decisions
+carry it:
+
+### The listing read model
+A category page row needs "from $4.50", a thumbnail and a variant count. Derived
+per row, that means joining `products → variants → product_images` and
+aggregating, and the aggregate's cost grows with the catalog rather than with
+the page size — no index removes it. So `products` carries `min_price_cents`,
+`max_price_cents`, `variant_count` and `primary_image_url`, maintained by
+trigger.
+
+Measured against 1,200 products and 1,900 variants — roughly the projected
+catalog — averaged over 200 runs:
+
+| Query | Naive join + aggregate | Read model |
+|---|---|---|
+| One category page, cheapest first | 0.765 ms | **0.236 ms** |
+| Whole catalog, cheapest first | 1.379 ms | **0.040 ms** |
+
+The absolute numbers are small either way at this size; the plan is the point.
+The naive version aggregates every matching product before it can sort, so it
+gets slower as the catalog grows. The read model walks a partial index and stops
+at 24 rows — `Index Scan using products_live_price_idx`, no sort node — so it
+costs the same at 1,200 products as at 50,000.
+
+### Partial indexes on what is actually visible
+A storefront query only ever looks at published products, so the indexes behind
+listings are `where status = 'active'`. Drafts and archived rows stay out of the
+index entirely, which keeps it small enough to stay cached.
+
+### Rollups instead of traversals
+`product_device_fit` exists so a "Shop by device" page is one indexed lookup
+rather than a join through every variant of every product. Smart collections
+resolve their rules into rows at write time rather than being evaluated per
+request. In both cases the write side absorbs the work so the read side does
+almost none.
+
+### Server rendering, and no client fetching for catalog pages
+Product and category pages are Server Components reading Postgres directly —
+no API round trip, no client-side data fetch, no loading spinner, and no JSON
+payload for data that was already on the server. Cache them and revalidate on
+publish rather than per request; the catalog changes when someone edits it, not
+continuously. Ship as little client JavaScript as possible: interactivity is the
+variant picker, the cart and search, and nothing else needs it.
+
 ## Selling in Lebanon
 
 Market facts the design has to absorb, rather than discover late:
