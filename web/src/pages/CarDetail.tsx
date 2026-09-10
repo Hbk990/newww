@@ -5,6 +5,7 @@ import { api, fmt, fmtDate, fmtUsd, todayIso, type Car, type CarStatus } from '.
 import { Alert, Card, Field, Spinner, StatusBadge, useSubmit } from '../components/ui';
 import { CarAction } from '../components/CarActions';
 import { PhotoGallery } from '../components/Photos';
+import { PriceModal } from '../components/PriceModal';
 import { MoneyInput } from '../components/MoneyInput';
 
 interface Adjustment {
@@ -280,6 +281,8 @@ export default function CarDetail() {
             </Card>
           )}
 
+          {!car.sale && costs.landedCostCfa && <PriceCard car={car} onChanged={load} />}
+
           <Card title="Photos">
             <p className="small muted" style={{ marginTop: 0 }}>
               Photograph every car the day it arrives. Weeks later, when a supplier or a shipper says
@@ -551,5 +554,61 @@ function AddExpense({ carId, disabled, onAdded }: { carId: number; disabled: boo
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * The asking price, changeable for as long as the car is unsold. Beside it sits
+ * what the car has cost, so the two numbers are never read apart.
+ */
+function PriceCard({ car, onChanged }: { car: CarDetailData; onChanged: () => void }) {
+  const { cfa } = useApp();
+  const [editing, setEditing] = useState(false);
+
+  const cost = Number(car.costs.landedCostCfa ?? 0);
+  const asking = Number(car.askingPriceCfa ?? 0);
+  const profit = asking - cost;
+
+  return (
+    <Card
+      title="Asking price"
+      action={
+        <button className="secondary small" onClick={() => setEditing(true)}>
+          {car.askingPriceCfa ? 'Change the price' : 'Set a price'}
+        </button>
+      }
+    >
+      {car.askingPriceCfa ? (
+        <div className="breakdown">
+          <div className="line">
+            <span>Asking</span>
+            <span className="amount strong">{fmt(car.askingPriceCfa)} {cfa}</span>
+          </div>
+          <div className="line">
+            <span>Cost so far</span>
+            <span className="amount">{fmt(cost)} {cfa}</span>
+          </div>
+          <div className="line total">
+            <span>{profit >= 0 ? 'Profit if it sells at that' : 'Loss if it sells at that'}</span>
+            <span className={`amount ${profit < 0 ? 'neg' : 'pos'}`}>{fmt(Math.abs(profit))} {cfa}</span>
+          </div>
+        </div>
+      ) : (
+        <p className="small muted" style={{ margin: 0 }}>
+          No price yet. It has cost {fmt(cost)} {cfa} so far.
+        </p>
+      )}
+
+      {editing && (
+        <PriceModal
+          car={car}
+          onClose={() => setEditing(false)}
+          onSaved={() => {
+            setEditing(false);
+            onChanged();
+          }}
+        />
+      )}
+    </Card>
   );
 }

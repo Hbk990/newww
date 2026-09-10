@@ -6,6 +6,7 @@ import { Alert, Card, Empty, Field, Modal, Spinner, useSubmit } from '../compone
 import { MoneyInput } from '../components/MoneyInput';
 import { PhotoThumb } from '../components/Photos';
 import { CancelReservationModal, ReserveModal } from '../components/ReserveModal';
+import { PriceModal } from '../components/PriceModal';
 
 export default function Showroom() {
   const { cfa } = useApp();
@@ -13,6 +14,7 @@ export default function Showroom() {
   const [selling, setSelling] = useState<Car | null>(null);
   const [reserving, setReserving] = useState<Car | null>(null);
   const [cancelling, setCancelling] = useState<Car | null>(null);
+  const [pricing, setPricing] = useState<Car | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -182,7 +184,11 @@ export default function Showroom() {
                       )}
                     </td>
                     <td className="num">{fmt(car.costs.landedCostCfa)}</td>
-                    <td className="num">{fmt(car.askingPriceCfa)}</td>
+                    <td className="num">
+                      <button className="link" onClick={() => setPricing(car)}>
+                        {car.askingPriceCfa ? fmt(car.askingPriceCfa) : 'Set a price'}
+                      </button>
+                    </td>
                     <td className={`num ${Number(car.potentialProfitCfa ?? 0) < 0 ? 'neg' : 'pos'}`}>
                       {fmt(car.potentialProfitCfa)}
                     </td>
@@ -222,6 +228,18 @@ export default function Showroom() {
           </>
           )}
         </Card>
+      )}
+
+      {pricing && (
+        <PriceModal
+          car={pricing}
+          onClose={() => setPricing(null)}
+          onSaved={(text) => {
+            setPricing(null);
+            setMessage(text);
+            void load();
+          }}
+        />
       )}
 
       {reserving && (
