@@ -1,8 +1,12 @@
 CAR SHOWROOM SYSTEM — START HERE
 =================================
 
-WHAT TO INSTALL FIRST
----------------------
+This is a clean install, from nothing. Follow it in order.
+Every command goes into PowerShell.
+
+
+1. INSTALL THESE TWO PROGRAMS
+-----------------------------
 1. Node.js (LTS)   https://nodejs.org
 2. Docker Desktop  https://www.docker.com/products/docker-desktop/
    - Tick "Use WSL 2", restart your PC when asked
@@ -15,28 +19,53 @@ After installing Node, CLOSE PowerShell and OPEN IT AGAIN,
 or it will not find the new commands.
 
 
-THEN RUN THESE
---------------
-Open PowerShell (Start menu -> type "powershell" -> Enter).
+2. PUT THE FOLDER SOMEWHERE
+---------------------------
+Extract the zip. Inside it is one folder called "showroom".
+Everything below assumes it sits on your Desktop, so that
+this file is at:
 
-Go to this folder. If you extracted it to C:\showroom, type:
+    C:\Users\<you>\Desktop\showroom\START-HERE.txt
 
-    cd C:\showroom
+Open PowerShell (Start menu -> type "powershell" -> Enter) and go there:
 
-Start the database (Docker only, first time):
+    cd $HOME\Desktop\showroom
 
-    docker run --name showroom-db -e MYSQL_ROOT_PASSWORD=devpassword -p 3306:3306 -d mysql:8
+If it says "cannot find path", you are pointing at the wrong
+folder. Check with:  dir
 
-Install and set up (takes a few minutes):
 
-    npm install
-    npm run setup
+3. START A DATABASE
+-------------------
+    docker run --name showroom-db -e MYSQL_ROOT_PASSWORD=devpassword -p 3307:3306 -d mysql:8
 
-When it asks about MySQL, press Enter for everything
-EXCEPT the password, where you type:   devpassword
+Port 3307 is used on purpose: 3306 is often already taken by
+another MySQL, and that clash is hard to spot later.
 
-Start it:
+Already have a container called showroom-db from before? Delete
+it first, so its old password cannot come back to haunt you:
 
+    docker rm -f showroom-db
+
+Then run the "docker run" line above.
+
+
+4. INSTALL AND SET UP
+---------------------
+    npm ci
+    npm run setup -- --big --db "mysql://root:devpassword@127.0.0.1:3307/carshowroom"
+
+That takes a few minutes. It builds the database, loads the car
+brand list, loads the practice showroom, and creates your login.
+It never asks you anything.
+
+Starting completely over later (ERASES EVERYTHING):
+
+    npm run setup -- --big --fresh --db "mysql://root:devpassword@127.0.0.1:3307/carshowroom"
+
+
+5. START IT
+-----------
     npm run dev
 
 Open your browser at:   http://localhost:5173
@@ -50,24 +79,38 @@ Press Ctrl+C in PowerShell to stop it.
 NEXT TIME YOU WANT TO USE IT
 ----------------------------
 1. Open Docker Desktop, wait for the green whale
-2. In PowerShell:   cd C:\showroom
+2. In PowerShell:   cd $HOME\Desktop\showroom
 3.                  docker start showroom-db
 4.                  npm run dev
 
 
-WHAT TO CHECK FIRST
--------------------
-The practice data has three cars mid-journey.
+WHAT YOU WILL SEE
+-----------------
+70 cars: 50 for sale, 6 being repaired, 14 already sold.
+5 suppliers (3 American, 2 Canadian), 5 shipping companies,
+5 money transfer companies, 3 cars held with a deposit.
 
-- Garage: the Mercedes shows a cost of 7,550,000.
-  Finish the repair, sell it at 9,000,000 in the Showroom.
-  The profit should be exactly 1,450,000.
+Every practice chassis number starts with TEST5, so practice
+cars can never be mistaken for real ones.
 
-- Accounts -> Pierre Tremblay: his statement runs
-  10,000 -> 10,700 -> 10,500 -> 10,800 -> 0 and says "Settled".
+Worth trying first:
 
-- Reports -> February 2026: the exchange loss of 108,000
-  appears on its own line, and the car's cost was NOT changed.
+- Garage: each car sits under the trade it is waiting for.
+  Open one, tick a trade, and list the parts it needs — a part
+  with no price yet puts a warning mark on its card, and no
+  supplier is charged until you record the part as bought.
+
+- Showroom: a car whose cost has passed its asking price shows
+  a red warning at the top. Click it to go straight to the car
+  and change the price.
+
+- Reports -> any month: gross profit, then overhead, then what
+  you actually made.
+
+When you are ready to enter your own cars, clear the practice
+data first:
+
+    npm run db:seed:large -- --wipe
 
 
 CAR BRAND LIST
@@ -87,10 +130,6 @@ the full one later:
 That takes a few minutes. Run it again any time - it only
 adds what is missing and never touches your cars.
 
-The same service decodes a VIN into make/model/year when
-you paste one. Everything else about VINs (the 17 characters,
-the check digit, spotting a duplicate) works without internet.
-
 
 FULL GUIDES (in the docs folder)
 --------------------------------
@@ -107,6 +146,26 @@ IF SOMETHING GOES WRONG
 
 "'npm' is not recognized"
     Node.js is not installed, or you did not reopen PowerShell.
+
+"ports are not available ... 3306"
+    Something else is already using that port. The instructions
+    above use 3307 to avoid it.
+
+"http proxy error ... ECONNREFUSED 127.0.0.1:4000"
+    The screens are running but the part holding your data is
+    not. Run the two halves in separate PowerShell windows so
+    the real error is not buried:
+        npm run dev:api
+        npm run dev:web
+
+"Could not build the code's picture of the database"
+    The application is running and Windows will not replace its
+    files while they are open. Press Ctrl+C where "npm run dev"
+    is running, then try again.
+
+It asks for a code from your authenticator and you cannot give one
+    npm run reset:2fa -- owner
+    Then sign in with the password and set it up again in Settings.
 
 Anything else: the PowerShell window prints the real reason.
 That message is what to go on.

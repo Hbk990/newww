@@ -185,7 +185,7 @@ ok(`Database "${dbName}" is ready at ${connection.host}:${connection.port}`);
 
 step('3. Tables');
 run('npx', ['prisma', 'migrate', 'deploy']);
-run('npx', ['prisma', 'generate']);
+run('node', ['scripts/ensure-client.mjs']);
 ok('Tables created');
 
 // --- 4. Car brands ----------------------------------------------------------
