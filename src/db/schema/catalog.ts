@@ -57,6 +57,10 @@ export const products = pgTable(
     maxPriceCents: integer(),
     variantCount: integer().notNull().default(0),
     primaryImageUrl: text(),
+    // True when any variant is buyable. Without it, an "in stock only" filter
+    // has to join inventory across every variant, which is the same aggregate
+    // problem as the price — and stock changes far more often than price.
+    inStock: boolean().notNull().default(false),
   },
   (t) => [
     index("products_status_published_idx").on(t.status, t.publishedAt.desc()),
@@ -70,6 +74,10 @@ export const products = pgTable(
     index("products_live_published_idx")
       .on(t.publishedAt.desc())
       .where(sql`${t.status} = 'active'`),
+    // "In stock, newest first" — the default listing for most shoppers.
+    index("products_buyable_idx")
+      .on(t.publishedAt.desc())
+      .where(sql`${t.status} = 'active' and ${t.inStock}`),
   ],
 );
 

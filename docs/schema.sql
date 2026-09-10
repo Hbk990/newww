@@ -81,7 +81,11 @@ create table products (
   min_price_cents   integer,
   max_price_cents   integer,
   variant_count     integer not null default 0,
-  primary_image_url text
+  primary_image_url text,
+  -- True when any variant is buyable. Without it an "in stock only" filter has
+  -- to join inventory across every variant -- the same aggregate problem as
+  -- price, and stock changes far more often than price does.
+  in_stock          boolean not null default false
 );
 create index on products (status, published_at desc);
 -- Partial indexes: a listing page only ever looks at active products, so the
@@ -90,6 +94,8 @@ create index on products (status, published_at desc);
 -- the whole catalog.
 create index on products (min_price_cents) where status = 'active';
 create index on products (published_at desc) where status = 'active';
+-- "In stock, newest first": the default listing for most shoppers.
+create index on products (published_at desc) where status = 'active' and in_stock;
 
 create table product_images (
   id         uuid primary key default gen_random_uuid(),
@@ -627,40 +633,45 @@ alter table inventory_reservations
   foreign key (cart_id) references carts(id) on delete cascade;
 
 -- ================================================================
--- PART 3 — Stock claim function.
+-- PART 3 — Functions and triggers.
+-- Implemented in drizzle/0003_commerce_functions.sql and 0004.
 -- ================================================================
-
--- Claims stock atomically and records the movement in one statement.
 --
--- Do NOT decrement inventory and insert the ledger row as two separate
--- statements: the guard on the UPDATE can filter the row out while the
--- following INSERT still runs, recording a sale that never happened. Chaining
--- the ledger insert off the UPDATE's RETURNING makes the pair inseparable, and
--- raising on an empty result turns a silent no-op into a caught error.
+-- claim_stock(variant, qty, order)
+--   Decrements inventory and writes the ledger in ONE statement, chaining the
+--   ledger insert off the update's RETURNING. Writing them separately lets the
+--   guard filter the row out while the insert still records a sale that never
+--   happened -- observed in testing, which is why the function exists.
+--   Verified: two transactions racing for one unit give one sale, one ledger
+--   row and one insufficient-stock error, never a negative balance.
 --
--- Verified under concurrency: two transactions racing for one unit produce one
--- sale, one ledger row, and one insufficient-stock exception.
-create or replace function claim_stock(p_variant uuid, p_qty int, p_order uuid)
-returns void language plpgsql as $$
-declare v_ok boolean;
-begin
-  with upd as (
-    update inventory set on_hand = on_hand - p_qty, updated_at = now()
-     where variant_id = p_variant
-       and (policy = 'continue' or (on_hand - reserved) >= p_qty)
-    returning variant_id
-  ), led as (
-    insert into inventory_ledger (variant_id, delta, reason, reference_id)
-    select variant_id, -p_qty, 'sale', p_order from upd
-    returning 1
-  )
-  select exists (select 1 from led) into v_ok;
-
-  if not v_ok then
-    raise exception 'insufficient stock for variant % (requested %)', p_variant, p_qty
-      using errcode = 'check_violation';
-  end if;
-end $$;
+-- return_stock(variant, qty, order, reason)
+--   The inverse, for refused Cash on Delivery parcels. Same single-statement
+--   shape, because putting goods back has to be as reliable as selling them.
+--
+-- next_order_number()
+--   Human-facing order numbers from store_settings.order_number_seq. A sequence
+--   would be faster but leaks gaps on every rolled-back checkout, and staff and
+--   customers read these numbers to each other.
+--
+-- refresh_product_summary(product)   -> min/max price, variant count, thumbnail
+-- refresh_product_stock(product)     -> in_stock
+-- refresh_product_device_fit(products[]) -> the device fitment rollup
+--   All three maintain the denormalized read model, driven by triggers on
+--   variants, product_images, inventory and variant_device_fit. Triggers rather
+--   than application code because these columns are what every listing page
+--   reads, so a stale value is a wrong price or a wrong "in stock" badge on the
+--   storefront, and a script or psql session would skip an app-level refresh.
+--
+--   The update triggers carry WHEN clauses so writes that cannot change a
+--   summary column -- a SKU edit, a position change -- do not each pay for an
+--   aggregate. The fitment rollup is statement-level with transition tables, so
+--   entering a 15-colour x 4-device matrix is one rebuild rather than 60.
+--
+--   0004 exists because the fitment rollup went stale when a variant was
+--   deleted: the cascade removed its fitment rows, and the statement trigger's
+--   join back to `variants` then found nothing to rebuild. Rebuilding from the
+--   variants trigger instead fixes it.
 
 -- ================================================================
 -- PART 4 — Store settings.
