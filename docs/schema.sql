@@ -9,10 +9,18 @@ create type user_role          as enum ('customer', 'staff', 'admin');
 create type product_status     as enum ('draft', 'active', 'archived');
 create type inventory_policy   as enum ('deny', 'continue');   -- allow backorder?
 create type cart_status        as enum ('active', 'converted', 'abandoned');
-create type order_status       as enum ('pending', 'open', 'cancelled');
-create type payment_status     as enum ('unpaid', 'authorized', 'paid', 'partially_refunded', 'refunded', 'failed');
+-- COD lifecycle: an order is pending until someone phones to confirm it, and
+-- only a confirmed order is dispatched. Skipping that step is how you end up
+-- paying couriers to deliver parcels nobody accepts.
+create type order_status       as enum ('pending', 'confirmed', 'cancelled');
+-- No gateway, so no 'authorized' step: cash is either collected or it is not.
+create type payment_status     as enum ('unpaid', 'paid', 'partially_refunded', 'refunded');
 create type fulfillment_status as enum ('unfulfilled', 'partial', 'fulfilled');
 create type discount_kind      as enum ('percent', 'fixed', 'free_shipping');
+-- Cash on Delivery is the only method. Kept as an enum rather than dropped
+-- because it documents intent and because adding a method later is a one-line
+-- `alter type payment_method add value 'whish'` with no table migration.
+create type payment_method     as enum ('cod');
 
 -- ---------------------------------------------------------------- identity
 
@@ -33,10 +41,11 @@ create table addresses (
   line1        text not null,
   line2        text,
   city         text not null,
-  region       text,                        -- state / province
-  postal_code  text not null,
+  region       text not null,               -- governorate; drives the shipping zone
+  postal_code  text,                        -- nullable: no reliable coverage in Lebanon
   country      char(2) not null,            -- ISO 3166-1 alpha-2
-  phone        text,
+  phone        text not null,               -- couriers need it
+  directions   text,                        -- landmark directions, how deliveries work here
   is_default   boolean not null default false,
   created_at   timestamptz not null default now()
 );
@@ -139,7 +148,7 @@ create table inventory_ledger (
   id           uuid primary key default gen_random_uuid(),
   variant_id   uuid not null references variants(id) on delete cascade,
   delta        integer not null,            -- signed
-  reason       text not null,               -- 'sale' | 'restock' | 'adjustment' | 'refund' | 'shrinkage'
+  reason       text not null,               -- 'sale' | 'restock' | 'adjustment' | 'refund' | 'shrinkage' | 'refused_delivery'
   reference_id uuid,                        -- order id, etc.
   note         text,
   created_at   timestamptz not null default now()
@@ -171,10 +180,13 @@ create table cart_items (
 
 -- ---------------------------------------------------------------- shipping
 
+-- Single-country store, so a zone is a set of governorates, not countries:
+-- Beirut, Mount Lebanon, North, Akkar, South, Nabatieh, Bekaa, Baalbek-Hermel.
 create table shipping_zones (
-  id        uuid primary key default gen_random_uuid(),
-  name      text not null,
-  countries char(2)[] not null
+  id       uuid primary key default gen_random_uuid(),
+  name     text not null,
+  regions  text[] not null,
+  position integer not null default 0
 );
 
 create table shipping_rates (
@@ -219,16 +231,24 @@ create table orders (
   discount_cents    integer not null default 0,
   shipping_cents    integer not null default 0,
   tax_cents         integer not null default 0,
-  total_cents       integer not null,
+  total_cents       integer not null,       -- what the courier must collect in cash
 
   -- Snapshots, not FKs: the customer may edit or delete the address later.
   shipping_address  jsonb not null,
   billing_address   jsonb,
   shipping_method   text,
 
+  payment_method    payment_method not null default 'cod',
+  phone             text not null,          -- couriers call ahead; not optional here
+  cod_fee_cents     integer not null default 0,  -- courier's collection fee, if passed on
+  confirmed_at      timestamptz,            -- when the confirmation call succeeded
+  confirmed_by      uuid references users(id) on delete set null,
+  confirm_attempts  integer not null default 0,
+
   cart_id           uuid references carts(id) on delete set null,
   placed_at         timestamptz,
   cancelled_at      timestamptz,
+  cancel_reason     text,                   -- 'refused_delivery' | 'customer_request' | ...
   created_at        timestamptz not null default now()
 );
 create index on orders (user_id, created_at desc);
@@ -259,29 +279,40 @@ create table order_discounts (
 
 -- ---------------------------------------------------------------- payments
 
+-- Cash actually received. There is no gateway and no checkout-time payment, so
+-- a row appears only once the courier remits: an unpaid order has none, and the
+-- absence of a row is the meaningful state.
 create table payments (
-  id                  uuid primary key default gen_random_uuid(),
-  order_id            uuid not null references orders(id) on delete cascade,
-  provider            text not null default 'stripe',
-  provider_intent_id  text not null unique,
-  amount_cents        integer not null,
-  currency            char(3) not null,
-  status              text not null,        -- mirrors Stripe's intent status
-  created_at          timestamptz not null default now()
+  id            uuid primary key default gen_random_uuid(),
+  order_id      uuid not null references orders(id) on delete cascade,
+  method        payment_method not null default 'cod',
+  amount_cents  integer not null check (amount_cents > 0),
+  currency      char(3) not null,
+  -- Couriers remit in batches; this is what you reconcile a batch against.
+  remittance_ref text,
+  courier        text,
+  collected_by  uuid references users(id) on delete set null,  -- staff who booked it
+  collected_at  timestamptz not null default now(),
+  note          text,
+  created_at    timestamptz not null default now()
 );
 create index on payments (order_id);
-
+create index on payments (remittance_ref);
+-- Cash refunds, recorded by staff. No gateway to call, so this is bookkeeping:
+-- it must reconcile against the till, hence who issued it.
 create table refunds (
-  id                 uuid primary key default gen_random_uuid(),
-  payment_id         uuid not null references payments(id) on delete cascade,
-  provider_refund_id text not null unique,
-  amount_cents       integer not null check (amount_cents > 0),
-  reason             text,
-  created_at         timestamptz not null default now()
+  id           uuid primary key default gen_random_uuid(),
+  payment_id   uuid not null references payments(id) on delete cascade,
+  amount_cents integer not null check (amount_cents > 0),
+  reason       text,
+  issued_by    uuid references users(id) on delete set null,
+  created_at   timestamptz not null default now()
 );
+create index on refunds (payment_id);
 
 -- ---------------------------------------------------------------- fulfillment
 
+-- Local couriers, so carrier is free text and there is no carrier API to call.
 create table fulfillments (
   id              uuid primary key default gen_random_uuid(),
   order_id        uuid not null references orders(id) on delete cascade,
@@ -289,6 +320,9 @@ create table fulfillments (
   tracking_number text,
   tracking_url    text,
   shipped_at      timestamptz,
+  delivered_at    timestamptz,
+  attempts        integer not null default 0,   -- COD deliveries get retried
+  refused_at      timestamptz,                  -- goods returned; stock goes back
   created_at      timestamptz not null default now()
 );
 create index on fulfillments (order_id);
@@ -303,19 +337,10 @@ create table fulfillment_items (
 
 -- ---------------------------------------------------------------- plumbing
 
--- Idempotency guard. Insert before processing; a duplicate event violates the
--- unique constraint and is safely discarded.
-create table webhook_events (
-  id                 uuid primary key default gen_random_uuid(),
-  provider           text not null,
-  provider_event_id  text not null,
-  type               text not null,
-  payload            jsonb not null,
-  received_at        timestamptz not null default now(),
-  processed_at       timestamptz,
-  error              text,
-  unique (provider, provider_event_id)
-);
+-- NOTE: there is no webhook_events table. With Cash on Delivery there is no
+-- gateway and nothing to receive, so an idempotency guard for callbacks would be
+-- a dead table. Adding an online payment method later means adding it back —
+-- deliberately deferred, not forgotten.
 
 -- Audit trail surfaced in the admin order timeline.
 create table order_events (
@@ -622,13 +647,18 @@ end $$;
 -- variant and cart: with a single currency those columns only create drift.
 -- orders and payments keep their own currency column because those are
 -- snapshots that must survive a future settings change and reconcile
--- against Stripe.
+-- against the payment gateway.
 create table store_settings (
   id               boolean primary key default true check (id),
   currency         char(3) not null,
   country          char(2) not null,        -- the one country we ship to
-  tax_rate_bps     integer not null default 0,  -- basis points; flat for v1
+  tax_rate_bps     integer not null default 1100, -- basis points; Lebanon VAT is 11%
   prices_include_tax boolean not null default false,
+  -- Display-only secondary currency (e.g. LBP shown alongside a USD price).
+  -- Never a second price list and never used for settlement.
+  display_currency      char(3),
+  display_rate          numeric(18,6),
+  display_rate_updated_at timestamptz,
   order_number_seq integer not null default 1000,
   store_name       text not null
 );
