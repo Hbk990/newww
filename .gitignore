@@ -1,0 +1,17 @@
+node_modules/
+.next/
+out/
+build/
+next-env.d.ts
+*.tsbuildinfo
+
+# Secrets — DATABASE_URL and friends. Never commit.
+.env
+.env.local
+.env*.local
+
+# Local dev database cluster
+.devdb/
+
+.DS_Store
+npm-debug.log*

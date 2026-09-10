@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+/* Design tokens. The storefront's real palette comes with the frontend work;
+   these are neutral placeholders so nothing hardcodes a colour yet. */
+@theme {
+  --color-ink: oklch(0.22 0.02 260);
+  --color-muted: oklch(0.55 0.015 260);
+  --color-line: oklch(0.91 0.005 260);
+  --color-surface: oklch(0.99 0.002 260);
+}
+
+@media (prefers-color-scheme: dark) {
+  @theme {
+    --color-ink: oklch(0.95 0.01 260);
+    --color-muted: oklch(0.68 0.015 260);
+    --color-line: oklch(0.3 0.01 260);
+    --color-surface: oklch(0.17 0.01 260);
+  }
+}
+
+body {
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
