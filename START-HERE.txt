@@ -25,7 +25,8 @@ Extract the zip. Inside it is one folder called "showroom".
 Put it wherever you like - the Desktop is fine.
 
 Open that folder. You should see setup.cmd, start.cmd,
-package.json, and folders called server, web and docs.
+doctor.cmd, package.json, and folders called server, web
+and docs.
 
 If instead you see another folder called "showroom", open it:
 the zip was extracted one level deeper than you wanted.
@@ -156,6 +157,16 @@ docs/DEPLOYMENT.md      putting it on a real server later
 
 IF SOMETHING GOES WRONG
 -----------------------
+FIRST: double-click doctor.cmd
+
+It checks everything that can be wrong - the database, the
+tables, how many cars, which logins exist, whether two-factor
+is on, whether the system is running - and prints what to do
+about each thing it finds. It only reads; it changes nothing.
+If you are asking someone for help, send them what it prints.
+
+Then, by symptom:
+
 "Could not reach MySQL"
     Docker Desktop is not running, or the database is stopped.
     Open Docker Desktop, then:  docker start showroom-db

@@ -10,6 +10,7 @@
   "scripts": {
     "postinstall": "node server/scripts/ensure-client.mjs --soft",
     "setup": "node scripts/setup-local.mjs",
+    "doctor": "node scripts/doctor.mjs",
     "dev": "concurrently -n api,web -c blue,green \"npm:dev:api\" \"npm:dev:web\"",
     "dev:api": "npm run dev --workspace=server",
     "dev:web": "npm run dev --workspace=web",

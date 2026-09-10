@@ -1,6 +1,6 @@
 /**
- * Makes sure the code's picture of the database — the Prisma client, which is
- * generated from prisma/schema.prisma — exists and matches the schema before
+ * Makes sure the code's picture of the database - the Prisma client, which is
+ * generated from prisma/schema.prisma - exists and matches the schema before
  * anything tries to use it. Without it, every command dies at its first import
  * with "does not provide an export named 'CarStatus'".
  *
@@ -26,7 +26,7 @@ const soft = process.argv.includes('--soft');
 
 const schemaHash = createHash('sha256').update(readFileSync(schemaPath)).digest('hex');
 
-/** Where the generated client landed — npm may hoist it to the repository root. */
+/** Where the generated client landed - npm may hoist it to the repository root. */
 function stampFile() {
   try {
     const require = createRequire(import.meta.url);
@@ -50,7 +50,7 @@ async function upToDate() {
 
 if (await upToDate()) process.exit(0);
 
-console.log('Building the code’s picture of the database…');
+console.log('Building the database client...');
 const generated = spawnSync('npx', ['prisma', 'generate'], {
   cwd: serverDir,
   stdio: 'inherit',
@@ -70,7 +70,7 @@ if (generated.status === 0) {
 }
 
 console.error(`
-Could not build the code's picture of the database.
+Could not build the database client.
 
 If the application is running, stop it first: Windows will not let these
 files be replaced while a running program has them open. Close the terminal
