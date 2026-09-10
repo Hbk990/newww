@@ -210,7 +210,9 @@ const PROBLEMS = [
 
 const SHOWROOM_CARS = 50;
 const SOLD_CARS = 14;
-const TOTAL = SHOWROOM_CARS + SOLD_CARS;
+/** Cars still in the garage, so the board has something on it. */
+const GARAGE_CARS = 6;
+const TOTAL = SHOWROOM_CARS + SOLD_CARS + GARAGE_CARS;
 
 /**
  * A chassis number that is obviously practice data and never a real car, and
@@ -236,6 +238,8 @@ interface Planned {
   refundMode: TaxRefundMode;
   originExpenseUsd: number | null;
   damaged: boolean;
+  /** Still being repaired: it never reaches the showroom in this data. */
+  inGarage: boolean;
 }
 
 const planned: Planned[] = [];
@@ -257,7 +261,16 @@ for (let index = 0; index < TOTAL; index++) {
     refundMode: canadian ? (index % 2 === 0 ? TaxRefundMode.SUPPLIER_CREDIT : TaxRefundMode.SEPARATE_REFUND) : TaxRefundMode.NONE,
     originExpenseUsd: chance(35) ? between(120, 700, 20) : null,
     damaged: chance(38),
+    inGarage: false,
   });
+}
+
+// Spread the cars that are still in the garage through the newer half of the
+// stock, and make sure each of them is damaged.
+for (let n = 0; n < GARAGE_CARS; n++) {
+  const spec = planned[Math.min(TOTAL - 1 - n * 3, TOTAL - 1)];
+  spec.inGarage = true;
+  spec.damaged = true;
 }
 
 // ---------------------------------------------------------------------------
@@ -381,12 +394,29 @@ for (const [groupIndex, group] of groups.entries()) {
     let repairsCfa = new Prisma.Decimal(0);
     let showroomAt = addDays(arrival, between(1, 4));
 
+    // What a damaged car is waiting for. A car still in the garage keeps at
+    // least one trade outstanding, which is what puts it in a column.
+    const needs = spec.damaged
+      ? {
+          blacksmith: chance(70),
+          painter: chance(75),
+          mechanic: chance(45),
+        }
+      : { blacksmith: false, painter: false, mechanic: false };
+    if (spec.damaged && !needs.blacksmith && !needs.painter && !needs.mechanic) needs.painter = true;
+
+    // The trades this car actually needs, in the order a body shop works them.
+    const wanted = [
+      needs.blacksmith ? SERVICES[1] : null,
+      needs.painter ? SERVICES[0] : null,
+      needs.mechanic ? SERVICES[2] : null,
+    ].filter(Boolean) as (typeof SERVICES)[number][];
+    // A car still in the garage has had some of its trades done, never all.
+    const doing = spec.inGarage ? wanted.slice(0, Math.max(0, wanted.length - 1)) : wanted;
+
     if (spec.damaged) {
-      const jobs = between(1, 3);
       const finished = addDays(arrival, between(9, 28));
-      // A repair cannot have been finished tomorrow.
-      for (let n = 0; n < jobs; n++) {
-        const service = SERVICES[(spec.index + n) % SERVICES.length];
+      for (const service of doing) {
         const labour = D(between(service.labour[0], service.labour[1], 5000));
         const worker = workers[service.worker];
         const job = await prisma.repairJob.create({
@@ -398,7 +428,7 @@ for (const [groupIndex, group] of groups.entries()) {
         await prisma.repairJob.update({ where: { id: job.id }, data: { ledgerEntryId: entry.id } });
         repairsCfa = repairsCfa.plus(labour);
       }
-      if (chance(70)) {
+      if (doing.length > 0 && chance(70)) {
         const cost = D(between(45000, 380000, 5000));
         const from = pick(partsSuppliers);
         const part = await prisma.repairPart.create({
@@ -421,12 +451,15 @@ for (const [groupIndex, group] of groups.entries()) {
     await prisma.car.update({
       where: { id: car.id },
       data: {
-        status: CarStatus.SHOWROOM,
+        status: spec.inGarage ? CarStatus.IN_GARAGE : CarStatus.SHOWROOM,
         damaged: spec.damaged,
         driveAndRun: !spec.damaged || chance(60),
+        needsBlacksmith: needs.blacksmith,
+        needsPainter: needs.painter,
+        needsMechanic: needs.mechanic,
         arrivedAt: arrival,
         arrivalNote: spec.damaged ? 'Damage confirmed on arrival, sent to the garage' : null,
-        showroomAt,
+        showroomAt: spec.inGarage ? null : showroomAt,
         cfaRate: D(snapshot.cfaRate.toString()),
         purchaseCfa: D(snapshot.purchaseCfa.toString()),
         originExpensesCfa: D(snapshot.originExpensesCfa.toString()),
@@ -436,6 +469,9 @@ for (const [groupIndex, group] of groups.entries()) {
         askingPriceCfa: asking,
       },
     });
+
+    // A car still in the garage is neither for sale nor sold.
+    if (spec.inGarage) continue;
 
     made.push({ id: car.id, label: `${spec.year} ${spec.make} ${spec.model}`, landed, asking, showroomAt });
   }
@@ -692,12 +728,13 @@ for (let month = 0; month < 11; month++) {
 // ---------------------------------------------------------------------------
 
 const inShowroom = await prisma.car.count({ where: { status: CarStatus.SHOWROOM } });
+const inGarage = await prisma.car.count({ where: { status: CarStatus.IN_GARAGE } });
 const stock = await prisma.car.aggregate({ where: { status: CarStatus.SHOWROOM }, _sum: { arrivalCostCfa: true } });
 
 console.log(`
 Practice data loaded.
 
-  ${carsMade} cars in total — ${inShowroom} standing in the showroom, ${sales} already sold
+  ${carsMade} cars in total — ${inShowroom} in the showroom, ${inGarage} in the garage, ${sales} sold
   5 suppliers: 3 in the USA, 2 in Canada (both invoice tax)
   ${shippers.length} shipping companies · ${transferCompanies.length} money transfer companies + your cash box
   ${groups.length} shipments, each with its own locked rate

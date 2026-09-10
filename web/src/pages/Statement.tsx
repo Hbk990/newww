@@ -4,6 +4,18 @@ import { PageHeader, useApp } from '../App';
 import { api, fmt, fmtDate, type Statement } from '../lib/api';
 import { Alert, Balance, Card, Empty, Spinner } from '../components/ui';
 
+/**
+ * AN ACCOUNT, AS A TIMELINE.
+ *
+ * A statement is a story in date order: he bought a car, you sent a wire, he
+ * credited the tax back. A spreadsheet grid hides that; a line down the page
+ * with the days marked on it shows it. Money in one direction is green, money
+ * the other way is red, and the running balance sits under each amount so you
+ * can always answer "how did it get to this?".
+ *
+ * The printed version stays a table — that is what a supplier expects on paper.
+ */
+
 const KIND_LABELS: Record<string, string> = {
   OPENING_BALANCE: 'Opening balance',
   CAR_PURCHASE: 'Car bought',
@@ -124,7 +136,47 @@ export default function StatementPage() {
         {data.lines.length === 0 ? (
           <Empty>Nothing has moved on this account yet.</Empty>
         ) : (
-          <div className="table-wrap">
+          <>
+          <div className="timeline no-print">
+            {data.lines.map((line, index) => {
+              const day = fmtDate(line.date);
+              const newDay = index === 0 || fmtDate(data.lines[index - 1].date) !== day;
+              // Coloured by what it means for you, not by its sign: on a
+              // supplier's account a new car is a debt going up, which is not
+              // good news, while the payment that clears it is.
+              const raw = Number(line.amount);
+              const positiveIsGood =
+                data.party.type === 'TRANSFER_COMPANY' || data.party.type === 'CUSTOMER';
+              const out = raw === 0 ? false : (raw > 0) !== positiveIsGood;
+              return (
+                <div key={line.id}>
+                  {newDay && <div className="day">{day}</div>}
+                  <div className={`entry ${out ? 'out' : 'in'}`}>
+                    <div className="what">
+                      <div className="kind">{KIND_LABELS[line.kind] ?? line.kind}</div>
+                      <div className="desc">{line.description}</div>
+                      {line.kind !== 'REVERSAL' && (
+                        <button className="link small" onClick={() => void reverse(line.id)}>
+                          Reverse this
+                        </button>
+                      )}
+                    </div>
+                    <div className="amounts">
+                      <span className="amount">
+                        {raw < 0 ? '−' : '+'}
+                        {fmt(String(line.amount).replace('-', ''))}
+                      </span>
+                      <div className="running">
+                        balance {fmt(line.runningBalance)} {currency}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="table-wrap print-only-block">
             <table>
               <thead>
                 <tr>
@@ -156,6 +208,7 @@ export default function StatementPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
         <div className="small muted" style={{ marginTop: 10 }}>
           Lines are never edited or deleted. A mistake is cancelled with a reversal, so the history

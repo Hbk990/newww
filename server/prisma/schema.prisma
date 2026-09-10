@@ -334,6 +334,14 @@ model Car {
   damaged     Boolean   @default(false)
   driveAndRun Boolean   @default(false)
 
+  /// What the car is waiting for in the garage, ticked when its condition is
+  /// set on arrival. Without this the garage board can only show what has been
+  /// done, never what is still owed — and "what is left" is the question a
+  /// garage is actually asked.
+  needsBlacksmith Boolean @default(false)
+  needsPainter    Boolean @default(false)
+  needsMechanic   Boolean @default(false)
+
   // shipment link
   shipmentId       Int?
   freightShareUsd  Decimal? @db.Decimal(18, 4) // equal split by default, editable

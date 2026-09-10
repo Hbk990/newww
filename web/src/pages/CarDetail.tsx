@@ -325,6 +325,9 @@ function ArrivalCard({ car, onChanged }: { car: CarDetailData; onChanged: () => 
   const [damaged, setDamaged] = useState(car.damaged);
   const [driveAndRun, setDriveAndRun] = useState(car.driveAndRun);
   const [note, setNote] = useState(car.arrivalNote ?? '');
+  // Which trades it is waiting for. Ticked here, it lands in the right column
+  // of the garage board instead of a pile of "damaged" cars.
+  const [needs, setNeeds] = useState({ blacksmith: false, painter: false, mechanic: false });
 
   const arrived = car.status === 'ARRIVED';
   const alreadySet = ['IN_GARAGE', 'SHOWROOM', 'SOLD'].includes(car.status);
@@ -334,6 +337,9 @@ function ArrivalCard({ car, onChanged }: { car: CarDetailData; onChanged: () => 
       damaged,
       driveAndRun,
       arrivalNote: note || null,
+      needsBlacksmith: needs.blacksmith,
+      needsPainter: needs.painter,
+      needsMechanic: needs.mechanic,
     });
     onChanged();
     return true;
@@ -382,6 +388,29 @@ function ArrivalCard({ car, onChanged }: { car: CarDetailData; onChanged: () => 
           <div className="small muted">Sends the car to the garage instead of the showroom.</div>
         </label>
       </div>
+
+      {damaged && arrived && (
+        <div style={{ margin: '4px 0 4px 26px' }}>
+          <div className="small muted" style={{ marginBottom: 2 }}>
+            What does it need? It goes to that column of the garage board.
+          </div>
+          {([
+            ['blacksmith', 'Blacksmith — body work'],
+            ['painter', 'Painter'],
+            ['mechanic', 'Mechanic'],
+          ] as const).map(([key, label]) => (
+            <div className="checkbox" key={key}>
+              <input
+                type="checkbox"
+                id={`needs-${key}`}
+                checked={needs[key]}
+                onChange={(e) => setNeeds({ ...needs, [key]: e.target.checked })}
+              />
+              <label htmlFor={`needs-${key}`}>{label}</label>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className={`checkbox${arrived ? '' : ' disabled'}`}>
         <input

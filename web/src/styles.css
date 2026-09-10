@@ -981,3 +981,344 @@ button.link:hover:not(:disabled) {
   border-color: var(--text);
   color: var(--surface);
 }
+
+/* ---------- A shipment, drawn as the voyage it is ---------- */
+
+.voyage {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  animation: rise 240ms var(--ease) both;
+  transition: box-shadow 200ms var(--ease), border-color 200ms var(--ease), transform 200ms var(--ease);
+}
+.voyage:hover { box-shadow: var(--shadow-lift); transform: translateY(-2px); }
+.voyage .head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.voyage .figures { display: flex; gap: 22px; flex-wrap: wrap; }
+.voyage .figures .figure .k {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+.voyage .figures .figure .v { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* The line the cars travel along: three stops, and the boat sits at the one
+   the shipment has actually reached. */
+.track {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 6px 0 14px;
+}
+.track::before {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 9px;
+  height: 2px;
+  background: var(--border-strong);
+  border-radius: 2px;
+}
+.track .stop { position: relative; text-align: center; }
+.track .stop .dot {
+  width: 20px;
+  height: 20px;
+  margin: 0 auto 6px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 2px solid var(--border-strong);
+  display: grid;
+  place-items: center;
+  position: relative;
+  z-index: 1;
+  transition: background 200ms var(--ease), border-color 200ms var(--ease), transform 200ms var(--ease);
+}
+.track .stop.done .dot { background: var(--chart-3); border-color: var(--chart-3); }
+.track .stop.here .dot {
+  background: var(--primary);
+  border-color: var(--primary);
+  transform: scale(1.25);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+.track .stop .what { font-size: 12.5px; font-weight: 600; }
+.track .stop .when { font-size: 12px; color: var(--muted); }
+.track .stop.todo .what { color: var(--muted); font-weight: 500; }
+
+.car-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ---------- The garage, as a board ---------- */
+
+.board {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(220px, 1fr);
+  gap: 12px;
+  align-items: start;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+@media (max-width: 900px) {
+  /* On a phone the board stacks rather than scrolling sideways forever. */
+  .board { grid-auto-flow: row; grid-auto-columns: auto; }
+}
+.column {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px;
+  min-height: 90px;
+}
+.column > h3 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.column > h3 .count {
+  background: var(--surface-3);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 12px;
+  color: var(--text);
+}
+.job {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--trade, var(--border-strong));
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  margin-bottom: 8px;
+  animation: rise 220ms var(--ease) both;
+  transition: transform 180ms var(--ease), box-shadow 180ms var(--ease);
+}
+.job:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
+.job .who { font-weight: 700; font-size: 14px; }
+.job .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.job .money {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+  font-variant-numeric: tabular-nums;
+}
+.job .trades { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; }
+.trade-dot {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.trade-dot.done { background: var(--success-bg); border-color: var(--success); color: var(--success); }
+.trade-dot.waiting { background: var(--warning-bg); border-color: var(--warning); color: var(--warning); }
+
+/* ---------- A statement, as a timeline ---------- */
+
+.timeline { position: relative; padding-left: 26px; }
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  background: var(--border);
+}
+.timeline .day {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin: 14px 0 6px -26px;
+  padding-left: 26px;
+}
+.timeline .entry {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.timeline .entry:last-child { border-bottom: none; }
+.timeline .entry::before {
+  content: '';
+  position: absolute;
+  left: -24px;
+  top: 15px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 2px solid var(--border-strong);
+}
+.timeline .entry.in::before { border-color: var(--success); background: var(--success); }
+.timeline .entry.out::before { border-color: var(--danger); background: var(--danger); }
+.timeline .entry .what { min-width: 0; }
+.timeline .entry .kind { font-weight: 600; font-size: 13.5px; }
+.timeline .entry .desc { font-size: 12.5px; color: var(--muted); }
+.timeline .entry .amounts { text-align: right; white-space: nowrap; }
+.timeline .entry .amount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 9px;
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 13.5px;
+}
+.timeline .entry.in .amount { background: var(--success-bg); color: var(--success); }
+.timeline .entry.out .amount { background: var(--danger-bg); color: var(--danger); }
+.timeline .entry .running { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+/* ---------- One thing at a time ---------- */
+
+.steps { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.steps .step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 8px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: all 180ms var(--ease);
+}
+.steps .step .n {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-3);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+.steps .step.on { border-color: var(--primary); color: var(--text); box-shadow: var(--ring); }
+.steps .step.on .n { background: var(--primary); color: var(--on-primary); }
+.steps .step.done .n { background: var(--success); color: #fff; }
+
+.sticky-total { position: sticky; top: 16px; }
+
+/* ---------- Jump to anything ---------- */
+
+.palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(6, 10, 20, 0.5);
+  backdrop-filter: blur(3px);
+  display: flex;
+  justify-content: center;
+  padding-top: 12vh;
+  animation: fade 140ms var(--ease) both;
+}
+.palette {
+  width: min(620px, 94vw);
+  height: fit-content;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lift);
+  overflow: hidden;
+  animation: rise 180ms var(--ease) both;
+}
+.palette input {
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  padding: 14px 16px;
+  font-size: 16px;
+}
+.palette input:focus { box-shadow: none; border-color: var(--border); }
+.palette .results { overflow-y: auto; padding: 6px; }
+.palette .result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.palette .result.on { background: var(--primary-soft); border-color: var(--primary); }
+.palette .result .title { font-weight: 600; font-size: 14px; }
+.palette .result .sub { font-size: 12px; color: var(--muted); }
+.palette .foot {
+  border-top: 1px solid var(--border);
+  padding: 7px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  gap: 14px;
+}
+kbd {
+  font: inherit;
+  font-size: 11px;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 0 5px;
+  background: var(--surface-2);
+}
+
+/* A block that exists only on paper — the statement keeps its table there. */
+.print-only-block { display: none; }
+@media print {
+  .print-only-block { display: block; }
+}
+
+.sidebar .jump {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 8px;
+  background: var(--rail-hover);
+  border-color: transparent;
+  color: var(--rail-text);
+  font-weight: 500;
+  font-size: 13px;
+  padding: 7px 10px;
+}
+.sidebar .jump:hover { background: #223046; color: #fff; box-shadow: none; }
+.sidebar .jump kbd { background: transparent; color: var(--rail-group); border-color: var(--rail-group); }
+
+/* Reversing a line is rare and permanent: it stays out of sight until you are
+   actually on the line. */
+.timeline .entry button.link { opacity: 0; transition: opacity 140ms var(--ease); }
+.timeline .entry:hover button.link,
+.timeline .entry button.link:focus-visible { opacity: 1; }

@@ -266,7 +266,13 @@ export async function carRoutes(app: FastifyInstance) {
     const input = purchaseInput
       .partial()
       .omit({ supplierId: true, originExpenses: true, taxUsd: true, taxRefundMode: true })
-      .extend({ damaged: z.boolean().optional(), driveAndRun: z.boolean().optional() })
+      .extend({
+        damaged: z.boolean().optional(),
+        driveAndRun: z.boolean().optional(),
+        needsBlacksmith: z.boolean().optional(),
+        needsPainter: z.boolean().optional(),
+        needsMechanic: z.boolean().optional(),
+      })
       .parse(request.body);
 
     if (input.purchasePriceUsd !== undefined && !isEditableCost(before.status))
@@ -296,6 +302,10 @@ export async function carRoutes(app: FastifyInstance) {
             : {}),
           ...(input.damaged !== undefined ? { damaged: input.damaged } : {}),
           ...(input.driveAndRun !== undefined ? { driveAndRun: input.driveAndRun } : {}),
+          // What the car is still waiting for in the garage.
+          ...(input.needsBlacksmith !== undefined ? { needsBlacksmith: input.needsBlacksmith } : {}),
+          ...(input.needsPainter !== undefined ? { needsPainter: input.needsPainter } : {}),
+          ...(input.needsMechanic !== undefined ? { needsMechanic: input.needsMechanic } : {}),
         },
       });
 

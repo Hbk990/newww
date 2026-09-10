@@ -282,6 +282,58 @@ describe('photos', () => {
   });
 });
 
+describe('what a car is waiting for in the garage', () => {
+  it('records the trades ticked on arrival, and clears them when it is not damaged', async () => {
+    const car = await api('POST', '/api/cars', {
+      supplierId: ids.usa,
+      makeName: 'Toyota', modelName: 'Hilux', year: 2019, color: 'Grey',
+      vin: '4T1B11HK5LU200010', purchasePriceUsd: 8000, purchaseDate: '2026-01-10',
+    });
+    const shipment = await api('POST', `/api/cars/${car.id}/ship`, {
+      reference: 'Container garage', shippingCompanyId: ids.shipper, departureDate: '2026-01-20',
+    });
+    await api('POST', `/api/shipments/${shipment.id}/arrive`, {
+      cfaRate: 600, freightCostUsd: 900, arrivalDate: '2026-02-15',
+    });
+
+    await api('POST', `/api/cars/${car.id}/arrival-condition`, {
+      damaged: true, driveAndRun: false, needsPainter: true, needsMechanic: true,
+    });
+
+    const garage = await api('GET', '/api/garage');
+    const row = garage.find((c: { id: number }) => c.id === car.id);
+    expect(row.needsPainter).toBe(true);
+    expect(row.needsMechanic).toBe(true);
+    expect(row.needsBlacksmith).toBe(false);
+    // Nothing has been done yet, so it is waiting for both.
+    expect(row.servicesDone).toEqual([]);
+  });
+
+  it('leaves a car that is not damaged waiting for nothing', async () => {
+    const car = await api('POST', '/api/cars', {
+      supplierId: ids.usa,
+      makeName: 'Toyota', modelName: 'Camry', year: 2019, color: 'White',
+      vin: '4T1B11HK5LU200011', purchasePriceUsd: 8000, purchaseDate: '2026-01-10',
+    });
+    const shipment = await api('POST', `/api/cars/${car.id}/ship`, {
+      reference: 'Container clean', shippingCompanyId: ids.shipper, departureDate: '2026-01-20',
+    });
+    await api('POST', `/api/shipments/${shipment.id}/arrive`, {
+      cfaRate: 600, freightCostUsd: 900, arrivalDate: '2026-02-15',
+    });
+
+    // Ticking a trade on a car that is not damaged must not follow it into the
+    // showroom, or the garage board would show a car that is not there.
+    await api('POST', `/api/cars/${car.id}/arrival-condition`, {
+      damaged: false, driveAndRun: true, needsPainter: true,
+    });
+
+    const full = await api('GET', `/api/cars/${car.id}`);
+    expect(full.status).toBe('SHOWROOM');
+    expect(full.needsPainter).toBe(false);
+  });
+});
+
 describe('the analysis pages', () => {
   it('separates suppliers, and counts repairs against the one whose car needed them', async () => {
     const damaged = await carInShowroom({

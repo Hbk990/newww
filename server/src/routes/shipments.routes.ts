@@ -571,6 +571,11 @@ export async function shipmentRoutes(app: FastifyInstance) {
         damaged: z.boolean(),
         driveAndRun: z.boolean(),
         arrivalNote: z.string().optional().nullable(),
+        /** Which trades the car is waiting for, so the garage board can show
+         *  what is left rather than only what has been done. */
+        needsBlacksmith: z.boolean().optional(),
+        needsPainter: z.boolean().optional(),
+        needsMechanic: z.boolean().optional(),
       })
       .parse(request.body);
 
@@ -587,6 +592,10 @@ export async function shipmentRoutes(app: FastifyInstance) {
         damaged: input.damaged,
         driveAndRun: input.driveAndRun,
         arrivalNote: input.arrivalNote || null,
+        // A car that is not damaged is waiting for nothing.
+        needsBlacksmith: input.damaged ? (input.needsBlacksmith ?? false) : false,
+        needsPainter: input.damaged ? (input.needsPainter ?? false) : false,
+        needsMechanic: input.damaged ? (input.needsMechanic ?? false) : false,
         status: nextStatus,
         ...(nextStatus === CarStatus.SHOWROOM ? { showroomAt: new Date() } : {}),
       },

@@ -4,6 +4,17 @@ import { PageHeader } from '../App';
 import { api, fmt, fmtDate, fmtUsd, todayIso, type Car, type Party, type Shipment } from '../lib/api';
 import { Alert, Card, Empty, Field, Modal, Spinner, useSubmit } from '../components/ui';
 import { MoneyInput, hasAmount, moneyValue } from '../components/MoneyInput';
+import { Chip } from '../components/Chip';
+import { CarMark, ShipMark } from '../components/icons';
+
+/**
+ * SHIPMENTS, DRAWN AS VOYAGES.
+ *
+ * A shipment is not a row of figures, it is cars in a container somewhere
+ * between a port in America and your yard. The strip shows where each one has
+ * got to, what it is costing, and which cars are aboard — the three things you
+ * would ask if you telephoned the shipping company.
+ */
 
 const STATUS_BADGE: Record<string, string> = {
   DRAFT: 'grey',
@@ -27,7 +38,7 @@ export default function Shipments() {
   }, []);
 
   return (
-    <>
+    <div className="page">
       <PageHeader
         title="Shipments"
         sub="One car alone is simply a shipment with one car in it"
@@ -36,55 +47,15 @@ export default function Shipments() {
 
       <Alert kind="error">{error}</Alert>
 
-      <Card>
-        {!shipments ? (
-          <Spinner />
-        ) : shipments.length === 0 ? (
+      {!shipments ? (
+        <Spinner />
+      ) : shipments.length === 0 ? (
+        <Card>
           <Empty>No shipments yet. Create one and add the cars that are travelling together.</Empty>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Shipping company</th>
-                  <th>Cars on board</th>
-                  <th className="num">Freight</th>
-                  <th className="num">Rate</th>
-                  <th>Departed</th>
-                  <th>Arrived</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {shipments.map((shipment) => (
-                  <tr key={shipment.id}>
-                    <td className="strong">
-                      <Link to={`/shipments/${shipment.id}`}>{shipment.shippingCompany.name}</Link>
-                    </td>
-                    <td className="small">
-                      {shipment.cars.map((car) => (
-                        <div key={car.id}>
-                          {car.year} {car.makeName} {car.modelName}
-                        </div>
-                      ))}
-                      {shipment.cars.length === 0 && <span className="muted">no cars yet</span>}
-                    </td>
-                    <td className="num">{fmtUsd(shipment.freightCostUsd)}</td>
-                    <td className="num">{shipment.cfaRate ? fmt(shipment.cfaRate) : '—'}</td>
-                    <td className="small">{fmtDate(shipment.departureDate)}</td>
-                    <td className="small">{fmtDate(shipment.arrivalDate)}</td>
-                    <td>
-                      <span className={`badge ${STATUS_BADGE[shipment.status]}`}>
-                        {shipment.status.toLowerCase()}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
+        </Card>
+      ) : (
+        shipments.map((shipment) => <Voyage key={shipment.id} shipment={shipment} />)
+      )}
 
       {creating && (
         <NewShipment
@@ -95,7 +66,103 @@ export default function Shipments() {
           }}
         />
       )}
-    </>
+    </div>
+  );
+}
+
+/** One shipment: where it is, what it costs, and who is aboard. */
+function Voyage({ shipment }: { shipment: Shipment }) {
+  const stops = [
+    {
+      what: 'Loaded',
+      when: shipment.departureDate,
+      reached: shipment.status !== 'DRAFT',
+    },
+    {
+      what: 'At sea',
+      when: shipment.status === 'SHIPPED' ? shipment.departureDate : null,
+      reached: shipment.status !== 'DRAFT',
+    },
+    {
+      what: 'Arrived',
+      when: shipment.arrivalDate,
+      reached: shipment.status === 'ARRIVED',
+    },
+  ];
+  // Where the shipment is now: the last stop it has reached.
+  const here = stops.reduce((last, stop, index) => (stop.reached ? index : last), -1);
+
+  return (
+    <div className="voyage">
+      <div className="head">
+        <div>
+          <Link to={`/shipments/${shipment.id}`} className="name-link" style={{ fontSize: 17 }}>
+            {shipment.shippingCompany.name}
+          </Link>
+          <div className="small muted">
+            {shipment.reference} · {shipment.cars.length} car
+            {shipment.cars.length === 1 ? '' : 's'}{' '}
+            <span className={`badge ${STATUS_BADGE[shipment.status]}`}>
+              {shipment.status.toLowerCase()}
+            </span>
+          </div>
+        </div>
+
+        <div className="figures">
+          <div className="figure">
+            <div className="k">Freight</div>
+            <div className="v">{fmtUsd(shipment.freightCostUsd)}</div>
+          </div>
+          <div className="figure">
+            <div className="k">Rate locked</div>
+            <div className="v">{shipment.cfaRate ? fmt(shipment.cfaRate) : '—'}</div>
+          </div>
+          <div className="figure">
+            <div className="k">Each car</div>
+            <div className="v">
+              {shipment.cars.length > 0
+                ? fmtUsd((Number(shipment.freightCostUsd) / shipment.cars.length).toFixed(2))
+                : '—'}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="track">
+        {stops.map((stop, index) => (
+          <div
+            key={stop.what}
+            className={`stop ${index === here ? 'here' : stop.reached ? 'done' : 'todo'}`}
+          >
+            <div className="dot">
+              {index === here && (
+                <span style={{ color: '#fff', display: 'grid', placeItems: 'center' }}>
+                  <ShipMark size={12} />
+                </span>
+              )}
+            </div>
+            <div className="what">{stop.what}</div>
+            <div className="when">{stop.when ? fmtDate(stop.when) : '—'}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="car-chips">
+        {shipment.cars.length === 0 ? (
+          <span className="small muted">No cars aboard yet.</span>
+        ) : (
+          shipment.cars.map((car) => (
+            <Chip
+              key={car.id}
+              to={`/cars/${car.id}`}
+              kind="car"
+              name={`${car.year} ${car.makeName} ${car.modelName}`}
+              icon={<CarMark size={14} />}
+            />
+          ))
+        )}
+      </div>
+    </div>
   );
 }
 

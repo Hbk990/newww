@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { BrowserRouter, NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { api, type Settings } from './lib/api';
 import { useTheme } from './lib/theme';
+import { CommandBar } from './components/CommandBar';
 import { Spinner } from './components/ui';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -77,6 +78,7 @@ export default function App() {
     <AppContext.Provider value={context}>
       <BrowserRouter>
         <div className="app">
+          <CommandBar />
           <Sidebar businessName={session.settings.businessName} onSignOut={context.signOut} />
           <div className="main">
             <Routes>
@@ -116,6 +118,14 @@ function Sidebar({ businessName, onSignOut }: { businessName: string; onSignOut:
   return (
     <nav className="sidebar">
       <div className="brand">{businessName}</div>
+
+      <button
+        type="button"
+        className="jump"
+        onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))}
+      >
+        Jump to… <kbd>Ctrl K</kbd>
+      </button>
 
       {item('/', 'Dashboard')}
 
