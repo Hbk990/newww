@@ -72,7 +72,6 @@ From inside the new folder:
 ```powershell
 npm ci
 npm run db:migrate
-npm run generate --workspace=server
 npm run build
 ```
 
@@ -94,7 +93,7 @@ Sign in and check the dashboard shows the same number of cars as before.
 | Command | What it does | Can it lose data? |
 |---|---|---|
 | `npm run db:migrate` | Adds the new tables and columns | **No** — it only adds |
-| `npm run generate` | Rebuilds the code's picture of the database | No, it touches no data |
+| `npm ci` | Installs the code, and rebuilds the code's picture of the database | No, it touches no data |
 | `npm run build` | Rebuilds the screens | No |
 | `npm run db:seed:demo -- --wipe` | Loads practice data | **YES — erases cars and accounts** |
 | `npm run db:seed:large -- --wipe` | Loads the 50-car practice data | **YES — erases cars and accounts** |

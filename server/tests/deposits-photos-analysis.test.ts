@@ -21,7 +21,7 @@ const PASSWORD = 'Test-Showroom-2026';
 async function resetDatabase() {
   await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 0');
   for (const table of [
-    'LedgerEntry', 'SalePayment', 'Sale', 'RepairJob', 'RepairPart', 'OriginExpense',
+    'LedgerEntry', 'SalePayment', 'Sale', 'RepairJob', 'PartNeeded', 'RepairPart', 'OriginExpense',
     'CostAdjustment', 'Transaction', 'OverheadExpense', 'CarPhoto', 'Reservation',
     'Car', 'Shipment', 'Party', 'AuditLog', 'Session', 'RecoveryCode', 'User', 'Setting',
   ]) {

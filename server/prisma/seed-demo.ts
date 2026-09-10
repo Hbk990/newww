@@ -28,7 +28,7 @@ if (wipe) {
   console.log('Erasing all business data…');
   await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 0');
   for (const table of [
-    'LedgerEntry', 'SalePayment', 'Sale', 'RepairJob', 'RepairPart', 'OriginExpense',
+    'LedgerEntry', 'SalePayment', 'Sale', 'RepairJob', 'PartNeeded', 'RepairPart', 'OriginExpense',
     'Transaction', 'OverheadExpense', 'Car', 'Shipment', 'Party',
   ]) {
     await prisma.$executeRawUnsafe(`TRUNCATE TABLE \`${table}\``);

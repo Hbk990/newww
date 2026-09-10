@@ -38,6 +38,10 @@ async function car(status: CarStatus = 'PURCHASED') {
 }
 async function shipment(cars: number[]) {
   const shipper = await party('SHIPPING_COMPANY');
+  // The API refuses a shipment when no car is waiting to be shipped. These
+  // tests build empty draft shipments on purpose, so keep one car waiting.
+  if (!cars.length && !(await prisma.car.count({ where: { status: 'PURCHASED', active: true } })))
+    await car();
   return ok('POST', '/api/shipments', { reference: `R-${++serial}`, shippingCompanyId: shipper.id,
     freightCostUsd: 100, carIds: cars });
 }

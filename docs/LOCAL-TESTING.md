@@ -393,6 +393,16 @@ To see what is holding 3306:
 Get-Process -Id (Get-NetTCPConnection -LocalPort 3306 -State Listen).OwningProcess
 ```
 
+**"does not provide an export named 'CarStatus'"** (or any other name) — the
+code's picture of the database has not been built yet. Build it and try again:
+
+```powershell
+npm run generate --workspace=server
+```
+
+`npm ci` and `npm run db:migrate` now do this for you, so this only happens on
+an older copy.
+
 **"Port 4000 (or 5173) is already in use"** — something else is using it, or an
 old copy is still running. Close the other terminal, or restart your computer.
 

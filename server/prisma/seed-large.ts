@@ -60,7 +60,7 @@ if (wipe) {
   console.log('Erasing every car, account and movement…');
   await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 0');
   for (const table of [
-    'LedgerEntry', 'SalePayment', 'Sale', 'RepairJob', 'RepairPart', 'OriginExpense',
+    'LedgerEntry', 'SalePayment', 'Sale', 'RepairJob', 'PartNeeded', 'RepairPart', 'OriginExpense',
     'CostAdjustment', 'Transaction', 'OverheadExpense', 'CarPhoto', 'Reservation',
     'Car', 'Shipment', 'Party',
   ]) {
@@ -439,6 +439,30 @@ for (const [groupIndex, group] of groups.entries()) {
         });
         await prisma.repairPart.update({ where: { id: part.id }, data: { ledgerEntryId: entry.id } });
         repairsCfa = repairsCfa.plus(cost);
+      }
+      // What a car in the garage is still waiting for. This is a plan, not a
+      // cost: nobody is charged for it until the part is recorded as bought.
+      // A few lines are left without a price on purpose, so the board shows the
+      // warning mark and you can see what an incomplete list looks like.
+      if (spec.inGarage) {
+        const waiting = wanted.filter((service) => !doing.includes(service));
+        const catalogue: Record<string, string[]> = {
+          PAINTER: ['Base coat and hardener, two litres', 'Clear coat and thinner'],
+          BLACKSMITH: ['Front wing, right side', 'Bonnet catch and brackets'],
+          MECHANIC: ['Front discs and brake pads', 'Radiator and hoses'],
+        };
+        const lines = waiting.flatMap((service) => catalogue[service.type] ?? []).slice(0, 3);
+        for (const [index, description] of lines.entries()) {
+          await prisma.partNeeded.create({
+            data: {
+              carId: car.id,
+              description,
+              partsSupplierId: chance(75) ? pick(partsSuppliers).id : null,
+              estimatedCostCfa: index === 0 || chance(55) ? D(between(20000, 220000, 5000)) : null,
+              createdAt: addDays(arrival, between(3, 10)),
+            },
+          });
+        }
       }
       showroomAt = finished > today ? today : finished;
     }
