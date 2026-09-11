@@ -7,6 +7,7 @@ import {
   pgTable,
   text,
   timestamp,
+  unique,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -103,6 +104,14 @@ export const inventoryReservations = pgTable(
   (t) => [
     index("inventory_reservations_expires_idx").on(t.expiresAt),
     index("inventory_reservations_cart_idx").on(t.cartId),
+    /**
+     * One hold per line, mirroring `cart_items`' own uniqueness.
+     *
+     * Changing the quantity in a cart has to update the hold rather than add a
+     * second one: without this, a shopper nudging the quantity from 1 to 2 to 3
+     * would accumulate three rows holding six units.
+     */
+    unique("inventory_reservations_cart_variant_key").on(t.cartId, t.variantId),
     check("inventory_reservations_quantity_positive", sql`${t.quantity} > 0`),
   ],
 );
