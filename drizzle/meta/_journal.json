@@ -141,6 +141,13 @@
       "when": 1789142842644,
       "tag": "0019_image_metadata",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1789153873626,
+      "tag": "0020_adjust_stock",
+      "breakpoints": true
     }
   ]
 }
