@@ -46,11 +46,29 @@ export const storeSettings = pgTable(
     displayRate: numeric({ precision: 18, scale: 6 }),
     displayRateUpdatedAt: timestamp({ withTimezone: true }),
     storeName: text().notNull(),
+    logoUrl: text(),
+    phone: text(),
+    whatsappNumber: text(),
+    // IANA name. Orders are stored in UTC; this only affects how times are
+    // shown to staff and customers.
+    timezone: text().notNull().default("Asia/Beirut"),
+    // Prefix on human-facing order numbers: DR-20260911-00001.
+    orderNumberPrefix: text().notNull().default("DR"),
+    freeDeliveryThresholdCents: integer(),
+    defaultLowStockThreshold: integer(),
     /**
      * While true the storefront sends `noindex` and blocks crawlers, so a
      * half-finished catalog never gets indexed. Turn it off at launch.
      */
     isPrivate: boolean().notNull().default(true),
+    /**
+     * Storefront shows a holding page; staff keep full access.
+     *
+     * Distinct from `isPrivate`, which only asks search engines not to index —
+     * a private site is still fully browsable to anyone with the URL.
+     */
+    maintenanceMode: boolean().notNull().default(false),
+    maintenanceMessage: text(),
   },
   (t) => [check("store_settings_single_row", sql`${t.id}`)],
 );

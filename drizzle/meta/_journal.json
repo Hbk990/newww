@@ -78,6 +78,27 @@
       "when": 1789103178113,
       "tag": "0010_availability_mode",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1789104725913,
+      "tag": "0011_admin_hardening",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1789104741343,
+      "tag": "0012_append_only_logs",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1789104832602,
+      "tag": "0013_decouple_history",
+      "breakpoints": true
     }
   ]
 }

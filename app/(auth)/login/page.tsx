@@ -39,6 +39,11 @@ export default async function LoginPage() {
       </ActionForm>
 
       <p className="mt-6 text-sm text-muted">
+        <Link href="/forgot" className="text-ink underline underline-offset-4">
+          Forgot your password?
+        </Link>
+      </p>
+      <p className="mt-2 text-sm text-muted">
         No account yet?{" "}
         <Link href="/register" className="text-ink underline underline-offset-4">
           Create one

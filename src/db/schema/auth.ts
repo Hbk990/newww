@@ -3,6 +3,7 @@ import {
   boolean,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -72,6 +73,15 @@ export const sessions = pgTable(
     tokenHash: text().notNull().unique(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     lastSeenAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    /**
+     * When the password was last re-entered on this session.
+     *
+     * Sensitive operations require this to be recent, so a borrowed unlocked
+     * laptop cannot change payment settings or export the customer list. Held
+     * on the session, not the user, because freshness is a property of this
+     * device right now.
+     */
+    reauthenticatedAt: timestamp({ withTimezone: true }),
     expiresAt: timestamp({ withTimezone: true }).notNull(),
     revokedAt: timestamp({ withTimezone: true }),
     // Shown on a "your sessions" screen so someone can recognize a login that
@@ -154,5 +164,41 @@ export const authAttempts = pgTable(
   (t) => [
     index("auth_attempts_identifier_idx").on(t.identifier, t.createdAt.desc()),
     index("auth_attempts_ip_idx").on(t.ipAddress, t.createdAt.desc()),
+  ],
+);
+
+/**
+ * Guards against the same request being processed twice.
+ *
+ * A double-tapped checkout on a slow connection sends the request twice; the
+ * first is still in flight when the second arrives, so disabling the button
+ * changes nothing. Without this the customer gets two orders and one parcel
+ * they did not ask for.
+ *
+ * `key` is the primary key, which is what makes the guard work: the second
+ * request's insert hits the constraint instead of racing. `requestHash` is
+ * compared too, so reusing a key with a different body is refused rather than
+ * silently replaying someone else's answer. `response` holds the first
+ * outcome, so a genuine retry gets the original order back rather than an
+ * error.
+ */
+export const idempotencyKeys = pgTable(
+  "idempotency_keys",
+  {
+    key: text().primaryKey(),
+    // 'order.create' | 'stock.adjust' | 'payment.record'
+    scope: text().notNull(),
+    userId: uuid().references(() => users.id, { onDelete: "set null" }),
+    requestHash: text().notNull(),
+    response: jsonb(),
+    // 'in_progress' | 'completed'
+    status: text().notNull().default("in_progress"),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp({ withTimezone: true }),
+  },
+  (t) => [
+    index("idempotency_keys_scope_idx").on(t.scope, t.createdAt.desc()),
+    // Sweeping old keys: a key is only useful while a retry might arrive.
+    index("idempotency_keys_created_idx").on(t.createdAt),
   ],
 );

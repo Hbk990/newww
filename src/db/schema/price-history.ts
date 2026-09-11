@@ -1,6 +1,5 @@
 import { index, integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
-import { variants } from "./catalog";
 import { users } from "./identity";
 
 /**
@@ -19,9 +18,9 @@ export const priceHistory = pgTable(
   "price_history",
   {
     id: uuid().primaryKey().defaultRandom(),
-    variantId: uuid()
-      .notNull()
-      .references(() => variants.id, { onDelete: "cascade" }),
+    // Loose reference, like the stock ledger: price history outlives the
+    // variant, and a cascade could not run against an append-only table.
+    variantId: uuid().notNull(),
     // 'price' | 'cost' | 'sale_price'
     field: text().notNull(),
     oldCents: integer(),

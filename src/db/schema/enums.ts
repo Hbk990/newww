@@ -161,3 +161,16 @@ export const verificationPurpose = pgEnum("verification_purpose", [
   "email_verify",
   "password_reset",
 ]);
+
+/**
+ * A staff or customer account's standing.
+ *
+ * Suspended and disabled rather than deleted: an account with history attached
+ * has audit entries and orders pointing at it, and deleting the row would
+ * orphan the record of what that person did.
+ */
+export const accountStatus = pgEnum("account_status", [
+  "active",
+  "suspended",
+  "disabled",
+]);

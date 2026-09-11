@@ -9,7 +9,12 @@ import { users, verificationCodes } from "@/db/schema";
 import { sendMail, verificationEmail } from "@/lib/mail";
 
 import { checkPasswordLength, hashPassword, verifyPassword } from "./password";
-import { createSession, currentUser, destroySession } from "./session";
+import {
+  createSession,
+  currentUser,
+  destroySession,
+  revokeAllSessions,
+} from "./session";
 import { clientIp, isThrottled, recordAttempt } from "./throttle";
 import {
   CODE_MAX_ATTEMPTS,
@@ -240,7 +245,11 @@ export async function signIn(
 
   const lowered = identifier.toLowerCase();
   const rows = await db
-    .select({ id: users.id, passwordHash: users.passwordHash })
+    .select({
+      id: users.id,
+      passwordHash: users.passwordHash,
+      status: users.status,
+    })
     .from(users)
     .where(
       sql`lower(${users.email}) = ${lowered} or lower(${users.username}) = ${lowered}`,
@@ -261,6 +270,14 @@ export async function signIn(
 
   if (!row || !ok) return { error: GENERIC_SIGNIN_ERROR };
 
+  /**
+   * Checked after the password, and reported as the same generic error.
+   *
+   * Saying "this account is suspended" to someone who guessed the password
+   * confirms both that the account exists and that they guessed right.
+   */
+  if (row.status !== "active") return { error: GENERIC_SIGNIN_ERROR };
+
   await recordAttempt("password", identifier, ip, true);
   await createSession(row.id, { ipAddress: ip, userAgent });
   redirect("/");
@@ -277,4 +294,225 @@ const DUMMY_HASH =
 export async function signOut(): Promise<void> {
   await destroySession();
   redirect("/login");
+}
+
+// ---------------------------------------------------------------- password
+
+/**
+ * Change the password while signed in.
+ *
+ * Requires the current password even though the session is already valid: a
+ * borrowed unlocked laptop should not be able to lock the owner out of their
+ * own account. Every other session is revoked afterwards, because a password
+ * change that leaves old sessions alive protects nothing.
+ */
+export async function changePassword(
+  _prev: FormState,
+  form: FormData,
+): Promise<FormState> {
+  const user = await currentUser();
+  if (!user) redirect("/login");
+
+  const current = String(form.get("current") ?? "");
+  const next = String(form.get("password") ?? "");
+  const { ip, userAgent } = await requestContext();
+
+  const problem = checkPasswordLength(next);
+  if (problem) return { error: problem };
+  if (next === current) return { error: "That is your current password." };
+
+  if (await isThrottled("password", user.email, ip)) return { error: TOO_MANY };
+
+  const rows = await db
+    .select({ passwordHash: users.passwordHash })
+    .from(users)
+    .where(eq(users.id, user.id))
+    .limit(1);
+
+  /**
+   * A Google-only account has no password to confirm. Setting one is a
+   * different operation — it needs the email re-verified, not a current
+   * password — so it is refused here rather than quietly allowed.
+   */
+  const hash = rows[0]?.passwordHash ?? null;
+  if (!hash) {
+    return {
+      error:
+        "This account signs in with Google and has no password. " +
+        "Use Forgot password to set one.",
+    };
+  }
+
+  if (!(await verifyPassword(hash, current))) {
+    await recordAttempt("password", user.email, ip, false);
+    return { error: "Your current password is not right." };
+  }
+
+  await db
+    .update(users)
+    .set({
+      passwordHash: await hashPassword(next),
+      mustChangePassword: false,
+    })
+    .where(eq(users.id, user.id));
+
+  await revokeAllSessions(user.id);
+  // Revoking everything logged this device out too, so issue a fresh session
+  // rather than bouncing someone who just proved who they are.
+  await createSession(user.id, { ipAddress: ip, userAgent });
+
+  redirect("/");
+}
+
+/**
+ * Start a password reset.
+ *
+ * Always reports success, whether or not the address has an account. Saying
+ * "no account with that email" turns this form into a way to discover who is
+ * registered.
+ */
+export async function requestPasswordReset(
+  _prev: FormState,
+  form: FormData,
+): Promise<FormState> {
+  const email = normalizeEmail(form.get("email"));
+  const { ip } = await requestContext();
+  const reassurance = {
+    notice: `If ${email} has an account, a reset code is on its way.`,
+  };
+
+  if (!looksLikeEmail(email)) return { error: "Enter a valid email address." };
+  if (await isThrottled("resend", email, ip)) return { error: TOO_MANY };
+  await recordAttempt("resend", email, ip, true);
+
+  const rows = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(sql`lower(${users.email}) = ${email}`)
+    .limit(1);
+
+  const found = rows[0];
+  if (!found) return reassurance;
+
+  const code = newVerificationCode();
+  await db
+    .update(verificationCodes)
+    .set({ consumedAt: new Date() })
+    .where(
+      and(
+        eq(verificationCodes.userId, found.id),
+        eq(verificationCodes.purpose, "password_reset"),
+        isNull(verificationCodes.consumedAt),
+      ),
+    );
+  await db.insert(verificationCodes).values({
+    userId: found.id,
+    purpose: "password_reset",
+    codeHash: hashCode(code),
+    sentTo: email,
+    expiresAt: new Date(Date.now() + CODE_TTL_MINUTES * 60_000),
+  });
+
+  try {
+    await sendMail({
+      to: email,
+      subject: `${code} is your DRPHONE password reset code`,
+      text: [
+        `Your password reset code is ${code}`,
+        "",
+        "It expires in 10 minutes. If you didn't ask to reset your password,",
+        "ignore this email — nothing has been changed.",
+      ].join("\n"),
+    });
+  } catch (error) {
+    console.error("Password reset email failed to send:", error);
+  }
+
+  return reassurance;
+}
+
+/**
+ * Finish a password reset: email, code and new password together.
+ *
+ * All three in one form so no half-authenticated state has to be carried in a
+ * cookie between steps. The person has the email open; asking for the address
+ * again costs them nothing.
+ */
+export async function resetPassword(
+  _prev: FormState,
+  form: FormData,
+): Promise<FormState> {
+  const email = normalizeEmail(form.get("email"));
+  const submitted = String(form.get("code") ?? "").replace(/\D/g, "");
+  const next = String(form.get("password") ?? "");
+  const { ip, userAgent } = await requestContext();
+
+  const problem = checkPasswordLength(next);
+  if (problem) return { error: problem };
+
+  if (await isThrottled("code", email, ip)) return { error: TOO_MANY };
+  await recordAttempt("code", email, ip, false);
+
+  const rows = await db
+    .select({
+      codeId: verificationCodes.id,
+      codeHash: verificationCodes.codeHash,
+      attempts: verificationCodes.attempts,
+      expiresAt: verificationCodes.expiresAt,
+      userId: users.id,
+      status: users.status,
+    })
+    .from(verificationCodes)
+    .innerJoin(users, eq(users.id, verificationCodes.userId))
+    .where(
+      and(
+        sql`lower(${users.email}) = ${email}`,
+        eq(verificationCodes.purpose, "password_reset"),
+        isNull(verificationCodes.consumedAt),
+      ),
+    )
+    .orderBy(sql`${verificationCodes.createdAt} desc`)
+    .limit(1);
+
+  const record = rows[0];
+  // One message for a wrong code, an expired code and an address with no
+  // outstanding reset: the difference is only useful to someone guessing.
+  const badCode = { error: "That code is not right, or it has expired." };
+  if (!record) return badCode;
+  if (record.expiresAt <= new Date()) return badCode;
+  if (record.attempts >= CODE_MAX_ATTEMPTS) {
+    return { error: "Too many wrong codes. Start again." };
+  }
+
+  if (!codeMatches(record.codeHash, submitted)) {
+    await db
+      .update(verificationCodes)
+      .set({ attempts: record.attempts + 1 })
+      .where(eq(verificationCodes.id, record.codeId));
+    return badCode;
+  }
+
+  if (record.status !== "active") return badCode;
+
+  await db
+    .update(verificationCodes)
+    .set({ consumedAt: new Date() })
+    .where(eq(verificationCodes.id, record.codeId));
+
+  await db
+    .update(users)
+    .set({
+      passwordHash: await hashPassword(next),
+      mustChangePassword: false,
+      // Proving control of the address doubles as verifying it.
+      emailVerifiedAt: new Date(),
+    })
+    .where(eq(users.id, record.userId));
+
+  // Whoever else was signed in loses their session — the point of a reset.
+  await revokeAllSessions(record.userId);
+  await recordAttempt("code", email, ip, true);
+  await createSession(record.userId, { ipAddress: ip, userAgent });
+
+  redirect("/");
 }

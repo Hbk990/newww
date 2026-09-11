@@ -18,6 +18,20 @@ const SESSION_DAYS = 30;
 /** Refresh `lastSeenAt` at most this often, so a page view is not a write. */
 const TOUCH_AFTER_MINUTES = 60;
 
+/**
+ * Staff and admin sessions also expire after this long without use.
+ *
+ * Eight hours covers a full shift without a second sign-in, and expires a
+ * session left open on a shop computer overnight. Customers are deliberately
+ * exempt: signing someone out mid-purchase costs a sale and protects nothing —
+ * a customer session can reach that customer's own orders and nothing else.
+ *
+ * `TOUCH_AFTER_MINUTES` must stay well below this, or a session could be
+ * declared idle while it was in fact being used — its `lastSeenAt` simply had
+ * not been written yet.
+ */
+const STAFF_IDLE_HOURS = 8;
+
 export type SessionUser = {
   id: string;
   email: string;
@@ -25,7 +39,12 @@ export type SessionUser = {
   name: string | null;
   avatarUrl: string | null;
   role: "customer" | "staff" | "admin";
+  status: "active" | "suspended" | "disabled";
   emailVerified: boolean;
+  mustChangePassword: boolean;
+  /** Whether the password was re-entered recently enough on this device. */
+  reauthenticatedAt: Date | null;
+  sessionId: string;
 };
 
 export async function createSession(
@@ -42,6 +61,13 @@ export async function createSession(
     ipAddress: meta.ipAddress ?? null,
     userAgent: meta.userAgent ?? null,
   });
+
+  // Denormalized onto the user so "when was this account last used" survives
+  // session pruning.
+  await db
+    .update(users)
+    .set({ lastLoginAt: new Date() })
+    .where(eq(users.id, userId));
 
   const store = await cookies();
   store.set(SESSION_COOKIE, token, {
@@ -88,8 +114,11 @@ export async function currentUser(): Promise<SessionUser | null> {
       username: users.username,
       name: users.name,
       avatarUrl: users.avatarUrl,
+      reauthenticatedAt: sessions.reauthenticatedAt,
       role: users.role,
+      status: users.status,
       emailVerifiedAt: users.emailVerifiedAt,
+      mustChangePassword: users.mustChangePassword,
     })
     .from(sessions)
     .innerJoin(users, eq(users.id, sessions.userId))
@@ -99,6 +128,32 @@ export async function currentUser(): Promise<SessionUser | null> {
   const row = rows[0];
   if (!row) return null;
   if (row.revokedAt || row.expiresAt <= new Date()) return null;
+
+  /**
+   * A suspended or disabled account reads as signed out, and its session is
+   * revoked on the way past so it cannot be used again. Checked here rather
+   * than only at sign-in, so suspending someone takes effect on their next
+   * request instead of whenever their cookie happens to expire.
+   */
+  if (row.status !== "active") {
+    await db
+      .update(sessions)
+      .set({ revokedAt: new Date() })
+      .where(eq(sessions.id, row.sessionId));
+    return null;
+  }
+
+  const isStaff = row.role === "staff" || row.role === "admin";
+  if (
+    isStaff &&
+    Date.now() - row.lastSeenAt.getTime() > STAFF_IDLE_HOURS * 3_600_000
+  ) {
+    await db
+      .update(sessions)
+      .set({ revokedAt: new Date() })
+      .where(eq(sessions.id, row.sessionId));
+    return null;
+  }
 
   if (Date.now() - row.lastSeenAt.getTime() > TOUCH_AFTER_MINUTES * 60_000) {
     await db
@@ -114,8 +169,23 @@ export async function currentUser(): Promise<SessionUser | null> {
     name: row.name,
     avatarUrl: row.avatarUrl,
     role: row.role,
+    status: row.status,
     emailVerified: row.emailVerifiedAt !== null,
+    mustChangePassword: row.mustChangePassword,
+    reauthenticatedAt: row.reauthenticatedAt,
+    sessionId: row.sessionId,
   };
+}
+
+/**
+ * Records that the password was just re-entered on this session, unlocking the
+ * operations in `REAUTH_REQUIRED` for a short window.
+ */
+export async function markReauthenticated(sessionId: string): Promise<void> {
+  await db
+    .update(sessions)
+    .set({ reauthenticatedAt: new Date() })
+    .where(eq(sessions.id, sessionId));
 }
 
 /** Signs out this device. The cookie is cleared and the row revoked, because

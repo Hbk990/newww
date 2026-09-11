@@ -12,7 +12,7 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import { userRole } from "./enums";
+import { accountStatus, userRole } from "./enums";
 
 export const users = pgTable(
   "users",
@@ -48,6 +48,19 @@ export const users = pgTable(
     // Google URL expires.
     avatarUrl: text(),
     role: userRole().notNull().default("customer"),
+    status: accountStatus().notNull().default("active"),
+    /**
+     * Set when an account is created with a temporary password, or after a
+     * suspected leak. Every authenticated route sends the person to change it
+     * before anything else.
+     */
+    mustChangePassword: boolean().notNull().default(false),
+    /**
+     * Last successful sign-in. Denormalized from the session rows rather than
+     * derived, because sessions get pruned and this is exactly the field you
+     * want when asking "is anyone still using this account".
+     */
+    lastLoginAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

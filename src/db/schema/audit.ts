@@ -9,7 +9,6 @@ import {
   uuid,
 } from "drizzle-orm/pg-core";
 
-import { users } from "./identity";
 
 /**
  * Who changed what, when, and what it was before.
@@ -26,7 +25,13 @@ export const auditLog = pgTable(
   "audit_log",
   {
     id: uuid().primaryKey().defaultRandom(),
-    actorId: uuid().references(() => users.id, { onDelete: "set null" }),
+    /**
+     * Loose reference. `on delete set null` would be an UPDATE against an
+     * append-only table and is therefore impossible — and nulling the actor is
+     * the opposite of what an audit log is for. Accounts are suspended rather
+     * than deleted anyway.
+     */
+    actorId: uuid(),
     // 'product' | 'variant' | 'order' | 'inventory' | 'store_settings' | ...
     entityType: text().notNull(),
     entityId: uuid(),

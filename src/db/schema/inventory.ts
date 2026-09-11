@@ -118,9 +118,18 @@ export const inventoryLedger = pgTable(
   "inventory_ledger",
   {
     id: uuid().primaryKey().defaultRandom(),
-    variantId: uuid()
-      .notNull()
-      .references(() => variants.id, { onDelete: "cascade" }),
+    /**
+     * A loose reference, with no foreign key, for the same reason
+     * `auditLog.entityId` has none: the ledger has to outlive the variant it
+     * describes.
+     *
+     * A cascade here would also be unenforceable — deleting a variant would try
+     * to delete its ledger rows, which the append-only trigger refuses, so no
+     * variant with any stock history could ever be removed. A deleted variant's
+     * movements are still reconcilable, and the sale itself survives in
+     * `orderItems`, which snapshots what was bought.
+     */
+    variantId: uuid().notNull(),
     // Signed: negative for a sale, positive for a restock or a return.
     delta: integer().notNull(),
     // 'sale' | 'restock' | 'adjustment' | 'refund' | 'shrinkage' | 'refused_delivery'

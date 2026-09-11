@@ -18,6 +18,9 @@ Read these before changing anything structural:
 - [`docs/DECISIONS-PRODUCT-FORM.md`](docs/DECISIONS-PRODUCT-FORM.md) — the 45
   product-form decisions, and why inventory tracks availability rather than
   quantities
+- [`docs/DECISIONS-AUTH-ADMIN.md`](docs/DECISIONS-AUTH-ADMIN.md) — the 50 auth
+  and admin-shell decisions, the permission function, and the append-only
+  audit log
 
 ## Getting started
 
@@ -92,6 +95,10 @@ refuses to run in production.
 Google sign-in is hidden unless `GOOGLE_CLIENT_ID` is set. Create an OAuth 2.0
 Client ID (type: Web application) in Google Cloud — free — and add your origin
 under "Authorized JavaScript origins".
+
+Permission checks go through `can(user, permission)` in
+`src/lib/auth/permissions.ts` — never `user.role === "admin"`. That is
+deliberate: it keeps the choice of three roles from being baked into every page.
 
 To make yourself staff after registering:
 
