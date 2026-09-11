@@ -1,0 +1,848 @@
+{
+  "device_brands": [
+    {
+      "slug": "apple",
+      "name": "Apple",
+      "position": 0
+    },
+    {
+      "slug": "samsung",
+      "name": "Samsung",
+      "position": 1
+    },
+    {
+      "slug": "xiaomi",
+      "name": "Xiaomi",
+      "position": 2
+    },
+    {
+      "slug": "infinix",
+      "name": "Infinix",
+      "position": 3
+    },
+    {
+      "slug": "tecno",
+      "name": "Tecno",
+      "position": 4
+    }
+  ],
+  "device_models": [
+    {
+      "brand": "Apple",
+      "family": "iPad",
+      "slug": "apple-ipad-10",
+      "name": "iPad 10",
+      "labels": [
+        "Ipad 10",
+        "IPAD 10"
+      ],
+      "count": 3
+    },
+    {
+      "brand": "Apple",
+      "family": "iPad",
+      "slug": "apple-ipad-11",
+      "name": "iPad 11",
+      "labels": [
+        "Ipad 11 A16",
+        "IPAD 11 A16"
+      ],
+      "count": 3
+    },
+    {
+      "brand": "Apple",
+      "family": "iPad",
+      "slug": "apple-ipad-9",
+      "name": "iPad 9",
+      "labels": [
+        "Ipad 9",
+        "IPAD 9"
+      ],
+      "count": 2
+    },
+    {
+      "brand": "Apple",
+      "family": "iPad",
+      "slug": "apple-ipad-air-10-9",
+      "name": "iPad Air 10.9",
+      "labels": [
+        "Air 10.9\""
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Apple",
+      "family": "iPad",
+      "slug": "apple-ipad-pro-11",
+      "name": "iPad Pro 11",
+      "labels": [
+        "Ipad Pro 11\""
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Apple",
+      "family": "iPad",
+      "slug": "apple-ipad-pro-11-2020",
+      "name": "iPad Pro 11 (2020)",
+      "labels": [
+        "Ipad Pro 11 (2020)"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Apple",
+      "family": "iPad",
+      "slug": "apple-ipad-pro-11-2024",
+      "name": "iPad Pro 11 (2024)",
+      "labels": [
+        "Pro 11 2024"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Apple",
+      "family": "iPad",
+      "slug": "apple-ipad-pro-12-9",
+      "name": "iPad Pro 12.9",
+      "labels": [
+        "12.9"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Apple",
+      "family": "iPad",
+      "slug": "apple-ipad-pro-13",
+      "name": "iPad Pro 13",
+      "labels": [
+        "Pro 13"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Apple",
+      "family": "iPhone",
+      "slug": "apple-iphone-11",
+      "name": "iPhone 11",
+      "labels": [
+        "11"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Apple",
+      "family": "iPhone",
+      "slug": "apple-iphone-11-pro",
+      "name": "iPhone 11 Pro",
+      "labels": [
+        "11 Pro"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Apple",
+      "family": "iPhone",
+      "slug": "apple-iphone-11-pro-max",
+      "name": "iPhone 11 Pro Max",
+      "labels": [
+        "11 Pro Max",
+        "11 PRO MAX"
+      ],
+      "count": 2
+    },
+    {
+      "brand": "Apple",
+      "family": "iPhone",
+      "slug": "apple-iphone-12",
+      "name": "iPhone 12",
+      "labels": [
+        "12"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Apple",
+      "family": "iPhone",
+      "slug": "apple-iphone-12-pro",
+      "name": "iPhone 12 Pro",
+      "labels": [
+        "12 Pro"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Apple",
+      "family": "iPhone",
+      "slug": "apple-iphone-12-pro-max",
+      "name": "iPhone 12 Pro Max",
+      "labels": [
+        "12 Pro Max",
+        "12 PRO MAX"
+      ],
+      "count": 4
+    },
+    {
+      "brand": "Apple",
+      "family": "iPhone",
+      "slug": "apple-iphone-13",
+      "name": "iPhone 13",
+      "labels": [
+        "13"
+      ],
+      "count": 2
+    },
+    {
+      "brand": "Apple",
+      "family": "iPhone",
+      "slug": "apple-iphone-13-pro",
+      "name": "iPhone 13 Pro",
+      "labels": [
+        "13 Pro",
+        "13 PRO"
+      ],
+      "count": 7
+    },
+    {
+      "brand": "Apple",
+      "family": "iPhone",
+      "slug": "apple-iphone-13-pro-max",
+      "name": "iPhone 13 Pro Max",
+      "labels": [
+        "13 Pro Max",
+        "13 PRO MAX"
+      ],
+      "count": 6
+    },
+    {
+      "brand": "Apple",
+      "family": "iPhone",
+      "slug": "apple-iphone-14",
+      "name": "iPhone 14",
+      "labels": [
+        "14"
+      ],
+      "count": 2
+    },
+    {
+      "brand": "Apple",
+      "family": "iPhone",
+      "slug": "apple-iphone-14-pro",
+      "name": "iPhone 14 Pro",
+      "labels": [
+        "14 Pro",
+        "14 PRO"
+      ],
+      "count": 7
+    },
+    {
+      "brand": "Apple",
+      "family": "iPhone",
+      "slug": "apple-iphone-14-pro-max",
+      "name": "iPhone 14 Pro Max",
+      "labels": [
+        "14 Pro Max",
+        "14 PRO MAX",
+        "14 Pro Mac"
+      ],
+      "count": 12
+    },
+    {
+      "brand": "Apple",
+      "family": "iPhone",
+      "slug": "apple-iphone-15",
+      "name": "iPhone 15",
+      "labels": [
+        "15"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Apple",
+      "family": "iPhone",
+      "slug": "apple-iphone-15-pro",
+      "name": "iPhone 15 Pro",
+      "labels": [
+        "15 Pro",
+        "15 PRO"
+      ],
+      "count": 5
+    },
+    {
+      "brand": "Apple",
+      "family": "iPhone",
+      "slug": "apple-iphone-15-pro-max",
+      "name": "iPhone 15 Pro Max",
+      "labels": [
+        "15 Pro Max",
+        "15 PRO MAX"
+      ],
+      "count": 13
+    },
+    {
+      "brand": "Apple",
+      "family": "iPhone",
+      "slug": "apple-iphone-16",
+      "name": "iPhone 16",
+      "labels": [
+        "16"
+      ],
+      "count": 8
+    },
+    {
+      "brand": "Apple",
+      "family": "iPhone",
+      "slug": "apple-iphone-16-plus",
+      "name": "iPhone 16 Plus",
+      "labels": [
+        "16 PLUS"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Apple",
+      "family": "iPhone",
+      "slug": "apple-iphone-16-pro",
+      "name": "iPhone 16 Pro",
+      "labels": [
+        "16 Pro",
+        "16 PRO"
+      ],
+      "count": 10
+    },
+    {
+      "brand": "Apple",
+      "family": "iPhone",
+      "slug": "apple-iphone-16-pro-max",
+      "name": "iPhone 16 Pro Max",
+      "labels": [
+        "16 Pro Max",
+        "16 PRO MAX",
+        "16 Pro MAX",
+        "16 pro MAX"
+      ],
+      "count": 14
+    },
+    {
+      "brand": "Apple",
+      "family": "iPhone",
+      "slug": "apple-iphone-17",
+      "name": "iPhone 17",
+      "labels": [
+        "17"
+      ],
+      "count": 6
+    },
+    {
+      "brand": "Apple",
+      "family": "iPhone",
+      "slug": "apple-iphone-17-air",
+      "name": "iPhone 17 Air",
+      "labels": [
+        "17 Air",
+        "17 AIR"
+      ],
+      "count": 3
+    },
+    {
+      "brand": "Apple",
+      "family": "iPhone",
+      "slug": "apple-iphone-17-pro",
+      "name": "iPhone 17 Pro",
+      "labels": [
+        "17 Pro",
+        "17 PRO"
+      ],
+      "count": 9
+    },
+    {
+      "brand": "Apple",
+      "family": "iPhone",
+      "slug": "apple-iphone-17-pro-max",
+      "name": "iPhone 17 Pro Max",
+      "labels": [
+        "17 Pro Max",
+        "17 PRO MAX",
+        "17 pro Max"
+      ],
+      "count": 11
+    },
+    {
+      "brand": "Apple",
+      "family": "iPhone",
+      "slug": "apple-iphone-18-pro",
+      "name": "iPhone 18 Pro",
+      "labels": [
+        "18 Pro"
+      ],
+      "count": 3
+    },
+    {
+      "brand": "Apple",
+      "family": "iPhone",
+      "slug": "apple-iphone-18-pro-max",
+      "name": "iPhone 18 Pro Max",
+      "labels": [
+        "18 Pro Max",
+        "18 Pro MAX"
+      ],
+      "count": 4
+    },
+    {
+      "brand": "Infinix",
+      "family": "Hot",
+      "slug": "infinix-hot-40",
+      "name": "Hot 40",
+      "labels": [
+        "HOT 40"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Infinix",
+      "family": "Hot",
+      "slug": "infinix-hot-40i",
+      "name": "Hot 40i",
+      "labels": [
+        "HOT 40I"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Infinix",
+      "family": "Hot",
+      "slug": "infinix-hot-50",
+      "name": "Hot 50",
+      "labels": [
+        "Hot 50 4G"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Infinix",
+      "family": "Hot",
+      "slug": "infinix-hot-50-pro",
+      "name": "Hot 50 Pro",
+      "labels": [
+        "HOT 50 Pro 4G"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Infinix",
+      "family": "Hot",
+      "slug": "infinix-hot-50-pro-plus",
+      "name": "Hot 50 Pro+",
+      "labels": [
+        "HOT 50 PRO +"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Infinix",
+      "family": "Hot",
+      "slug": "infinix-hot-50i",
+      "name": "Hot 50i",
+      "labels": [
+        "Hot50i"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Infinix",
+      "family": "Note",
+      "slug": "infinix-note-14",
+      "name": "Note 14",
+      "labels": [
+        "Note 14 4G"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Infinix",
+      "family": "Note",
+      "slug": "infinix-note-14-pro",
+      "name": "Note 14 Pro",
+      "labels": [
+        "Note 14 Pro 4G"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Infinix",
+      "family": "Smart",
+      "slug": "infinix-smart-9",
+      "name": "Smart 9",
+      "labels": [
+        "Smart 9"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy A",
+      "slug": "samsung-galaxy-a05s",
+      "name": "Galaxy A05s",
+      "labels": [
+        "A05S"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy A",
+      "slug": "samsung-galaxy-a06",
+      "name": "Galaxy A06",
+      "labels": [
+        "A06"
+      ],
+      "count": 2
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy A",
+      "slug": "samsung-galaxy-a06s",
+      "name": "Galaxy A06s",
+      "labels": [
+        "A06S"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy A",
+      "slug": "samsung-galaxy-a07",
+      "name": "Galaxy A07",
+      "labels": [
+        "A07"
+      ],
+      "count": 2
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy A",
+      "slug": "samsung-galaxy-a13",
+      "name": "Galaxy A13",
+      "labels": [
+        "A13"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy A",
+      "slug": "samsung-galaxy-a14",
+      "name": "Galaxy A14",
+      "labels": [
+        "A14"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy A",
+      "slug": "samsung-galaxy-a15",
+      "name": "Galaxy A15",
+      "labels": [
+        "A15"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy A",
+      "slug": "samsung-galaxy-a16",
+      "name": "Galaxy A16",
+      "labels": [
+        "A16"
+      ],
+      "count": 2
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy A",
+      "slug": "samsung-galaxy-a17",
+      "name": "Galaxy A17",
+      "labels": [
+        "A17"
+      ],
+      "count": 2
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy A",
+      "slug": "samsung-galaxy-a23",
+      "name": "Galaxy A23",
+      "labels": [
+        "A23"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy A",
+      "slug": "samsung-galaxy-a25",
+      "name": "Galaxy A25",
+      "labels": [
+        "A25"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy A",
+      "slug": "samsung-galaxy-a26",
+      "name": "Galaxy A26",
+      "labels": [
+        "A26"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy A",
+      "slug": "samsung-galaxy-a35",
+      "name": "Galaxy A35",
+      "labels": [
+        "A35"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy A",
+      "slug": "samsung-galaxy-a55",
+      "name": "Galaxy A55",
+      "labels": [
+        "A55"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy S",
+      "slug": "samsung-galaxy-s24-ultra",
+      "name": "Galaxy S24 Ultra",
+      "labels": [
+        "S24 Ultra",
+        "S24 ULTRA"
+      ],
+      "count": 5
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy S",
+      "slug": "samsung-galaxy-s25-ultra",
+      "name": "Galaxy S25 Ultra",
+      "labels": [
+        "S25 Ultra",
+        "S25 ULTRA"
+      ],
+      "count": 8
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy S",
+      "slug": "samsung-galaxy-s26-ultra",
+      "name": "Galaxy S26 Ultra",
+      "labels": [
+        "S26 Ultra",
+        "S26 ULTRA"
+      ],
+      "count": 4
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy Tab A",
+      "slug": "samsung-galaxy-tab-a11",
+      "name": "Galaxy Tab A11",
+      "labels": [
+        "A11"
+      ],
+      "count": 3
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy Tab A",
+      "slug": "samsung-galaxy-tab-a11-plus",
+      "name": "Galaxy Tab A11+",
+      "labels": [
+        "A11 Plus",
+        "A11 +"
+      ],
+      "count": 2
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy Tab A",
+      "slug": "samsung-galaxy-tab-a8",
+      "name": "Galaxy Tab A8",
+      "labels": [
+        "A8"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy Tab A",
+      "slug": "samsung-galaxy-tab-a9",
+      "name": "Galaxy Tab A9",
+      "labels": [
+        "A9"
+      ],
+      "count": 3
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy Tab A",
+      "slug": "samsung-galaxy-tab-a9-plus",
+      "name": "Galaxy Tab A9+",
+      "labels": [
+        "A9+",
+        "A9 Plus",
+        "A9 +"
+      ],
+      "count": 4
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy Tab S",
+      "slug": "samsung-galaxy-tab-s10-fe",
+      "name": "Galaxy Tab S10 FE",
+      "labels": [
+        "S10 FE"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy Tab S",
+      "slug": "samsung-galaxy-tab-s10-lite",
+      "name": "Galaxy Tab S10 Lite",
+      "labels": [
+        "S10 Lite"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy Tab S",
+      "slug": "samsung-galaxy-tab-s11",
+      "name": "Galaxy Tab S11",
+      "labels": [
+        "S11"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy Tab S",
+      "slug": "samsung-galaxy-tab-s9-fe",
+      "name": "Galaxy Tab S9 FE",
+      "labels": [
+        "S9 FE"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Samsung",
+      "family": "Galaxy Tab S",
+      "slug": "samsung-galaxy-tab-s9-fe-plus",
+      "name": "Galaxy Tab S9 FE+",
+      "labels": [
+        "S9 FE +"
+      ],
+      "count": 2
+    },
+    {
+      "brand": "Tecno",
+      "family": "Pova",
+      "slug": "tecno-pova-6",
+      "name": "Pova 6",
+      "labels": [
+        "POVA 6"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Tecno",
+      "family": "Spark",
+      "slug": "tecno-spark-30c",
+      "name": "Spark 30C",
+      "labels": [
+        "Spark 30C"
+      ],
+      "count": 2
+    },
+    {
+      "brand": "Tecno",
+      "family": "Spark",
+      "slug": "tecno-spark-40c",
+      "name": "Spark 40C",
+      "labels": [
+        "SPARK 40C"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Tecno",
+      "family": "Spark",
+      "slug": "tecno-spark-go-2",
+      "name": "Spark Go 2",
+      "labels": [
+        "SPARK GO 2"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Xiaomi",
+      "family": "Redmi",
+      "slug": "xiaomi-redmi-14c",
+      "name": "Redmi 14C",
+      "labels": [
+        "REDMI 14C"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Xiaomi",
+      "family": "Redmi",
+      "slug": "xiaomi-redmi-15c",
+      "name": "Redmi 15C",
+      "labels": [
+        "Redmi 15C"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Xiaomi",
+      "family": "Redmi",
+      "slug": "xiaomi-redmi-a5",
+      "name": "Redmi A5",
+      "labels": [
+        "Redmi A5"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Xiaomi",
+      "family": "Redmi",
+      "slug": "xiaomi-redmi-note-14",
+      "name": "Redmi Note 14",
+      "labels": [
+        "Redmi NOte 14"
+      ],
+      "count": 1
+    },
+    {
+      "brand": "Xiaomi",
+      "family": "Redmi",
+      "slug": "xiaomi-redmi-note-14-pro",
+      "name": "Redmi Note 14 Pro",
+      "labels": [
+        "Redmi Note 14 Pro"
+      ],
+      "count": 1
+    }
+  ]
+}

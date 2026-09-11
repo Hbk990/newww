@@ -1,0 +1,1089 @@
+{
+  "brands": [
+    {
+      "slug": "xo",
+      "name": "XO",
+      "products_in_export": 234
+    },
+    {
+      "slug": "green-lion",
+      "name": "Green Lion",
+      "products_in_export": 170
+    },
+    {
+      "slug": "porodo",
+      "name": "Porodo",
+      "products_in_export": 110
+    },
+    {
+      "slug": "razer",
+      "name": "Razer",
+      "products_in_export": 36
+    },
+    {
+      "slug": "powerology",
+      "name": "Powerology",
+      "products_in_export": 29
+    },
+    {
+      "slug": "apple",
+      "name": "Apple",
+      "products_in_export": 23
+    },
+    {
+      "slug": "hyperx",
+      "name": "HyperX",
+      "products_in_export": 23
+    },
+    {
+      "slug": "jmary",
+      "name": "Jmary",
+      "products_in_export": 21
+    },
+    {
+      "slug": "jbl",
+      "name": "JBL",
+      "products_in_export": 20
+    },
+    {
+      "slug": "anker",
+      "name": "ANKER",
+      "products_in_export": 17
+    },
+    {
+      "slug": "samsung",
+      "name": "Samsung",
+      "products_in_export": 17
+    },
+    {
+      "slug": "dobe",
+      "name": "Dobe",
+      "products_in_export": 16
+    },
+    {
+      "slug": "meetion",
+      "name": "MeeTion",
+      "products_in_export": 12
+    },
+    {
+      "slug": "hp",
+      "name": "HP",
+      "products_in_export": 11
+    },
+    {
+      "slug": "moxom",
+      "name": "Moxom",
+      "products_in_export": 11
+    },
+    {
+      "slug": "philips",
+      "name": "PHILIPS",
+      "products_in_export": 10
+    },
+    {
+      "slug": "sony",
+      "name": "Sony",
+      "products_in_export": 10
+    },
+    {
+      "slug": "xiaomi",
+      "name": "Xiaomi",
+      "products_in_export": 10
+    },
+    {
+      "slug": "tp-link",
+      "name": "Tp-Link",
+      "products_in_export": 9
+    },
+    {
+      "slug": "lepresso",
+      "name": "Lepresso",
+      "products_in_export": 8
+    },
+    {
+      "slug": "rtako",
+      "name": "Rtako",
+      "products_in_export": 8
+    },
+    {
+      "slug": "hifuture",
+      "name": "HiFuture",
+      "products_in_export": 7
+    },
+    {
+      "slug": "sandisk",
+      "name": "Sandisk",
+      "products_in_export": 7
+    },
+    {
+      "slug": "instax",
+      "name": "INSTAX",
+      "products_in_export": 6
+    },
+    {
+      "slug": "ip-camera-4g",
+      "name": "Ip Camera 4G",
+      "products_in_export": 6
+    },
+    {
+      "slug": "playx",
+      "name": "PlayX",
+      "products_in_export": 6
+    },
+    {
+      "slug": "berlia",
+      "name": "Berlia",
+      "products_in_export": 5
+    },
+    {
+      "slug": "ring-light",
+      "name": "Ring Light",
+      "products_in_export": 5
+    },
+    {
+      "slug": "joker-b",
+      "name": "Joker-B",
+      "products_in_export": 4
+    },
+    {
+      "slug": "moka",
+      "name": "Moka",
+      "products_in_export": 4
+    },
+    {
+      "slug": "teclast",
+      "name": "Teclast",
+      "products_in_export": 4
+    },
+    {
+      "slug": "aulo",
+      "name": "Aulo",
+      "products_in_export": 3
+    },
+    {
+      "slug": "baby-monitor",
+      "name": "Baby Monitor",
+      "products_in_export": 3
+    },
+    {
+      "slug": "beats",
+      "name": "Beats",
+      "products_in_export": 3
+    },
+    {
+      "slug": "caisless",
+      "name": "Caisless",
+      "products_in_export": 3
+    },
+    {
+      "slug": "dji",
+      "name": "DJI",
+      "products_in_export": 3
+    },
+    {
+      "slug": "kingston",
+      "name": "Kingston",
+      "products_in_export": 3
+    },
+    {
+      "slug": "marshall",
+      "name": "Marshall",
+      "products_in_export": 3
+    },
+    {
+      "slug": "nintendo-controller",
+      "name": "Nintendo Controller",
+      "products_in_export": 3
+    },
+    {
+      "slug": "samsung-solum",
+      "name": "Samsung Solum",
+      "products_in_export": 3
+    },
+    {
+      "slug": "ugreen",
+      "name": "UGREEN",
+      "products_in_export": 3
+    },
+    {
+      "slug": "bang",
+      "name": "BANG",
+      "products_in_export": 2
+    },
+    {
+      "slug": "barista",
+      "name": "Barista",
+      "products_in_export": 2
+    },
+    {
+      "slug": "blulory",
+      "name": "Blulory",
+      "products_in_export": 2
+    },
+    {
+      "slug": "deadskull",
+      "name": "DeadSkull",
+      "products_in_export": 2
+    },
+    {
+      "slug": "flip",
+      "name": "Flip",
+      "products_in_export": 2
+    },
+    {
+      "slug": "gopro",
+      "name": "GoPro",
+      "products_in_export": 2
+    },
+    {
+      "slug": "hori",
+      "name": "HORI",
+      "products_in_export": 2
+    },
+    {
+      "slug": "huawei",
+      "name": "Huawei",
+      "products_in_export": 2
+    },
+    {
+      "slug": "jbq",
+      "name": "JBQ",
+      "products_in_export": 2
+    },
+    {
+      "slug": "jmray",
+      "name": "Jmray",
+      "products_in_export": 2
+    },
+    {
+      "slug": "mee-tion",
+      "name": "Mee Tion",
+      "products_in_export": 2
+    },
+    {
+      "slug": "mercusys",
+      "name": "Mercusys",
+      "products_in_export": 2
+    },
+    {
+      "slug": "mi",
+      "name": "Mi",
+      "products_in_export": 2
+    },
+    {
+      "slug": "mimd",
+      "name": "Mimd",
+      "products_in_export": 2
+    },
+    {
+      "slug": "netis",
+      "name": "Netis",
+      "products_in_export": 2
+    },
+    {
+      "slug": "og-glass",
+      "name": "OG GLASS",
+      "products_in_export": 2
+    },
+    {
+      "slug": "ps4",
+      "name": "PS4",
+      "products_in_export": 2
+    },
+    {
+      "slug": "printer-camera",
+      "name": "Printer Camera",
+      "products_in_export": 2
+    },
+    {
+      "slug": "smart-keyboard-folio",
+      "name": "Smart Keyboard Folio",
+      "products_in_export": 2
+    },
+    {
+      "slug": "telesin",
+      "name": "Telesin",
+      "products_in_export": 2
+    },
+    {
+      "slug": "wd",
+      "name": "WD",
+      "products_in_export": 2
+    },
+    {
+      "slug": "wiwu",
+      "name": "Wiwu",
+      "products_in_export": 2
+    },
+    {
+      "slug": "xprinter",
+      "name": "Xprinter",
+      "products_in_export": 2
+    },
+    {
+      "slug": "005-2019",
+      "name": "005-2019",
+      "products_in_export": 1
+    },
+    {
+      "slug": "12v-5a",
+      "name": "12V - 5A",
+      "products_in_export": 1
+    },
+    {
+      "slug": "24v-2-5a",
+      "name": "24V - 2.5A",
+      "products_in_export": 1
+    },
+    {
+      "slug": "551",
+      "name": "551",
+      "products_in_export": 1
+    },
+    {
+      "slug": "559",
+      "name": "559",
+      "products_in_export": 1
+    },
+    {
+      "slug": "5d-glass",
+      "name": "5D Glass",
+      "products_in_export": 1
+    },
+    {
+      "slug": "8-in-1",
+      "name": "8 IN 1",
+      "products_in_export": 1
+    },
+    {
+      "slug": "911",
+      "name": "911",
+      "products_in_export": 1
+    },
+    {
+      "slug": "a01",
+      "name": "A01",
+      "products_in_export": 1
+    },
+    {
+      "slug": "aaok",
+      "name": "AAOK",
+      "products_in_export": 1
+    },
+    {
+      "slug": "al-120x",
+      "name": "AL-120X",
+      "products_in_export": 1
+    },
+    {
+      "slug": "ay-31",
+      "name": "AY-31",
+      "products_in_export": 1
+    },
+    {
+      "slug": "aigo",
+      "name": "Aigo",
+      "products_in_export": 1
+    },
+    {
+      "slug": "airpods-cover",
+      "name": "Airpods Cover",
+      "products_in_export": 1
+    },
+    {
+      "slug": "amazfit",
+      "name": "Amazfit",
+      "products_in_export": 1
+    },
+    {
+      "slug": "apple-watch",
+      "name": "Apple Watch",
+      "products_in_export": 1
+    },
+    {
+      "slug": "auchiyu",
+      "name": "Auchiyu",
+      "products_in_export": 1
+    },
+    {
+      "slug": "aukey",
+      "name": "Aukey",
+      "products_in_export": 1
+    },
+    {
+      "slug": "bd-b6",
+      "name": "BD-B6",
+      "products_in_export": 1
+    },
+    {
+      "slug": "back-film",
+      "name": "Back Film",
+      "products_in_export": 1
+    },
+    {
+      "slug": "bvot",
+      "name": "Bvot",
+      "products_in_export": 1
+    },
+    {
+      "slug": "c55",
+      "name": "C55",
+      "products_in_export": 1
+    },
+    {
+      "slug": "c59",
+      "name": "C59",
+      "products_in_export": 1
+    },
+    {
+      "slug": "canon",
+      "name": "CANON",
+      "products_in_export": 1
+    },
+    {
+      "slug": "cs7",
+      "name": "CS7",
+      "products_in_export": 1
+    },
+    {
+      "slug": "cudy",
+      "name": "CUDY",
+      "products_in_export": 1
+    },
+    {
+      "slug": "car-wash",
+      "name": "Car Wash",
+      "products_in_export": 1
+    },
+    {
+      "slug": "chair-for-kids",
+      "name": "Chair For Kids",
+      "products_in_export": 1
+    },
+    {
+      "slug": "converter-3-in-1",
+      "name": "Converter 3 IN 1",
+      "products_in_export": 1
+    },
+    {
+      "slug": "crown-lux",
+      "name": "Crown Lux",
+      "products_in_export": 1
+    },
+    {
+      "slug": "d-6a",
+      "name": "D-6A",
+      "products_in_export": 1
+    },
+    {
+      "slug": "d2",
+      "name": "D2",
+      "products_in_export": 1
+    },
+    {
+      "slug": "d2-pro",
+      "name": "D2 Pro",
+      "products_in_export": 1
+    },
+    {
+      "slug": "dr-41",
+      "name": "DR-41",
+      "products_in_export": 1
+    },
+    {
+      "slug": "dell",
+      "name": "Dell",
+      "products_in_export": 1
+    },
+    {
+      "slug": "dingend",
+      "name": "Dingend",
+      "products_in_export": 1
+    },
+    {
+      "slug": "drone",
+      "name": "Drone",
+      "products_in_export": 1
+    },
+    {
+      "slug": "duck",
+      "name": "Duck",
+      "products_in_export": 1
+    },
+    {
+      "slug": "e900",
+      "name": "E900",
+      "products_in_export": 1
+    },
+    {
+      "slug": "fashion-watch",
+      "name": "Fashion Watch",
+      "products_in_export": 1
+    },
+    {
+      "slug": "fuhlen",
+      "name": "Fuhlen",
+      "products_in_export": 1
+    },
+    {
+      "slug": "g28",
+      "name": "G28",
+      "products_in_export": 1
+    },
+    {
+      "slug": "g5",
+      "name": "G5",
+      "products_in_export": 1
+    },
+    {
+      "slug": "gun",
+      "name": "GUN",
+      "products_in_export": 1
+    },
+    {
+      "slug": "gydz",
+      "name": "GYDZ",
+      "products_in_export": 1
+    },
+    {
+      "slug": "game-controller",
+      "name": "Game Controller",
+      "products_in_export": 1
+    },
+    {
+      "slug": "game-stock-2-4g",
+      "name": "Game Stock 2.4G",
+      "products_in_export": 1
+    },
+    {
+      "slug": "gamesir",
+      "name": "GameSir",
+      "products_in_export": 1
+    },
+    {
+      "slug": "gaming-seat",
+      "name": "Gaming Seat",
+      "products_in_export": 1
+    },
+    {
+      "slug": "gaming-x-trust",
+      "name": "Gaming X Trust",
+      "products_in_export": 1
+    },
+    {
+      "slug": "geatix",
+      "name": "Geatix",
+      "products_in_export": 1
+    },
+    {
+      "slug": "gecko",
+      "name": "Gecko",
+      "products_in_export": 1
+    },
+    {
+      "slug": "glass-tab",
+      "name": "Glass Tab",
+      "products_in_export": 1
+    },
+    {
+      "slug": "google",
+      "name": "Google",
+      "products_in_export": 1
+    },
+    {
+      "slug": "gulf-orchid",
+      "name": "Gulf Orchid",
+      "products_in_export": 1
+    },
+    {
+      "slug": "hd-180x",
+      "name": "HD-180X",
+      "products_in_export": 1
+    },
+    {
+      "slug": "hd-60x",
+      "name": "HD-60X",
+      "products_in_export": 1
+    },
+    {
+      "slug": "hd-65x",
+      "name": "HD-65X",
+      "products_in_export": 1
+    },
+    {
+      "slug": "hd-g66x",
+      "name": "HD-G66X",
+      "products_in_export": 1
+    },
+    {
+      "slug": "hd-m18x",
+      "name": "HD-M18X",
+      "products_in_export": 1
+    },
+    {
+      "slug": "hd-m26x",
+      "name": "HD-M26X",
+      "products_in_export": 1
+    },
+    {
+      "slug": "hd-m300x",
+      "name": "HD-M300X",
+      "products_in_export": 1
+    },
+    {
+      "slug": "hd-m600x",
+      "name": "HD-M600X",
+      "products_in_export": 1
+    },
+    {
+      "slug": "hd-m80x",
+      "name": "HD-M80X",
+      "products_in_export": 1
+    },
+    {
+      "slug": "hd-s002",
+      "name": "HD-S002",
+      "products_in_export": 1
+    },
+    {
+      "slug": "hlx",
+      "name": "HLX",
+      "products_in_export": 1
+    },
+    {
+      "slug": "halo",
+      "name": "Halo",
+      "products_in_export": 1
+    },
+    {
+      "slug": "hama",
+      "name": "Hama",
+      "products_in_export": 1
+    },
+    {
+      "slug": "holder",
+      "name": "Holder",
+      "products_in_export": 1
+    },
+    {
+      "slug": "hummer",
+      "name": "Hummer",
+      "products_in_export": 1
+    },
+    {
+      "slug": "insmart",
+      "name": "INSMART",
+      "products_in_export": 1
+    },
+    {
+      "slug": "j-c-nintendo-controller",
+      "name": "J-C Nintendo Controller",
+      "products_in_export": 1
+    },
+    {
+      "slug": "joyroom",
+      "name": "JOYROOM",
+      "products_in_export": 1
+    },
+    {
+      "slug": "kodak",
+      "name": "KODAK",
+      "products_in_export": 1
+    },
+    {
+      "slug": "kama",
+      "name": "Kama",
+      "products_in_export": 1
+    },
+    {
+      "slug": "kindsuit",
+      "name": "Kindsuit",
+      "products_in_export": 1
+    },
+    {
+      "slug": "kislect",
+      "name": "Kislect",
+      "products_in_export": 1
+    },
+    {
+      "slug": "l-jj-22",
+      "name": "L-JJ-22",
+      "products_in_export": 1
+    },
+    {
+      "slug": "liorque",
+      "name": "LIORQUE",
+      "products_in_export": 1
+    },
+    {
+      "slug": "lacor",
+      "name": "Lacor",
+      "products_in_export": 1
+    },
+    {
+      "slug": "lamp",
+      "name": "Lamp",
+      "products_in_export": 1
+    },
+    {
+      "slug": "lexar",
+      "name": "Lexar",
+      "products_in_export": 1
+    },
+    {
+      "slug": "logitech",
+      "name": "Logitech",
+      "products_in_export": 1
+    },
+    {
+      "slug": "m10x",
+      "name": "M10X",
+      "products_in_export": 1
+    },
+    {
+      "slug": "m3x",
+      "name": "M3x",
+      "products_in_export": 1
+    },
+    {
+      "slug": "m5",
+      "name": "M5",
+      "products_in_export": 1
+    },
+    {
+      "slug": "m55",
+      "name": "M55",
+      "products_in_export": 1
+    },
+    {
+      "slug": "m830",
+      "name": "M830",
+      "products_in_export": 1
+    },
+    {
+      "slug": "m9x",
+      "name": "M9X",
+      "products_in_export": 1
+    },
+    {
+      "slug": "misik",
+      "name": "MISIK",
+      "products_in_export": 1
+    },
+    {
+      "slug": "mj30",
+      "name": "MJ30",
+      "products_in_export": 1
+    },
+    {
+      "slug": "msi",
+      "name": "MSI",
+      "products_in_export": 1
+    },
+    {
+      "slug": "mxq-tv-box",
+      "name": "MXQ TV BOX",
+      "products_in_export": 1
+    },
+    {
+      "slug": "mz026",
+      "name": "MZ026",
+      "products_in_export": 1
+    },
+    {
+      "slug": "mz032",
+      "name": "MZ032",
+      "products_in_export": 1
+    },
+    {
+      "slug": "massager-gun",
+      "name": "Massager Gun",
+      "products_in_export": 1
+    },
+    {
+      "slug": "mini-camera",
+      "name": "Mini Camera",
+      "products_in_export": 1
+    },
+    {
+      "slug": "modem",
+      "name": "Modem",
+      "products_in_export": 1
+    },
+    {
+      "slug": "monster",
+      "name": "Monster",
+      "products_in_export": 1
+    },
+    {
+      "slug": "motorized",
+      "name": "Motorized",
+      "products_in_export": 1
+    },
+    {
+      "slug": "nexa",
+      "name": "NEXA",
+      "products_in_export": 1
+    },
+    {
+      "slug": "no-258",
+      "name": "NO.258",
+      "products_in_export": 1
+    },
+    {
+      "slug": "naidun",
+      "name": "Naidun",
+      "products_in_export": 1
+    },
+    {
+      "slug": "neck-bracket-scs-nh001",
+      "name": "Neck Bracket SCS-NH001",
+      "products_in_export": 1
+    },
+    {
+      "slug": "neon-light",
+      "name": "Neon Light",
+      "products_in_export": 1
+    },
+    {
+      "slug": "nintedndo",
+      "name": "Nintedndo",
+      "products_in_export": 1
+    },
+    {
+      "slug": "nintendo",
+      "name": "Nintendo",
+      "products_in_export": 1
+    },
+    {
+      "slug": "p67z",
+      "name": "P67Z",
+      "products_in_export": 1
+    },
+    {
+      "slug": "ps4-controller",
+      "name": "PS4 Controller",
+      "products_in_export": 1
+    },
+    {
+      "slug": "pen",
+      "name": "Pen",
+      "products_in_export": 1
+    },
+    {
+      "slug": "philco-gaming",
+      "name": "Philco Gaming",
+      "products_in_export": 1
+    },
+    {
+      "slug": "power-ology",
+      "name": "Power ology",
+      "products_in_export": 1
+    },
+    {
+      "slug": "print-cable",
+      "name": "Print Cable",
+      "products_in_export": 1
+    },
+    {
+      "slug": "proector",
+      "name": "Proector",
+      "products_in_export": 1
+    },
+    {
+      "slug": "r4-rgb",
+      "name": "R4 RGB",
+      "products_in_export": 1
+    },
+    {
+      "slug": "rl-1800",
+      "name": "RL-1800",
+      "products_in_export": 1
+    },
+    {
+      "slug": "rl1100",
+      "name": "RL1100",
+      "products_in_export": 1
+    },
+    {
+      "slug": "ragnok",
+      "name": "Ragnok",
+      "products_in_export": 1
+    },
+    {
+      "slug": "rapidpower",
+      "name": "RapidPower",
+      "products_in_export": 1
+    },
+    {
+      "slug": "reading-stand",
+      "name": "Reading Stand",
+      "products_in_export": 1
+    },
+    {
+      "slug": "roccat",
+      "name": "Roccat",
+      "products_in_export": 1
+    },
+    {
+      "slug": "sf3000",
+      "name": "SF3000",
+      "products_in_export": 1
+    },
+    {
+      "slug": "sy608a",
+      "name": "SY608A",
+      "products_in_export": 1
+    },
+    {
+      "slug": "sy706a",
+      "name": "SY706A",
+      "products_in_export": 1
+    },
+    {
+      "slug": "safe-box",
+      "name": "Safe Box",
+      "products_in_export": 1
+    },
+    {
+      "slug": "scorpion",
+      "name": "Scorpion",
+      "products_in_export": 1
+    },
+    {
+      "slug": "smiling-shark",
+      "name": "Smiling Shark",
+      "products_in_export": 1
+    },
+    {
+      "slug": "steam",
+      "name": "Steam",
+      "products_in_export": 1
+    },
+    {
+      "slug": "strap",
+      "name": "Strap",
+      "products_in_export": 1
+    },
+    {
+      "slug": "stunt",
+      "name": "Stunt",
+      "products_in_export": 1
+    },
+    {
+      "slug": "stylus-pen",
+      "name": "Stylus Pen",
+      "products_in_export": 1
+    },
+    {
+      "slug": "tcl",
+      "name": "TCL",
+      "products_in_export": 1
+    },
+    {
+      "slug": "tedgem",
+      "name": "TedGem",
+      "products_in_export": 1
+    },
+    {
+      "slug": "teddy",
+      "name": "Teddy",
+      "products_in_export": 1
+    },
+    {
+      "slug": "tenda",
+      "name": "Tenda",
+      "products_in_export": 1
+    },
+    {
+      "slug": "tsunami",
+      "name": "Tsunami",
+      "products_in_export": 1
+    },
+    {
+      "slug": "turtle-beach",
+      "name": "Turtle Beach",
+      "products_in_export": 1
+    },
+    {
+      "slug": "ultra-projector",
+      "name": "Ultra Projector",
+      "products_in_export": 1
+    },
+    {
+      "slug": "v-link",
+      "name": "V Link",
+      "products_in_export": 1
+    },
+    {
+      "slug": "w-d12",
+      "name": "W-D12",
+      "products_in_export": 1
+    },
+    {
+      "slug": "whoop",
+      "name": "WHOOP",
+      "products_in_export": 1
+    },
+    {
+      "slug": "ws-858",
+      "name": "WS-858",
+      "products_in_export": 1
+    },
+    {
+      "slug": "wt-02",
+      "name": "WT-02",
+      "products_in_export": 1
+    },
+    {
+      "slug": "walkie-talkie-video",
+      "name": "Walkie Talkie Video",
+      "products_in_export": 1
+    },
+    {
+      "slug": "wireless-charge-4-in-1",
+      "name": "Wireless Charge 4 IN 1",
+      "products_in_export": 1
+    },
+    {
+      "slug": "wood-cutter",
+      "name": "Wood Cutter",
+      "products_in_export": 1
+    },
+    {
+      "slug": "x8",
+      "name": "X8",
+      "products_in_export": 1
+    },
+    {
+      "slug": "yj",
+      "name": "YJ",
+      "products_in_export": 1
+    },
+    {
+      "slug": "yl-906",
+      "name": "YL-906",
+      "products_in_export": 1
+    },
+    {
+      "slug": "ym200",
+      "name": "YM200",
+      "products_in_export": 1
+    },
+    {
+      "slug": "yellow-projector",
+      "name": "Yellow Projector",
+      "products_in_export": 1
+    },
+    {
+      "slug": "zgrl-02",
+      "name": "ZGRL-02",
+      "products_in_export": 1
+    },
+    {
+      "slug": "zgrl-2000",
+      "name": "ZGRL-2000",
+      "products_in_export": 1
+    }
+  ]
+}

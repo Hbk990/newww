@@ -47,6 +47,7 @@ round-trip latency, or the driver error if it can't connect.
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm run db:generate` | Generate a migration from the Drizzle schema |
 | `npm run db:migrate` | Apply pending migrations (via `scripts/migrate.mjs`) |
+| `npm run db:seed` | Seed categories, brands and device models from `seed/` |
 | `npm run db:studio` | Drizzle Studio |
 
 Migrations are generated and reviewed as SQL before being applied — there is no

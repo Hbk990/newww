@@ -1,0 +1,416 @@
+{
+  "categories": [
+    {
+      "slug": "mobile-accessories-power",
+      "name": "Mobile Accessories & Power",
+      "parent": null,
+      "position": 0
+    },
+    {
+      "slug": "charge-cable",
+      "name": "Charge & Cable",
+      "parent": "mobile-accessories-power",
+      "position": 0,
+      "products_in_export": 90
+    },
+    {
+      "slug": "holder-stand",
+      "name": "Holder & Stand",
+      "parent": "mobile-accessories-power",
+      "position": 1,
+      "products_in_export": 75
+    },
+    {
+      "slug": "power-bank",
+      "name": "Power Bank",
+      "parent": "mobile-accessories-power",
+      "position": 2,
+      "products_in_export": 45
+    },
+    {
+      "slug": "converter",
+      "name": "Converter",
+      "parent": "mobile-accessories-power",
+      "position": 3,
+      "products_in_export": 40
+    },
+    {
+      "slug": "cover",
+      "name": "Cover",
+      "parent": "mobile-accessories-power",
+      "position": 4,
+      "products_in_export": 29
+    },
+    {
+      "slug": "cooling-radiator",
+      "name": "Cooling Radiator",
+      "parent": "mobile-accessories-power",
+      "position": 5,
+      "products_in_export": 10
+    },
+    {
+      "slug": "pen",
+      "name": "Pen",
+      "parent": "mobile-accessories-power",
+      "position": 6,
+      "products_in_export": 9
+    },
+    {
+      "slug": "screen-protector",
+      "name": "Screen Protector",
+      "parent": "mobile-accessories-power",
+      "position": 7,
+      "products_in_export": 7
+    },
+    {
+      "slug": "airtag",
+      "name": "Airtag",
+      "parent": "mobile-accessories-power",
+      "position": 8,
+      "products_in_export": 2
+    },
+    {
+      "slug": "audio-wearables",
+      "name": "Audio & Wearables",
+      "parent": null,
+      "position": 1
+    },
+    {
+      "slug": "speaker",
+      "name": "Speaker",
+      "parent": "audio-wearables",
+      "position": 0,
+      "products_in_export": 48
+    },
+    {
+      "slug": "airpods",
+      "name": "Airpods",
+      "parent": "audio-wearables",
+      "position": 1,
+      "products_in_export": 44
+    },
+    {
+      "slug": "microphone",
+      "name": "Microphone",
+      "parent": "audio-wearables",
+      "position": 2,
+      "products_in_export": 37
+    },
+    {
+      "slug": "smart-watch",
+      "name": "Smart Watch",
+      "parent": "audio-wearables",
+      "position": 3,
+      "products_in_export": 32
+    },
+    {
+      "slug": "headphones",
+      "name": "Headphones",
+      "parent": "audio-wearables",
+      "position": 4,
+      "products_in_export": 31
+    },
+    {
+      "slug": "earphone",
+      "name": "Earphone",
+      "parent": "audio-wearables",
+      "position": 5,
+      "products_in_export": 16
+    },
+    {
+      "slug": "smart-glasses",
+      "name": "Smart Glasses",
+      "parent": "audio-wearables",
+      "position": 6,
+      "products_in_export": 10
+    },
+    {
+      "slug": "aux",
+      "name": "AUX",
+      "parent": "audio-wearables",
+      "position": 7,
+      "products_in_export": 4
+    },
+    {
+      "slug": "home-personal-care",
+      "name": "Home & Personal Care",
+      "parent": null,
+      "position": 2
+    },
+    {
+      "slug": "light",
+      "name": "Light",
+      "parent": "home-personal-care",
+      "position": 0,
+      "products_in_export": 59
+    },
+    {
+      "slug": "hair-trimmer",
+      "name": "Hair Trimmer",
+      "parent": "home-personal-care",
+      "position": 1,
+      "products_in_export": 23
+    },
+    {
+      "slug": "blower-fan",
+      "name": "Blower & Fan",
+      "parent": "home-personal-care",
+      "position": 2,
+      "products_in_export": 22
+    },
+    {
+      "slug": "massage-machine",
+      "name": "Massage Machine",
+      "parent": "home-personal-care",
+      "position": 3,
+      "products_in_export": 9
+    },
+    {
+      "slug": "socket",
+      "name": "Socket",
+      "parent": "home-personal-care",
+      "position": 4,
+      "products_in_export": 9
+    },
+    {
+      "slug": "scale",
+      "name": "Scale",
+      "parent": "home-personal-care",
+      "position": 5,
+      "products_in_export": 7
+    },
+    {
+      "slug": "coffee-maker",
+      "name": "Coffee Maker",
+      "parent": "home-personal-care",
+      "position": 6,
+      "products_in_export": 7
+    },
+    {
+      "slug": "toothbrush",
+      "name": "Toothbrush",
+      "parent": "home-personal-care",
+      "position": 7,
+      "products_in_export": 5
+    },
+    {
+      "slug": "safe-box",
+      "name": "Safe Box",
+      "parent": "home-personal-care",
+      "position": 8,
+      "products_in_export": 1
+    },
+    {
+      "slug": "kitchen-drinkware",
+      "name": "Kitchen & Drinkware",
+      "parent": "home-personal-care",
+      "position": 9,
+      "products_in_export": 0
+    },
+    {
+      "slug": "grooming",
+      "name": "Grooming",
+      "parent": "home-personal-care",
+      "position": 10,
+      "products_in_export": 0
+    },
+    {
+      "slug": "cleaning",
+      "name": "Cleaning",
+      "parent": "home-personal-care",
+      "position": 11,
+      "products_in_export": 0
+    },
+    {
+      "slug": "humidifier-air",
+      "name": "Humidifier & Air",
+      "parent": "home-personal-care",
+      "position": 12,
+      "products_in_export": 0
+    },
+    {
+      "slug": "night-light",
+      "name": "Night Light",
+      "parent": "home-personal-care",
+      "position": 13,
+      "products_in_export": 0
+    },
+    {
+      "slug": "furniture-comfort",
+      "name": "Furniture & Comfort",
+      "parent": "home-personal-care",
+      "position": 14,
+      "products_in_export": 0
+    },
+    {
+      "slug": "gaming-computers",
+      "name": "Gaming & Computers",
+      "parent": null,
+      "position": 3
+    },
+    {
+      "slug": "keyboard-mouse",
+      "name": "Keyboard & Mouse",
+      "parent": "gaming-computers",
+      "position": 0,
+      "products_in_export": 49
+    },
+    {
+      "slug": "gaming-accessories",
+      "name": "Gaming Accessories",
+      "parent": "gaming-computers",
+      "position": 1,
+      "products_in_export": 49
+    },
+    {
+      "slug": "monitor",
+      "name": "Monitor",
+      "parent": "gaming-computers",
+      "position": 2,
+      "products_in_export": 7
+    },
+    {
+      "slug": "console-retro-game",
+      "name": "Console Retro Game",
+      "parent": "gaming-computers",
+      "position": 3,
+      "products_in_export": 7
+    },
+    {
+      "slug": "gaming-chair",
+      "name": "Gaming Chair",
+      "parent": "gaming-computers",
+      "position": 4,
+      "products_in_export": 7
+    },
+    {
+      "slug": "tablet",
+      "name": "Tablet",
+      "parent": "gaming-computers",
+      "position": 5,
+      "products_in_export": 4
+    },
+    {
+      "slug": "cameras-security-projection",
+      "name": "Cameras, Security & Projection",
+      "parent": null,
+      "position": 4
+    },
+    {
+      "slug": "tripod-gimbal",
+      "name": "Tripod & Gimbal",
+      "parent": "cameras-security-projection",
+      "position": 0,
+      "products_in_export": 30
+    },
+    {
+      "slug": "digital-action-camera",
+      "name": "Digital & Action Camera",
+      "parent": "cameras-security-projection",
+      "position": 1,
+      "products_in_export": 25
+    },
+    {
+      "slug": "ip-camera",
+      "name": "IP Camera",
+      "parent": "cameras-security-projection",
+      "position": 2,
+      "products_in_export": 22
+    },
+    {
+      "slug": "projector",
+      "name": "Projector",
+      "parent": "cameras-security-projection",
+      "position": 3,
+      "products_in_export": 13
+    },
+    {
+      "slug": "baby-monitor",
+      "name": "Baby Monitor",
+      "parent": "cameras-security-projection",
+      "position": 4,
+      "products_in_export": 3
+    },
+    {
+      "slug": "toys-lifestyle-miscellaneous",
+      "name": "Toys, Lifestyle & Miscellaneous",
+      "parent": null,
+      "position": 5
+    },
+    {
+      "slug": "bag",
+      "name": "Bag",
+      "parent": "toys-lifestyle-miscellaneous",
+      "position": 0,
+      "products_in_export": 29
+    },
+    {
+      "slug": "toys",
+      "name": "Toys",
+      "parent": "toys-lifestyle-miscellaneous",
+      "position": 1,
+      "products_in_export": 20
+    },
+    {
+      "slug": "stationery-print",
+      "name": "Stationery & Print",
+      "parent": "toys-lifestyle-miscellaneous",
+      "position": 2,
+      "products_in_export": 0
+    },
+    {
+      "slug": "travel-outdoor",
+      "name": "Travel & Outdoor",
+      "parent": "toys-lifestyle-miscellaneous",
+      "position": 3,
+      "products_in_export": 0
+    },
+    {
+      "slug": "storage-network-tv",
+      "name": "Storage, Network & TV",
+      "parent": null,
+      "position": 6
+    },
+    {
+      "slug": "network",
+      "name": "Network",
+      "parent": "storage-network-tv",
+      "position": 0,
+      "products_in_export": 23
+    },
+    {
+      "slug": "flash-memory",
+      "name": "Flash & Memory",
+      "parent": "storage-network-tv",
+      "position": 1,
+      "products_in_export": 15
+    },
+    {
+      "slug": "tv-box",
+      "name": "TV Box",
+      "parent": "storage-network-tv",
+      "position": 2,
+      "products_in_export": 7
+    },
+    {
+      "slug": "car-electronics",
+      "name": "Car Electronics",
+      "parent": null,
+      "position": 7
+    },
+    {
+      "slug": "fm-transmitter",
+      "name": "FM Transmitter",
+      "parent": "car-electronics",
+      "position": 0,
+      "products_in_export": 12
+    },
+    {
+      "slug": "jump-starter",
+      "name": "Jump Starter",
+      "parent": "car-electronics",
+      "position": 1,
+      "products_in_export": 11
+    }
+  ]
+}
