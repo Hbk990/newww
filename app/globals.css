@@ -1,24 +1,95 @@
 @import "tailwindcss";
 
-/* Design tokens. The storefront's real palette comes with the frontend work;
-   these are neutral placeholders so nothing hardcodes a colour yet. */
-@theme {
-  --color-ink: oklch(0.22 0.02 260);
-  --color-muted: oklch(0.55 0.015 260);
-  --color-line: oklch(0.91 0.005 260);
-  --color-surface: oklch(0.99 0.002 260);
+/**
+ * Palette as plain custom properties, then exposed to Tailwind with
+ * `@theme inline` so every utility resolves to the variable at runtime rather
+ * than being baked in at build time. That is what lets one set of classes serve
+ * light, dark and an explicit override.
+ *
+ * Three states, not two: an explicit choice stamps `data-theme` on <html>, and
+ * the default "system" setting stamps nothing — so only `prefers-color-scheme`
+ * separates light from dark there. Every token is declared on bare `:root`
+ * first; a colour whose only definition sits inside a media query never applies
+ * in the unstamped state.
+ */
+:root {
+  --ink: oklch(0.22 0.02 260);
+  --muted: oklch(0.53 0.018 260);
+  --line: oklch(0.91 0.005 260);
+  --surface: oklch(0.99 0.002 260);
+  --raised: oklch(1 0 0);
+  --sunken: oklch(0.965 0.003 260);
+  --accent: oklch(0.52 0.13 250);
+  --accent-soft: oklch(0.95 0.02 250);
+  --on-accent: oklch(0.99 0 0);
+  --good: oklch(0.52 0.12 155);
+  --warn: oklch(0.6 0.13 75);
+  --bad: oklch(0.53 0.17 25);
 }
 
 @media (prefers-color-scheme: dark) {
-  @theme {
-    --color-ink: oklch(0.95 0.01 260);
-    --color-muted: oklch(0.68 0.015 260);
-    --color-line: oklch(0.3 0.01 260);
-    --color-surface: oklch(0.17 0.01 260);
+  :root:not([data-theme="light"]) {
+    --ink: oklch(0.94 0.01 260);
+    --muted: oklch(0.66 0.018 260);
+    --line: oklch(0.3 0.012 260);
+    --surface: oklch(0.17 0.012 260);
+    --raised: oklch(0.21 0.014 260);
+    --sunken: oklch(0.145 0.01 260);
+    --accent: oklch(0.72 0.12 250);
+    --accent-soft: oklch(0.27 0.04 250);
+    --on-accent: oklch(0.16 0.01 260);
+    --good: oklch(0.72 0.13 155);
+    --warn: oklch(0.78 0.13 75);
+    --bad: oklch(0.7 0.15 25);
   }
 }
 
+:root[data-theme="dark"] {
+  --ink: oklch(0.94 0.01 260);
+  --muted: oklch(0.66 0.018 260);
+  --line: oklch(0.3 0.012 260);
+  --surface: oklch(0.17 0.012 260);
+  --raised: oklch(0.21 0.014 260);
+  --sunken: oklch(0.145 0.01 260);
+  --accent: oklch(0.72 0.12 250);
+  --accent-soft: oklch(0.27 0.04 250);
+  --on-accent: oklch(0.16 0.01 260);
+  --good: oklch(0.72 0.13 155);
+  --warn: oklch(0.78 0.13 75);
+  --bad: oklch(0.7 0.15 25);
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-sunken: var(--sunken);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent: var(--on-accent);
+  --color-good: var(--good);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+}
+
 body {
-  background: var(--color-surface);
-  color: var(--color-ink);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+/* Digits in a table column have to line up, or scanning a price list is
+   needlessly hard. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

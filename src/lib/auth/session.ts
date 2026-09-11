@@ -1,5 +1,5 @@
 import { and, eq, isNull, lt, or } from "drizzle-orm";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 import { db } from "@/db";
 import { sessions, users } from "@/db/schema";
@@ -69,12 +69,26 @@ export async function createSession(
     .set({ lastLoginAt: new Date() })
     .where(eq(users.id, userId));
 
+  /**
+   * `Secure` follows the request's protocol, not the build mode.
+   *
+   * Keying it to NODE_ENV means a production build served over http — a local
+   * smoke test, a staging box without TLS — sets a cookie the browser then
+   * refuses, and sign-in silently fails with nothing in the logs to explain it.
+   *
+   * The default when no proxy header is present stays `https` in production, so
+   * a misconfigured proxy cannot quietly downgrade a real deployment.
+   */
+  const requestHeaders = await headers();
+  const proto =
+    requestHeaders.get("x-forwarded-proto")?.split(",")[0]?.trim() ??
+    (env.isProduction ? "https" : "http");
+
   const store = await cookies();
   store.set(SESSION_COOKIE, token, {
     // Unreadable from JavaScript, so an XSS bug cannot exfiltrate the session.
     httpOnly: true,
-    // Sent over TLS only. Off in development, where there is no TLS.
-    secure: env.isProduction,
+    secure: proto === "https",
     /**
      * `lax` rather than `strict`: `strict` drops the cookie on any cross-site
      * navigation, so arriving from a Google search or a WhatsApp link would

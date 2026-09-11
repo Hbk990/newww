@@ -21,6 +21,9 @@ Read these before changing anything structural:
 - [`docs/DECISIONS-AUTH-ADMIN.md`](docs/DECISIONS-AUTH-ADMIN.md) — the 50 auth
   and admin-shell decisions, the permission function, and the append-only
   audit log
+- [`docs/DECISIONS-ADMIN-SHELL.md`](docs/DECISIONS-ADMIN-SHELL.md) — the 45
+  shell behaviour decisions, and why the admin is tested against a production
+  build rather than `next dev`
 
 ## Getting started
 
@@ -105,6 +108,20 @@ To make yourself staff after registering:
 ```sql
 update users set role = 'admin' where email = 'you@example.com';
 ```
+
+## Testing the admin
+
+Client interactivity does not work under `next dev` in some sandboxed
+environments: the HMR WebSocket cannot connect, hydration never finishes, and no
+event handler attaches. Test the admin against a production build:
+
+```bash
+npm run build && npm run start
+```
+
+The login throttle allows eight attempts per identifier per fifteen minutes and
+counts successes, so a test run that cannot sign in has usually tripped it.
+Clear it with `delete from auth_attempts;`.
 
 ## Notes
 

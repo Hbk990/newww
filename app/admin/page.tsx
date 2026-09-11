@@ -2,13 +2,13 @@ import { count, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { orders, products, sourceProducts } from "@/db/schema";
-import { requireStaff } from "@/lib/auth/guards";
+import { requirePermission } from "@/lib/auth/guards";
 
 export const metadata = { title: "Admin · DRPHONE" };
 export const dynamic = "force-dynamic";
 
 export default async function AdminHome() {
-  const user = await requireStaff();
+  const user = await requirePermission("orders.view");
 
   const [live] = await db
     .select({ n: count() })

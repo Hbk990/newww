@@ -67,6 +67,11 @@ type Role = SessionUser["role"];
  * things you would not hand to a new employee on their first day. That is a
  * default, not a claim about your current team — the feature plan asked for
  * cost and profit to be separable, and this is where that lives.
+ *
+ * `audit.view` is admin-only for the same reason, and it is easy to get wrong:
+ * the audit log records price and cost changes with their previous values, so
+ * granting it to someone who cannot see cost hands them cost history by another
+ * route. A permission set is only as tight as its leakiest member.
  */
 const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   customer: [],
@@ -89,7 +94,6 @@ const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     "reviews.moderate",
     "promotions.manage",
     "settings.view",
-    "audit.view",
   ],
 
   admin: PERMISSIONS,

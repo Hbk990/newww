@@ -1,50 +1,68 @@
-import Link from "next/link";
+import { count, eq } from "drizzle-orm";
 
+import { db } from "@/db";
+import { notifications } from "@/db/schema";
+import { Breadcrumbs } from "@/components/admin/breadcrumbs";
+import { MobileNav } from "@/components/admin/mobile-nav";
+import { Sidebar } from "@/components/admin/sidebar";
+import { TopBar } from "@/components/admin/top-bar";
+import { NAV, NAV_FOOTER, QUICK_CREATE } from "@/lib/admin/nav";
 import { signOut } from "@/lib/auth/actions";
 import { requireStaff } from "@/lib/auth/guards";
+import { can } from "@/lib/auth/permissions";
 
 /**
- * The admin gate.
+ * The admin gate and the shell around every admin page.
  *
- * Every route under /admin passes through this layout, so access is enforced in
- * one place rather than remembered on each page. It runs on the server, so
- * nothing under here is ever sent to a browser that should not have it.
- *
- * Not middleware: the check needs the database to read the user's current role,
- * so a demoted account loses access on its next request rather than whenever
- * its cookie happens to expire.
+ * Access is enforced here rather than per page, so a new screen is protected by
+ * existing in this tree. Not middleware: the check reads the user's current
+ * role and status from the database, so suspending or demoting someone takes
+ * effect on their next request instead of whenever their cookie expires.
  */
 export default async function AdminLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const user = await requireStaff();
 
+  /**
+   * The nav is filtered by permission even though the decision was to show
+   * everything to all staff. Nothing here is hidden from a `staff` account
+   * except Staff and Audit log, which are admin-only — and a link that
+   * redirects away is worse than no link.
+   */
+  const sections = NAV.map((section) => ({
+    ...section,
+    items: section.items.filter((item) => can(user, item.permission)),
+  })).filter((section) => section.items.length > 0);
+
+  const footer = NAV_FOOTER.filter((item) => can(user, item.permission));
+  const createItems = QUICK_CREATE.filter((item) => can(user, item.permission)).map(
+    ({ label, href }) => ({ label, href }),
+  );
+
+  const [unread] = await db
+    .select({ n: count() })
+    .from(notifications)
+    .where(eq(notifications.status, "queued"));
+
   return (
-    <div className="min-h-svh">
-      <header className="border-b border-line">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-6 py-3">
-          <Link href="/admin" className="text-sm font-semibold tracking-tight">
-            DRPHONE admin
-          </Link>
-          <nav className="flex gap-4 text-sm text-muted">
-            <Link href="/admin">Overview</Link>
-          </nav>
-          <div className="ml-auto flex items-center gap-3 text-sm text-muted">
-            <span>
-              {user.username ?? user.name ?? user.email}
-              <span className="ml-1.5 rounded bg-line/50 px-1.5 py-0.5 text-xs">
-                {user.role}
-              </span>
-            </span>
-            <form action={signOut}>
-              <button type="submit" className="underline underline-offset-4">
-                Sign out
-              </button>
-            </form>
-          </div>
-        </div>
-      </header>
-      <main className="mx-auto max-w-5xl px-6 py-10">{children}</main>
+    <div className="flex min-h-svh">
+      <Sidebar sections={sections} footer={footer} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <TopBar
+          createItems={createItems}
+          unread={unread?.n ?? 0}
+          name={user.username ?? user.name ?? user.email}
+          role={user.role}
+          signOut={signOut}
+        />
+        {/* Bottom padding clears the mobile nav bar. */}
+        <main className="min-w-0 flex-1 px-4 pb-24 pt-5 md:px-6 md:pb-10">
+          <Breadcrumbs />
+          {children}
+        </main>
+      </div>
+      <MobileNav sections={sections} footer={footer} />
     </div>
   );
 }
