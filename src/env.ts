@@ -37,6 +37,15 @@ export const env = {
    */
   mailTransport: process.env.MAIL_TRANSPORT ?? "console",
   mailFrom: process.env.MAIL_FROM ?? "DRPHONE <no-reply@localhost>",
+  /**
+   * Shared secret for the scheduled-job endpoints.
+   *
+   * Optional, and the endpoints refuse to run at all when it is unset rather
+   * than running unauthenticated. An open endpoint that sweeps stock holds is
+   * a denial-of-service tool: anyone could call it in a loop and strip the
+   * holds off every live cart in the shop.
+   */
+  cronSecret: process.env.CRON_SECRET ?? null,
   nodeEnv: process.env.NODE_ENV ?? "development",
   get isProduction(): boolean {
     return this.nodeEnv === "production";

@@ -71,10 +71,21 @@ made the attributes page report "None yet" for attributes that had options.
 registers rtk (github.com/rtk-ai/rtk) as a `PreToolUse` hook, so an agent
 working in this repo sees `rtk git status` in place of `git status` and gets
 filtered output. That is deliberate — it cuts tokens sharply — but it means
-command output reaching the model is not raw. If output ever looks wrong,
-rtk issue #2176 is the open bug for exactly that, and
-`~/.config/rtk/config.toml` takes `[hooks]` / `exclude_commands` to exempt
-commands whose output is load-bearing here: `git`, `psql`, `playwright`.
+command output reaching the model is neither raw nor merely trimmed.
+**rtk's filters can change which binary runs.** Its eslint filter invoked a
+globally installed ESLint 10.1.0 instead of this repo's pinned 9.39.5, hit the
+`getFilename` incompatibility `eslint.config.mjs` warns about, failed to parse
+the crash as JSON and returned exit 2 — a clean lint reported as a broken one.
+Reproduced here, not hypothetical; rtk issue #2176 is the open bug for the
+related output-fidelity problem. The fix is `~/.config/rtk/config.toml`:
+
+    [hooks]
+    exclude_commands = ["npx", "npm", "eslint", "tsc", "vitest", "playwright", "psql", "pg_dump", "node"]
+
+That file is per-machine and not in this repo, so **every developer and every
+fresh container needs it** — those are the commands by which migrations, schema
+state, both test suites, types and lint are verified, and rtk must not stand
+between them and you.
 `.claude/hooks/install-rtk.sh` installs the binary and exits 0 on every path,
 so a session without rtk degrades to unfiltered output rather than failing.
 
