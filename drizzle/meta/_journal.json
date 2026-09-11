@@ -64,6 +64,20 @@
       "when": 1789084360161,
       "tag": "0008_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789103111534,
+      "tag": "0009_product_form",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1789103178113,
+      "tag": "0010_availability_mode",
+      "breakpoints": true
     }
   ]
 }

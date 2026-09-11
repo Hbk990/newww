@@ -66,7 +66,18 @@ always-in-stock behaviour of the current site.
 ### Orders snapshot everything
 `order_items` copies the product title, variant title, SKU, and unit price at purchase time. It keeps a nullable FK to the variant for reporting, but never joins to it for display. Products get renamed, repriced, and deleted; a two-year-old invoice must still render exactly what the customer bought.
 
-### Inventory is on_hand minus reserved
+### Inventory is availability first, quantities only where they are wanted
+This is a wholesale business, and the shelf stock serves trade customers as well
+as the website — so a number on a product would not mean "how many the site may
+sell". `inventory.track` therefore defaults to **false**, and `available` is a
+switch someone flips. Nothing is counted, a sale decrements nothing, and selling
+something switched off is refused.
+
+Turning `track` on for a variant brings the counted machinery below to life for
+that variant alone. Both modes coexist per variant on purpose: the few lines
+worth counting can be counted without forcing a number onto the other 1,900.
+
+### Where quantities are tracked, inventory is on_hand minus reserved
 `available = on_hand - reserved`. Adding to cart creates a row in `inventory_reservations` with an `expires_at`; a sweeper releases stale ones. Every decrement goes through the `claim_stock()` function in `schema.sql`, which guards the `UPDATE` on available quantity and chains the ledger insert off its `RETURNING`, so the two can't come apart. Do not write them as separate statements: the guard can filter the row out while the following insert still records a sale that never happened. Verified against Postgres 16 — two transactions racing for one unit give one sale, one ledger row, and one honest out-of-stock error, never a negative balance. All movements append to `inventory_ledger`, so stock is auditable rather than just a mutable number.
 
 ### Cash on Delivery removes the hard parts, and adds different ones

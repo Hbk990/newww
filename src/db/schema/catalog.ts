@@ -70,6 +70,24 @@ export const products = pgTable(
     ratingAvg: numeric({ precision: 2, scale: 1 }),
     // True when this product is sold as a bundle of other variants.
     isBundle: boolean().notNull().default(false),
+    // A manual homepage flag. "New arrival" is derived from publishedAt
+    // instead, so it cannot go stale because nobody remembered to untick it.
+    isFeatured: boolean().notNull().default(false),
+    /**
+     * Free-form tags, for grouping and for smart collections to match on.
+     * An array rather than a join table: tags are read with the product on
+     * every listing, and a GIN index (added in the migration) answers
+     * "has this tag" without a join.
+     */
+    tags: text().array(),
+    // Staff-only. Must never reach the storefront.
+    internalNote: text(),
+    /**
+     * A price floor. The form warns rather than blocks — a hard stop gets in
+     * the way of a genuine clearance — so this records intent, not a
+     * constraint.
+     */
+    minAllowedPriceCents: integer(),
   },
   (t) => [
     index("products_status_published_idx").on(t.status, t.publishedAt.desc()),
@@ -91,6 +109,9 @@ export const products = pgTable(
     index("products_bestselling_idx")
       .on(t.salesCount.desc())
       .where(sql`${t.status} = 'active'`),
+    index("products_featured_idx")
+      .on(t.publishedAt.desc())
+      .where(sql`${t.status} = 'active' and ${t.isFeatured}`),
   ],
 );
 
@@ -166,6 +187,18 @@ export const variants = pgTable(
     priceCents: integer().notNull(),
     costCents: integer(),
     compareAtCents: integer(),
+    /**
+     * A scheduled sale. Per variant, not per product, because your catalog
+     * prices options separately — a 32GB flash drive at $4.50 and a 512GB at
+     * $29 do not share a discount.
+     *
+     * Outside the window `priceCents` applies; inside it, this does. Resolved
+     * at read time rather than by a job rewriting prices, so a sale that ends
+     * cannot leave a stale price behind.
+     */
+    salePriceCents: integer(),
+    saleStartsAt: timestamp({ withTimezone: true }),
+    saleEndsAt: timestamp({ withTimezone: true }),
     weightGrams: integer(),
     imageId: uuid().references(() => productImages.id, { onDelete: "set null" }),
     position: integer().notNull().default(0),
@@ -176,6 +209,12 @@ export const variants = pgTable(
     check("variants_price_cents_nonneg", sql`${t.priceCents} >= 0`),
     check("variants_cost_cents_nonneg", sql`${t.costCents} >= 0`),
     check("variants_compare_at_cents_nonneg", sql`${t.compareAtCents} >= 0`),
+    check("variants_sale_price_nonneg", sql`${t.salePriceCents} >= 0`),
+    // A window with only one end is ambiguous about when the sale applies.
+    check(
+      "variants_sale_window_complete",
+      sql`(${t.salePriceCents} is null) = (${t.saleStartsAt} is null) and (${t.saleStartsAt} is null) = (${t.saleEndsAt} is null)`,
+    ),
   ],
 );
 

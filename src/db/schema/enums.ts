@@ -8,9 +8,15 @@ import { pgEnum } from "drizzle-orm/pg-core";
  * order as fixed once a migration has shipped.
  */
 
+/**
+ * `discontinued` is distinct from `archived`: no longer stocked but still
+ * visible in reports, reorder history and a customer's past orders, where
+ * archived is hidden outright. Nothing is ever hard-deleted.
+ */
 export const productStatus = pgEnum("product_status", [
   "draft",
   "active",
+  "discontinued",
   "archived",
 ]);
 
@@ -120,10 +126,16 @@ export const reviewStatus = pgEnum("review_status", [
 ]);
 
 /** Why two products are linked. */
+/**
+ * Two kinds are used: `cross_sell` ("goes with this") and `alternative`
+ * ("instead of this"). The other two remain available but curating five lists
+ * per product costs five times the work for mostly the same products.
+ */
 export const relationKind = pgEnum("relation_kind", [
   "cross_sell",
   "accessory",
   "similar",
+  "alternative",
 ]);
 
 export const alertKind = pgEnum("alert_kind", ["back_in_stock", "price_drop"]);

@@ -26,9 +26,17 @@ export const storeSettings = pgTable(
     currency: char({ length: 3 }).notNull(),
     // The one country we ship to.
     country: char({ length: 2 }).notNull(),
-    // Basis points. Lebanon VAT is 11%.
-    taxRateBps: integer().notNull().default(1100),
-    pricesIncludeTax: boolean().notNull().default(false),
+    /**
+     * Basis points, and zero by default.
+     *
+     * Prices are entered tax-inclusive, so nothing is added at checkout: the
+     * figure on the product page is what the courier collects. Set a rate here
+     * only if tax ever needs showing as a separate line, and then
+     * `pricesIncludeTax` decides whether it is added to the total or broken out
+     * of it.
+     */
+    taxRateBps: integer().notNull().default(0),
+    pricesIncludeTax: boolean().notNull().default(true),
     /**
      * Display-only secondary currency, e.g. an LBP figure shown next to a USD
      * price. Never a second price list and never used for settlement — the rate

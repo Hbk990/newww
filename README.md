@@ -15,6 +15,9 @@ Read these before changing anything structural:
   line wholesale catalog export and how it is used
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) — the 58 feature decisions: what is in
   scope, what is explicitly out, and the schema changes they require
+- [`docs/DECISIONS-PRODUCT-FORM.md`](docs/DECISIONS-PRODUCT-FORM.md) — the 45
+  product-form decisions, and why inventory tracks availability rather than
+  quantities
 
 ## Getting started
 

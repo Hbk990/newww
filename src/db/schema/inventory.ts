@@ -14,14 +14,18 @@ import { variants } from "./catalog";
 import { inventoryPolicy } from "./enums";
 
 /**
- * Stock per variant. `available = onHand - reserved`.
+ * Stock per variant, in one of two modes.
  *
- * Every write locks the row, and the only sanctioned path for a sale is
- * `claim_stock()` (see the migration), which decrements and writes the ledger
- * in one statement so the two cannot come apart.
+ * **Untracked** (the default): `available` is a switch someone flips. Nothing
+ * is counted and nothing is decremented by a sale. This suits a wholesaler
+ * whose shelf stock is shared with trade customers, where a count on the
+ * website would be misleading rather than useful.
  *
- * `policy = 'deny'` by default: real quantities are being entered, so the store
- * should stop selling at zero rather than accept backorders silently.
+ * **Tracked**: `onHand` and `reserved` are real, a sale decrements them through
+ * `claim_stock()`, and `policy` decides what happens at zero.
+ *
+ * Mixing the two per variant is deliberate — the handful of lines worth
+ * counting can be counted without forcing a number onto the other 1,900.
  */
 export const inventory = pgTable(
   "inventory",
@@ -29,9 +33,30 @@ export const inventory = pgTable(
     variantId: uuid()
       .primaryKey()
       .references(() => variants.id, { onDelete: "cascade" }),
+    /**
+     * Whether this variant is counted in units.
+     *
+     * Defaults to FALSE, because this is a wholesale business: the physical
+     * stock serves trade customers as well as the website, so a number here
+     * would not mean "how many the website may sell". Availability is set by
+     * hand instead.
+     *
+     * Turn it on per variant when a real count is worth keeping — then
+     * `onHand`, `reserved`, `policy` and `lowStockThreshold` all come alive and
+     * `available` is ignored.
+     */
+    track: boolean().notNull().default(false),
+    /**
+     * The manual in-stock switch, used when `track` is false. This is what the
+     * admin actually toggles.
+     *
+     * Without it, an untracked variant has no way to be marked out of stock —
+     * quantity zero cannot mean "none left" when quantity was never entered.
+     */
+    available: boolean().notNull().default(true),
+    // Only meaningful when `track` is true.
     onHand: integer().notNull().default(0),
     reserved: integer().notNull().default(0),
-    track: boolean().notNull().default(true),
     policy: inventoryPolicy().notNull().default("deny"),
     /**
      * Reorder point. `in_stock` already flips at zero; this is what warns you
@@ -44,6 +69,8 @@ export const inventory = pgTable(
   (t) => [
     check("inventory_reserved_nonneg", sql`${t.reserved} >= 0`),
     // The low-stock worklist: only variants actually at or under their point.
+    // Only tracked variants can be low: an untracked one has no quantity to
+    // compare against a threshold.
     index("inventory_low_stock_idx")
       .on(t.variantId)
       .where(

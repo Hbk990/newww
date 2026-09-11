@@ -8,6 +8,7 @@ import {
   pgTable,
   primaryKey,
   text,
+  unique,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -38,6 +39,32 @@ export const attributeDefinitions = pgTable("attribute_definitions", {
 });
 
 /** Which attributes make sense where: mAh for Power Bank, not for Gaming Chair. */
+/**
+ * The choices for an `enum` attribute — Silicone / TPU / Leather / PC.
+ *
+ * This is what makes the attribute builder work without a developer: the owner
+ * defines an attribute and its options in the admin, and the product form
+ * renders a dropdown from these rows. A free-text field instead would fill the
+ * database with "silicone", "Silicone" and "silicon", and nothing would filter.
+ */
+export const attributeOptions = pgTable(
+  "attribute_options",
+  {
+    id: uuid().primaryKey().defaultRandom(),
+    attributeId: uuid()
+      .notNull()
+      .references(() => attributeDefinitions.id, { onDelete: "cascade" }),
+    value: text().notNull(),
+    // Optional swatch, so a colour attribute can render as colour.
+    colorHex: text(),
+    position: integer().notNull().default(0),
+  },
+  (t) => [
+    unique("attribute_options_value_key").on(t.attributeId, t.value),
+    index("attribute_options_ordered_idx").on(t.attributeId, t.position),
+  ],
+);
+
 export const categoryAttributes = pgTable(
   "category_attributes",
   {
