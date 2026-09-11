@@ -147,7 +147,13 @@ export const optionTypes = pgTable(
     kind: optionKind().notNull().default("other"),
     position: integer().notNull().default(0),
   },
-  (t) => [unique("option_types_product_name_key").on(t.productId, t.name)],
+  (t) => [
+    unique("option_types_product_name_key").on(t.productId, t.name),
+    // `id` is unique alone; this pairing is the target of option_values'
+    // composite key, which is what lets a row-level check there know whether
+    // its parent axis is a device axis.
+    unique("option_types_id_kind_key").on(t.id, t.kind),
+  ],
 );
 
 /** A value on an axis: "M", "Red", "256GB", "17 Pro Max". */
@@ -159,9 +165,46 @@ export const optionValues = pgTable(
       .notNull()
       .references(() => optionTypes.id, { onDelete: "cascade" }),
     value: text().notNull(),
+    /**
+     * Denormalised from the parent axis and held honest by a composite foreign
+     * key on (option_type_id, kind), declared in migration 0017 with ON UPDATE
+     * CASCADE. It exists so the check below can be a plain row-level rule
+     * rather than a trigger reaching into option_types.
+     */
+    kind: optionKind().notNull().default("other"),
+    /**
+     * Set when this value names a real device.
+     *
+     * Selling a cover at a different price per phone size makes the device an
+     * option axis — and "shop by device" reads product_device_fit, which rolls
+     * up from variant_device_fit and wants a real device_models row. Without
+     * this the same devices would be entered twice: once as axis text, once in
+     * the fitment picker. Generating variants writes the fitment rows straight
+     * from here.
+     *
+     * Nullable even on a device axis: the catalog still carries device labels
+     * nobody has identified ("A3", "X 11PRO"), and those must not block a sale.
+     * Such a variant simply never appears under "shop by device".
+     * The reference to device_models is declared in migration 0017, not here:
+     * devices.ts already imports from this file, so naming it would make the
+     * two modules circular — and Drizzle resolves a `references` callback at
+     * module-init time, where a cycle yields undefined rather than an error.
+     */
+    deviceModelId: uuid(),
     position: integer().notNull().default(0),
   },
-  (t) => [unique("option_values_type_value_key").on(t.optionTypeId, t.value)],
+  (t) => [
+    unique("option_values_type_value_key").on(t.optionTypeId, t.value),
+    // The same phone twice on one axis would generate duplicate variants.
+    uniqueIndex("option_values_type_device_uq").on(
+      t.optionTypeId,
+      t.deviceModelId,
+    ),
+    check(
+      "option_values_device_only_on_device_axis",
+      sql`${t.deviceModelId} is null or ${t.kind} = 'device_fit'`,
+    ),
+  ],
 );
 
 /**

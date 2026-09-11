@@ -120,6 +120,20 @@
       "when": 1789137168355,
       "tag": "0016_sync_snapshot",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1789138511031,
+      "tag": "0017_device_option_values",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1789138642469,
+      "tag": "0018_sync_snapshot",
+      "breakpoints": true
     }
   ]
 }
