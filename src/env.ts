@@ -20,6 +20,23 @@ export const env = {
   get databaseUrl(): string {
     return required("DATABASE_URL");
   },
+  /**
+   * Google's OAuth client id. Public by design — it ships to the browser for
+   * One Tap — but still read from the environment so staging and production can
+   * use different Google projects.
+   *
+   * Optional: with it unset, Google sign-in is hidden and email registration
+   * still works. That keeps the app runnable before anyone has created a
+   * Google Cloud project.
+   */
+  googleClientId: process.env.GOOGLE_CLIENT_ID ?? null,
+  /**
+   * Which mail transport to use. `console` prints the message instead of
+   * sending it, so the whole registration flow works end to end before an
+   * email provider is chosen.
+   */
+  mailTransport: process.env.MAIL_TRANSPORT ?? "console",
+  mailFrom: process.env.MAIL_FROM ?? "DRPHONE <no-reply@localhost>",
   nodeEnv: process.env.NODE_ENV ?? "development",
   get isProduction(): boolean {
     return this.nodeEnv === "production";

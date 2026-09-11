@@ -75,6 +75,27 @@ drizzle/        Generated migrations
 7. Bulk paste-entry for hand-corrected rows
 8. Cart, checkout, COD order and the confirmation queue
 
+## Authentication
+
+Cookie sessions in Postgres, Argon2id passwords, and Google One Tap. See
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for why each piece is shaped the
+way it is.
+
+Running it locally needs nothing configured: with `MAIL_TRANSPORT=console` the
+verification code is printed to the server log instead of emailed, so
+registration works end to end before an email provider exists. That transport
+refuses to run in production.
+
+Google sign-in is hidden unless `GOOGLE_CLIENT_ID` is set. Create an OAuth 2.0
+Client ID (type: Web application) in Google Cloud — free — and add your origin
+under "Authorized JavaScript origins".
+
+To make yourself staff after registering:
+
+```sql
+update users set role = 'admin' where email = 'you@example.com';
+```
+
 ## Notes
 
 - **Pinned to ESLint 9.** `eslint-config-next@16` declares `eslint >=9` but
