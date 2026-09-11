@@ -33,13 +33,23 @@ export default async function Page() {
       unit: attributeDefinitions.unit,
       isFilterable: attributeDefinitions.isFilterable,
       position: attributeDefinitions.position,
+      /*
+       * The outer column is named literally, not interpolated.
+       *
+       * `${attributeDefinitions.id}` renders as bare "id" with no table
+       * qualifier, and inside a subquery that binds to the INNER table's own
+       * id when it has one — so this counted options whose id equalled their
+       * attribute_id, which is never, and always reported zero. The
+       * category_attributes count below looked correct only because that table
+       * has no id column for "id" to bind to.
+       */
       options: sql<number>`(
         select count(*)::int from attribute_options o
-        where o.attribute_id = ${attributeDefinitions.id}
+        where o.attribute_id = attribute_definitions.id
       )`,
       categories: sql<number>`(
         select count(*)::int from category_attributes ca
-        where ca.attribute_id = ${attributeDefinitions.id}
+        where ca.attribute_id = attribute_definitions.id
       )`,
     })
     .from(attributeDefinitions)

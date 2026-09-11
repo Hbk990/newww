@@ -1,17 +1,21 @@
-import { Placeholder } from "@/components/admin/placeholder";
+import { BrandsManager } from "@/components/admin/brands-manager";
+import { loadBrands } from "@/lib/admin/taxonomy-actions";
 import { requirePermission } from "@/lib/auth/guards";
 
 export const metadata = { title: "Brands · DRPHONE" };
 
-// The guard runs before anything is returned, so its redirect happens before
-// the response starts streaming.
 export default async function Page() {
   await requirePermission("products.edit");
+  const rows = await loadBrands();
 
   return (
-    <Placeholder
-      title="Brands"
-      description="The 226 brands from your catalog, each with its own storefront page."
-    />
+    <>
+      <h1 className="text-xl font-semibold tracking-tight">Brands</h1>
+      <p className="mt-1 max-w-2xl text-sm text-muted">
+        Who makes the product. Featured brands are the ones a storefront
+        homepage can single out.
+      </p>
+      <BrandsManager rows={rows} />
+    </>
   );
 }
