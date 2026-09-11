@@ -240,11 +240,23 @@ export async function createProduct(raw: ProductInput): Promise<SaveResult> {
         // Availability, not quantity: `track` stays false so `available` is
         // the switch that decides, and on_hand is ignored until someone opts
         // a variant into counting.
-        await tx.insert(inventory).values({
-          variantId: variant.id,
-          available: v.available,
-          track: false,
-        });
+        //
+        // Upsert, not insert: the `variants_inventory_row` trigger (migration
+        // 0021) has already created a default row by the time this runs, so a
+        // plain insert would fail on the primary key. The trigger guarantees
+        // every variant has a row whatever created it; this sets the one field
+        // the form actually knows about.
+        await tx
+          .insert(inventory)
+          .values({
+            variantId: variant.id,
+            available: v.available,
+            track: false,
+          })
+          .onConflictDoUpdate({
+            target: inventory.variantId,
+            set: { available: v.available, track: false },
+          });
 
         const chosen = v.combo
           .map((valueIndex, axisIndex) => valueIds[axisIndex]?.[valueIndex])
@@ -714,9 +726,14 @@ export async function updateProduct(
             .returning({ id: variants.id });
           if (!row) throw new Error("variant insert returned no row");
           variantId = row.id;
+          // Upsert for the same reason as above: the trigger got there first.
           await tx
             .insert(inventory)
-            .values({ variantId, available: v.available, track: false });
+            .values({ variantId, available: v.available, track: false })
+            .onConflictDoUpdate({
+              target: inventory.variantId,
+              set: { available: v.available, track: false },
+            });
           if (inheritedFit.length > 0) {
             const fresh = row.id;
             await tx.insert(variantDeviceFit).values(
