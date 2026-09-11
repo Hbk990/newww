@@ -10,41 +10,60 @@ import {
   type DeviceOption,
   type Row,
 } from "@/components/admin/variant-grid";
-import { createProduct } from "@/lib/admin/product-form-actions";
+import { createProduct, updateProduct } from "@/lib/admin/product-form-actions";
 import { skuFragment, slugify } from "@/lib/slug";
 
 type Brand = { id: string; name: string };
 type Category = { id: string; name: string; parentId: string | null; position: number };
+
+export type ProductInitial = {
+  id: string;
+  title: string;
+  slug: string;
+  brandId: string;
+  categoryIds: string[];
+  shortDescription: string;
+  status: string;
+  axes: Axis[];
+  rows: Row[];
+};
 
 export function ProductForm({
   brands,
   categories,
   devices,
   showCost,
+  initial,
 }: {
   brands: Brand[];
   categories: Category[];
   devices: DeviceOption[];
   showCost: boolean;
+  /** Absent when creating. */
+  initial?: ProductInitial;
 }) {
   const router = useRouter();
   const toast = useToast();
   const [pending, start] = useTransition();
 
-  const [title, setTitle] = useState("");
-  const [slug, setSlug] = useState("");
-  const [slugTouched, setSlugTouched] = useState(false);
-  const [brandId, setBrandId] = useState("");
-  const [categoryIds, setCategoryIds] = useState<string[]>([]);
-  const [shortDescription, setShortDescription] = useState("");
-  const [status, setStatus] = useState("draft");
-  const [axes, setAxes] = useState<Axis[]>([]);
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [slug, setSlug] = useState(initial?.slug ?? "");
+  // An existing slug is never rewritten by editing the title: it is the
+  // product's public address, and changing it silently breaks every link to it.
+  const [slugTouched, setSlugTouched] = useState(Boolean(initial));
+  const [brandId, setBrandId] = useState(initial?.brandId ?? "");
+  const [categoryIds, setCategoryIds] = useState<string[]>(initial?.categoryIds ?? []);
+  const [shortDescription, setShortDescription] = useState(initial?.shortDescription ?? "");
+  const [status, setStatus] = useState(initial?.status ?? "draft");
+  const [axes, setAxes] = useState<Axis[]>(initial?.axes ?? []);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // One default row, so a product sold one way needs no options at all.
-  const [rows, setRows] = useState<Row[]>([
-    { combo: [], key: "", title: "Default", sku: "", price: "", available: true, fresh: true },
-  ]);
+  const [rows, setRows] = useState<Row[]>(
+    initial?.rows ?? [
+      { combo: [], key: "", title: "Default", sku: "", price: "", available: true, fresh: true },
+    ],
+  );
 
   const groups = categories.filter((c) => c.parentId === null);
   const brandName = brands.find((b) => b.id === brandId)?.name ?? "";
@@ -57,7 +76,7 @@ export function ProductForm({
   function submit(event: React.FormEvent, andAnother: boolean) {
     event.preventDefault();
     start(async () => {
-      const result = await createProduct({
+      const payload = {
         title,
         slug: slug || slugify(title),
         brandId: brandId || null,
@@ -68,16 +87,30 @@ export function ProductForm({
           // An axis with no values contributes nothing but would multiply the
           // grid by zero, so it is dropped rather than rejected.
           .filter((a) => a.name.trim() && a.values.length > 0)
-          .map((a) => ({ name: a.name.trim(), kind: a.kind as never, values: a.values })),
-        variants: rows.map((r) => ({
-          combo: r.combo,
-          title: r.title,
-          sku: r.sku.trim() || null,
-          price: r.price.trim(),
-          costCents: null,
-          available: r.available,
-        })),
-      });
+          .map((a) => ({
+            id: a.id,
+            name: a.name.trim(),
+            kind: a.kind as never,
+            values: a.values,
+          })),
+        // Rows on their way out are simply absent from the payload; the server
+        // works out which of them can be deleted and which have been sold.
+        variants: rows
+          .filter((r) => !r.leaving)
+          .map((r) => ({
+            id: r.id,
+            combo: r.combo,
+            title: r.title,
+            sku: r.sku.trim() || null,
+            price: r.price.trim(),
+            costCents: null,
+            available: r.available,
+          })),
+      };
+
+      const result = initial
+        ? await updateProduct(initial.id, payload)
+        : await createProduct(payload);
 
       if (!result.ok) {
         setErrors(result.fieldErrors ?? {});
@@ -85,7 +118,13 @@ export function ProductForm({
         return;
       }
       setErrors({});
-      toast({ text: `${title} saved.` });
+      const hidden = result.kept;
+      toast({
+        text:
+          hidden > 0
+            ? `${title} saved. ${hidden} sold variant${hidden === 1 ? "" : "s"} hidden rather than deleted, so their orders keep the link.`
+            : `${title} saved.`,
+      });
 
       if (andAnother) {
         // Keeps brand, categories and status — the fields that repeat across a

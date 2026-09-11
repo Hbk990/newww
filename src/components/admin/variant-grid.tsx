@@ -2,14 +2,28 @@
 
 import { useMemo, useState } from "react";
 
+import { comboKey, expand } from "@/lib/admin/variant-combos";
 import { skuFragment } from "@/lib/slug";
 
 export type DeviceOption = { id: string; name: string; family: string | null };
 
-export type AxisValue = { value: string; deviceModelId: string | null };
-export type Axis = { name: string; kind: string; values: AxisValue[] };
+export type AxisValue = {
+  id?: string;
+  value: string;
+  deviceModelId: string | null;
+};
+export type Axis = {
+  id?: string;
+  name: string;
+  kind: string;
+  values: AxisValue[];
+};
 
 export type Row = {
+  /** Set for a variant that already exists; absent means it will be created. */
+  id?: string;
+  /** Has been sold at least once, so it can be hidden but never deleted. */
+  sold?: boolean;
   /** Indexes into each axis, in axis order — the identity of this combination. */
   combo: number[];
   key: string;
@@ -19,6 +33,8 @@ export type Row = {
   available: boolean;
   /** Generated but not yet edited, so the form can point at what needs a price. */
   fresh: boolean;
+  /** Its combination no longer exists on the axes; kept visible until saved. */
+  leaving?: boolean;
 };
 
 const KINDS = [
@@ -30,19 +46,6 @@ const KINDS = [
   { value: "power", label: "Power" },
   { value: "other", label: "Other" },
 ];
-
-export function comboKey(axes: Axis[], combo: number[]): string {
-  return combo.map((v, i) => axes[i]?.values[v]?.value ?? "").join(" / ");
-}
-
-/** Every combination of the axes, in axis order. */
-export function expand(axes: Axis[]): number[][] {
-  return axes.reduce<number[][]>(
-    (acc, axis) =>
-      acc.flatMap((prefix) => axis.values.map((_, i) => [...prefix, i])),
-    [[]],
-  );
-}
 
 export function VariantGrid({
   axes,
@@ -74,26 +77,40 @@ export function VariantGrid({
   function rebuild(next: Axis[]) {
     const previous = new Map(rows.map((r) => [r.key, r]));
     const combos = next.length === 0 ? [[]] : expand(next);
-    const first = rows[0];
+    const first = rows.find((r) => !r.leaving);
     setAxes(next);
-    setRows(
-      combos.map((combo) => {
-        const key = comboKey(next, combo);
-        const existing = previous.get(key);
-        if (existing) return { ...existing, combo };
-        return {
-          combo,
-          key,
-          title: key || "Default",
-          sku: autoSku(next, combo, skuPrefix),
-          // Copied from the first row so a new axis value does not mean
-          // retyping every price — flagged fresh so it is still visible.
-          price: first?.price ?? "",
-          available: true,
-          fresh: true,
-        };
-      }),
-    );
+
+    const wanted = combos.map((combo) => {
+      const key = comboKey(next, combo);
+      const existing = previous.get(key);
+      if (existing) return { ...existing, combo, leaving: false };
+      return {
+        combo,
+        key,
+        title: key || "Default",
+        sku: autoSku(next, combo, skuPrefix),
+        // Copied from the first row so a new axis value does not mean
+        // retyping every price — flagged fresh so it is still visible.
+        price: first?.price ?? "",
+        available: true,
+        fresh: true,
+      };
+    });
+
+    /*
+     * Saved variants whose combination the axes no longer produce.
+     *
+     * They stay on screen, greyed, rather than vanishing the moment a value is
+     * removed: dropping a colour on a live product removes real rows with real
+     * prices, and doing that silently is how someone loses work to a mis-click.
+     * The save then deletes them, except any that have been sold.
+     */
+    const wantedKeys = new Set(wanted.map((r) => r.key));
+    const orphans = rows
+      .filter((r) => r.id && !wantedKeys.has(r.key))
+      .map((r) => ({ ...r, leaving: true }));
+
+    setRows([...wanted, ...orphans]);
     setSelected(new Set());
   }
 
@@ -121,33 +138,53 @@ export function VariantGrid({
   function removeValue(axisIndex: number, valueIndex: number) {
     const axis = axes[axisIndex];
     if (!axis) return;
-    patchAxis(axisIndex, { values: axis.values.filter((_, i) => i !== valueIndex) });
+    patchAxis(axisIndex, {
+      values: axis.values.filter((_, i) => i !== valueIndex),
+    });
   }
 
   function patchRow(key: string, patch: Partial<Row>) {
-    setRows(rows.map((r) => (r.key === key ? { ...r, ...patch, fresh: false } : r)));
+    setRows(
+      rows.map((r) => (r.key === key ? { ...r, ...patch, fresh: false } : r)),
+    );
   }
 
   /** Copies the first row's value down the column — most rows share a price. */
   function fillDown(field: "sku" | "price") {
-    const first = rows[0];
+    const first = rows.find((r) => !r.leaving);
     if (!first) return;
-    setRows(rows.map((r, i) => (i === 0 ? r : { ...r, [field]: first[field], fresh: false })));
+    setRows(
+      rows.map((r) =>
+        r.leaving || r.key === first.key
+          ? r
+          : { ...r, [field]: first[field], fresh: false },
+      ),
+    );
   }
 
   function regenerateSkus() {
-    setRows(rows.map((r) => ({ ...r, sku: autoSku(axes, r.combo, skuPrefix) })));
+    setRows(
+      rows.map((r) => ({ ...r, sku: autoSku(axes, r.combo, skuPrefix) })),
+    );
   }
 
   const freshCount = useMemo(() => rows.filter((r) => r.fresh).length, [rows]);
+  // Existing rows the current axes no longer produce. They are not silently
+  // dropped: sold ones will be hidden, the rest deleted, and the form says so
+  // before the save rather than after.
+  const leaving = useMemo(() => rows.filter((r) => r.leaving), [rows]);
 
   return (
     <section className="mt-8">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-base font-semibold">Options and variants</h2>
         <span className="text-xs text-muted">
-          {rows.length} variant{rows.length === 1 ? "" : "s"}
+          {rows.length - leaving.length} variant
+          {rows.length - leaving.length === 1 ? "" : "s"}
           {freshCount > 0 ? ` · ${freshCount} new` : null}
+          {leaving.length > 0 ? (
+            <span className="text-warn"> · {leaving.length} leaving</span>
+          ) : null}
         </span>
       </div>
       <p className="mt-1 text-sm text-muted">
@@ -162,7 +199,11 @@ export function VariantGrid({
             axis={axis}
             devices={devices}
             usedDeviceIds={
-              new Set(axis.values.map((v) => v.deviceModelId).filter(Boolean) as string[])
+              new Set(
+                axis.values
+                  .map((v) => v.deviceModelId)
+                  .filter(Boolean) as string[],
+              )
             }
             onPatch={(patch) => patchAxis(ai, patch)}
             onRemove={() => removeAxis(ai)}
@@ -207,13 +248,17 @@ export function VariantGrid({
             </button>
             {selected.size > 0 ? (
               <>
-                <span className="ml-1 text-muted">{selected.size} selected</span>
+                <span className="ml-1 text-muted">
+                  {selected.size} selected
+                </span>
                 <button
                   type="button"
                   onClick={() =>
                     setRows(
                       rows.map((r) =>
-                        selected.has(r.key) ? { ...r, available: true, fresh: false } : r,
+                        selected.has(r.key)
+                          ? { ...r, available: true, fresh: false }
+                          : r,
                       ),
                     )
                   }
@@ -226,7 +271,9 @@ export function VariantGrid({
                   onClick={() =>
                     setRows(
                       rows.map((r) =>
-                        selected.has(r.key) ? { ...r, available: false, fresh: false } : r,
+                        selected.has(r.key)
+                          ? { ...r, available: false, fresh: false }
+                          : r,
                       ),
                     )
                   }
@@ -248,82 +295,125 @@ export function VariantGrid({
                       aria-label="Select all variants"
                       checked={selected.size === rows.length && rows.length > 0}
                       onChange={(e) =>
-                        setSelected(e.target.checked ? new Set(rows.map((r) => r.key)) : new Set())
+                        setSelected(
+                          e.target.checked
+                            ? new Set(
+                                rows
+                                  .filter((r) => !r.leaving)
+                                  .map((r) => r.key),
+                              )
+                            : new Set(),
+                        )
                       }
                     />
                   </th>
                   <th className="px-3 py-2 font-medium">Variant</th>
                   <th className="px-3 py-2 font-medium">SKU</th>
                   <th className="w-28 px-3 py-2 font-medium">Price</th>
-                  {showCost ? <th className="w-28 px-3 py-2 font-medium">Cost</th> : null}
+                  {showCost ? (
+                    <th className="w-28 px-3 py-2 font-medium">Cost</th>
+                  ) : null}
                   <th className="w-36 px-3 py-2 font-medium">Available</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
-                  <tr
-                    key={row.key}
-                    className={`border-b border-line last:border-0 ${
-                      selected.has(row.key) ? "bg-accent-soft" : ""
-                    }`}
-                  >
-                    <td className="px-2 py-1.5">
-                      <input
-                        type="checkbox"
-                        aria-label={`Select ${row.title}`}
-                        checked={selected.has(row.key)}
-                        onChange={(e) => {
-                          const next = new Set(selected);
-                          if (e.target.checked) next.add(row.key);
-                          else next.delete(row.key);
-                          setSelected(next);
-                        }}
-                      />
-                    </td>
-                    <td className="px-3 py-1.5 font-medium">{row.title}</td>
-                    <td className="px-3 py-1.5">
-                      <input
-                        value={row.sku}
-                        onChange={(e) => patchRow(row.key, { sku: e.target.value })}
-                        aria-label={`SKU for ${row.title}`}
-                        className="w-full rounded border border-transparent bg-transparent px-1.5 py-1 font-mono text-xs hover:border-line focus:border-accent focus:bg-surface focus:outline-none"
-                      />
-                    </td>
-                    <td className="px-3 py-1.5">
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs text-muted">$</span>
-                        <input
-                          value={row.price}
-                          onChange={(e) => patchRow(row.key, { price: e.target.value })}
-                          placeholder="0.00"
-                          inputMode="decimal"
-                          aria-label={`Price for ${row.title}`}
-                          className={`w-full rounded border bg-transparent px-1.5 py-1 font-mono text-xs focus:border-accent focus:bg-surface focus:outline-none ${
-                            row.fresh && !row.price ? "border-warn" : "border-transparent hover:border-line"
-                          }`}
-                        />
-                      </div>
-                    </td>
-                    {showCost ? (
-                      <td className="px-3 py-1.5">
-                        <span className="text-xs text-muted">—</span>
+                {rows.map((row) =>
+                  row.leaving ? (
+                    <tr
+                      key={row.key}
+                      className="border-b border-line last:border-0"
+                    >
+                      <td className="px-2 py-1.5" />
+                      <td className="px-3 py-1.5 text-muted line-through">
+                        {row.title}
                       </td>
-                    ) : null}
-                    <td className="px-3 py-1.5">
-                      <label className="flex cursor-pointer items-center gap-2">
+                      <td className="px-3 py-1.5 font-mono text-xs text-muted line-through">
+                        {row.sku}
+                      </td>
+                      <td
+                        colSpan={showCost ? 3 : 2}
+                        className="px-3 py-1.5 text-xs text-warn"
+                      >
+                        {!row.sold
+                          ? "Will be removed when you save."
+                          : row.available
+                            ? "Sold before — will be hidden, not deleted, so its orders keep their link."
+                            : "Sold before, now hidden. Kept so its orders keep their link."}
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr
+                      key={row.key}
+                      className={`border-b border-line last:border-0 ${
+                        selected.has(row.key) ? "bg-accent-soft" : ""
+                      }`}
+                    >
+                      <td className="px-2 py-1.5">
                         <input
                           type="checkbox"
-                          checked={row.available}
-                          onChange={(e) => patchRow(row.key, { available: e.target.checked })}
-                          aria-label={`Available: ${row.title}`}
+                          aria-label={`Select ${row.title}`}
+                          checked={selected.has(row.key)}
+                          onChange={(e) => {
+                            const next = new Set(selected);
+                            if (e.target.checked) next.add(row.key);
+                            else next.delete(row.key);
+                            setSelected(next);
+                          }}
                         />
-                        <span className="text-xs text-muted">
-                          {row.available ? "Available" : "Unavailable"}
-                        </span>
-                      </label>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-3 py-1.5 font-medium">{row.title}</td>
+                      <td className="px-3 py-1.5">
+                        <input
+                          value={row.sku}
+                          onChange={(e) =>
+                            patchRow(row.key, { sku: e.target.value })
+                          }
+                          aria-label={`SKU for ${row.title}`}
+                          className="w-full rounded border border-transparent bg-transparent px-1.5 py-1 font-mono text-xs hover:border-line focus:border-accent focus:bg-surface focus:outline-none"
+                        />
+                      </td>
+                      <td className="px-3 py-1.5">
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-muted">$</span>
+                          <input
+                            value={row.price}
+                            onChange={(e) =>
+                              patchRow(row.key, { price: e.target.value })
+                            }
+                            placeholder="0.00"
+                            inputMode="decimal"
+                            aria-label={`Price for ${row.title}`}
+                            className={`w-full rounded border bg-transparent px-1.5 py-1 font-mono text-xs focus:border-accent focus:bg-surface focus:outline-none ${
+                              row.fresh && !row.price
+                                ? "border-warn"
+                                : "border-transparent hover:border-line"
+                            }`}
+                          />
+                        </div>
+                      </td>
+                      {showCost ? (
+                        <td className="px-3 py-1.5">
+                          <span className="text-xs text-muted">—</span>
+                        </td>
+                      ) : null}
+                      <td className="px-3 py-1.5">
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={row.available}
+                            onChange={(e) =>
+                              patchRow(row.key, { available: e.target.checked })
+                            }
+                            aria-label={`Available: ${row.title}`}
+                          />
+                          <span className="text-xs text-muted">
+                            {row.available ? "Available" : "Unavailable"}
+                          </span>
+                        </label>
+                      </td>
+                    </tr>
+                  ),
+                )}
               </tbody>
             </table>
           </div>
@@ -351,7 +441,9 @@ function autoSku(axes: Axis[], combo: number[], prefix: string): string {
 
 /** The leading word every value on a device axis shares, if there is one. */
 function familyWords(axis: Axis): string[] {
-  const firsts = axis.values.map((v) => v.value.split(/\s+/)[0]).filter(Boolean);
+  const firsts = axis.values
+    .map((v) => v.value.split(/\s+/)[0])
+    .filter(Boolean);
   const unique = new Set(firsts);
   return unique.size === 1 && firsts[0] ? [firsts[0]] : [];
 }
@@ -428,7 +520,10 @@ function AxisEditor({
             {isDevice && !v.deviceModelId ? (
               // Allowed, but worth flagging: it sells fine and never appears
               // under "shop by device" until someone identifies it.
-              <span className="text-warn" title="Not matched to a device — won't appear in Shop by device">
+              <span
+                className="text-warn"
+                title="Not matched to a device — won't appear in Shop by device"
+              >
                 unmatched
               </span>
             ) : null}
@@ -449,7 +544,8 @@ function AxisEditor({
             aria-label="Add a device"
             onChange={(e) => {
               const device = devices.find((d) => d.id === e.target.value);
-              if (device) onAddValue({ value: device.name, deviceModelId: device.id });
+              if (device)
+                onAddValue({ value: device.name, deviceModelId: device.id });
             }}
             className="rounded-md border border-dashed border-line bg-surface px-2 py-1 text-xs"
           >
@@ -475,7 +571,11 @@ function AxisEditor({
             onAddValue({ value: draft.trim(), deviceModelId: null });
             setDraft("");
           }}
-          placeholder={isDevice ? "or type an unlisted device" : "Type a value, press Enter"}
+          placeholder={
+            isDevice
+              ? "or type an unlisted device"
+              : "Type a value, press Enter"
+          }
           aria-label="New option value"
           className="w-48 rounded-md border border-line bg-surface px-2 py-1 text-xs"
         />
