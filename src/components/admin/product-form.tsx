@@ -9,6 +9,7 @@ import {
   type Axis,
   type DeviceOption,
   type Row,
+  type VariantImage,
 } from "@/components/admin/variant-grid";
 import { createProduct, updateProduct } from "@/lib/admin/product-form-actions";
 import { skuFragment, slugify } from "@/lib/slug";
@@ -34,6 +35,7 @@ export function ProductForm({
   devices,
   showCost,
   initial,
+  images,
 }: {
   brands: Brand[];
   categories: Category[];
@@ -41,6 +43,8 @@ export function ProductForm({
   showCost: boolean;
   /** Absent when creating. */
   initial?: ProductInitial;
+  /** The product's images, for the per-variant photo picker. */
+  images?: VariantImage[];
 }) {
   const router = useRouter();
   const toast = useToast();
@@ -99,6 +103,7 @@ export function ProductForm({
           .filter((r) => !r.leaving)
           .map((r) => ({
             id: r.id,
+            imageId: r.imageId ?? null,
             combo: r.combo,
             title: r.title,
             sku: r.sku.trim() || null,
@@ -267,6 +272,7 @@ export function ProductForm({
         skuPrefix={skuPrefix}
         showCost={showCost}
         error={errors["variants"] ?? errors["options"] ?? errors.sku}
+        images={images}
       />
 
       <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-line pt-4">

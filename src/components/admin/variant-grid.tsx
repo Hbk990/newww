@@ -19,9 +19,14 @@ export type Axis = {
   values: AxisValue[];
 };
 
+/** Just enough of an image to choose between them in a dropdown. */
+export type VariantImage = { id: string; label: string };
+
 export type Row = {
   /** Set for a variant that already exists; absent means it will be created. */
   id?: string;
+  /** Which image this variant shows. Null uses the product's main photo. */
+  imageId?: string | null;
   /** Has been sold at least once, so it can be hidden but never deleted. */
   sold?: boolean;
   /** Indexes into each axis, in axis order — the identity of this combination. */
@@ -56,6 +61,7 @@ export function VariantGrid({
   skuPrefix,
   showCost,
   error,
+  images = [],
 }: {
   axes: Axis[];
   setAxes: (axes: Axis[]) => void;
@@ -65,6 +71,11 @@ export function VariantGrid({
   skuPrefix: string;
   showCost: boolean;
   error?: string;
+  /**
+   * The product's images, for the per-variant picker. Empty while creating —
+   * images are uploaded after the product exists, so there is nothing to pick.
+   */
+  images?: VariantImage[];
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
@@ -313,6 +324,9 @@ export function VariantGrid({
                   {showCost ? (
                     <th className="w-28 px-3 py-2 font-medium">Cost</th>
                   ) : null}
+                  {images.length > 0 ? (
+                    <th className="w-32 px-3 py-2 font-medium">Photo</th>
+                  ) : null}
                   <th className="w-36 px-3 py-2 font-medium">Available</th>
                 </tr>
               </thead>
@@ -331,7 +345,9 @@ export function VariantGrid({
                         {row.sku}
                       </td>
                       <td
-                        colSpan={showCost ? 3 : 2}
+                        colSpan={
+                          (showCost ? 3 : 2) + (images.length > 0 ? 1 : 0)
+                        }
                         className="px-3 py-1.5 text-xs text-warn"
                       >
                         {!row.sold
@@ -394,6 +410,29 @@ export function VariantGrid({
                       {showCost ? (
                         <td className="px-3 py-1.5">
                           <span className="text-xs text-muted">—</span>
+                        </td>
+                      ) : null}
+                      {images.length > 0 ? (
+                        <td className="px-3 py-1.5">
+                          <select
+                            value={row.imageId ?? ""}
+                            onChange={(e) =>
+                              patchRow(row.key, {
+                                imageId: e.target.value || null,
+                              })
+                            }
+                            aria-label={`Photo for ${row.title}`}
+                            className="w-full rounded border border-line bg-surface px-1 py-1 text-xs"
+                          >
+                            {/* Empty means "use the product's main photo", which
+                                is what most variants want. */}
+                            <option value="">Main photo</option>
+                            {images.map((image, i) => (
+                              <option key={image.id} value={image.id}>
+                                {image.label || `Image ${i + 1}`}
+                              </option>
+                            ))}
+                          </select>
                         </td>
                       ) : null}
                       <td className="px-3 py-1.5">

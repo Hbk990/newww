@@ -254,6 +254,34 @@ Market facts the design has to absorb, rather than discover late:
 - **Delivery is local couriers**, so fulfillment needs a free-text carrier plus a
   tracking reference and, for COD, a remittance record.
 
+## Writing a migration
+
+Run `drizzle-kit generate` **first**, then edit the SQL it produced — never the
+other way round. The generator diffs the TypeScript schema against
+`drizzle/meta/*_snapshot.json`, not against the database, so a hand-written
+migration leaves the snapshot stale and the next `generate` re-emits everything
+it missed. That is what 0016 and 0018 exist to repair; generating first means
+no such file is ever needed again.
+
+Then add by hand what Drizzle cannot express, because it will silently omit all
+of it:
+
+- composite foreign keys — `product_attributes (attribute_id, option_id)` and
+  `option_values (option_type_id, kind)`
+- `NULLS NOT DISTINCT` on a unique index — load-bearing on
+  `product_attributes_value_uq`
+- triggers and functions, including every `trg_*` and `refresh_*` in the schema
+- `ON DELETE RESTRICT` where the generator assumes the default
+
+Read what it generates before applying it. Asked to regenerate these tables
+from scratch it produces a weaker schema than the one installed, and the
+difference is invisible until something that should have been refused succeeds.
+
+Verify on two databases: one built from zero, and one upgraded over existing
+rows. Several bugs here only appeared on one of the two — an enum value added
+in an earlier migration is unusable in the same transaction on a fresh
+database, and `SET DEFAULT` changes nothing for rows that already exist.
+
 ## Deliberately deferred
 
 Retail only, one currency, one country — decided, not deferred. That kills

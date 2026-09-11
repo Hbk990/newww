@@ -123,10 +123,42 @@ export const productImages = pgTable(
       .notNull()
       .references(() => products.id, { onDelete: "cascade" }),
     url: text().notNull(),
+    /**
+     * The storage provider's own handle for the file.
+     *
+     * A URL cannot delete anything. Without the key, removing a row leaves the
+     * file behind for good — a bill that keeps growing on a paid bucket, or a
+     * free tier filling with images nobody can see. Null for a row created from
+     * a URL typed by hand, where there is nothing of ours to delete.
+     */
+    storageKey: text(),
     alt: text(),
+    /**
+     * Intrinsic size, read from the file header on upload.
+     *
+     * `<Image>` needs both to reserve space before the bytes arrive. Without
+     * them a product page reflows as each image loads, which is the most
+     * visible way a catalog feels slow. The check constraint in migration 0019
+     * keeps them set together: one without the other cannot reserve anything.
+     */
+    width: integer(),
+    height: integer(),
+    bytes: integer(),
     position: integer().notNull().default(0),
   },
-  (t) => [index("product_images_product_position_idx").on(t.productId, t.position)],
+  (t) => [
+    index("product_images_product_position_idx").on(t.productId, t.position),
+    check(
+      "product_images_dimensions_together",
+      sql`num_nonnulls(${t.width}, ${t.height}) <> 1`,
+    ),
+    check(
+      "product_images_positive_size",
+      sql`(${t.width} is null or ${t.width} > 0)
+          and (${t.height} is null or ${t.height} > 0)
+          and (${t.bytes} is null or ${t.bytes} > 0)`,
+    ),
+  ],
 );
 
 /**

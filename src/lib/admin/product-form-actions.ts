@@ -57,6 +57,8 @@ const optionTypeInput = z.object({
 const variantInput = z.object({
   /** Present when this variant already exists; absent means insert. */
   id: z.uuid().optional(),
+  /** Which of the product's images this variant shows; null uses the main one. */
+  imageId: z.uuid().nullable().optional(),
   /** Indexes into each axis, in axis order — what identifies this combination. */
   combo: z.array(z.number().int().min(0)),
   title: z.string().trim().min(1).max(200),
@@ -424,6 +426,7 @@ export async function loadProduct(id: string) {
         sku: v.sku ?? "",
         price: (v.priceCents / 100).toFixed(2),
         available: availableBy.get(v.id) ?? true,
+        imageId: v.imageId,
         /** Sold at least once: it can be hidden, never deleted. */
         sold: history.has(v.id),
       };
@@ -655,6 +658,7 @@ export async function updateProduct(
               sku: v.sku || null,
               priceCents: v.price,
               costCents: v.costCents,
+              imageId: v.imageId ?? null,
               position,
             })
             .where(eq(variants.id, variantId));

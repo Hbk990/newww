@@ -2,10 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ProductForm } from "@/components/admin/product-form";
+import { ProductImages } from "@/components/admin/product-images";
 import { comboKey } from "@/lib/admin/variant-combos";
+import { loadImages } from "@/lib/admin/image-actions";
 import { formOptions, loadProduct } from "@/lib/admin/product-form-actions";
 import { requirePermission } from "@/lib/auth/guards";
 import { can } from "@/lib/auth/permissions";
+import { imagesAreDurable } from "@/lib/storage";
 
 export const metadata = { title: "Edit product · DRPHONE" };
 
@@ -22,9 +25,10 @@ export default async function Page({
   // attribute editor: this page sits inside the admin's Suspense boundary.
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
 
-  const [loaded, { brandRows, categoryRows, deviceRows }] = await Promise.all([
+  const [loaded, { brandRows, categoryRows, deviceRows }, images] = await Promise.all([
     loadProduct(id),
     formOptions(),
+    loadImages(id),
   ]);
   if (!loaded) notFound();
 
@@ -51,6 +55,10 @@ export default async function Page({
           .sort((a, b) => a.name.localeCompare(b.name))
           .map(({ id: deviceId, name, family }) => ({ id: deviceId, name, family }))}
         showCost={can(user, "products.view_cost")}
+        images={images.map((img, i) => ({
+          id: img.id,
+          label: img.alt || `Image ${i + 1}`,
+        }))}
         initial={{
           id: product.id,
           title: product.title,
@@ -71,6 +79,7 @@ export default async function Page({
             sku: v.sku,
             price: v.price,
             available: v.available,
+            imageId: v.imageId,
             fresh: false,
             /*
              * A combination the current axes cannot produce — the index came
@@ -84,6 +93,8 @@ export default async function Page({
           })),
         }}
       />
+
+      <ProductImages productId={id} rows={images} durable={imagesAreDurable} />
     </>
   );
 }

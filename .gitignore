@@ -15,3 +15,7 @@ next-env.d.ts
 
 .DS_Store
 npm-debug.log*
+
+# Uploaded product images. The local driver writes here; production uses a
+# bucket, and committing a catalog of photos would bloat the repo.
+/public/uploads/
