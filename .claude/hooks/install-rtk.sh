@@ -45,8 +45,32 @@ RTK_VERSION="${RTK_VERSION:-}"
 export RTK_VERSION
 
 if ! curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/master/install.sh | sh >/dev/null 2>&1; then
-  echo "rtk: install failed — continuing without it (Bash output will not be filtered)." >&2
-  exit 0
+  # Fall back to building from source, but only when asked.
+  #
+  # The release tarball is served from github.com, which some sandboxes block
+  # at the egress proxy while still allowing git through it — this repo's own
+  # cloud environment is one: raw.githubusercontent.com answers 200, github.com
+  # answers 403. Cargo fetches via git and takes its crates from
+  # index.crates.io, so `cargo install --git` reaches rtk where the download
+  # cannot.
+  #
+  # Opt-in because it is slow: measured at 3m27s for rtk 0.49.0 on the cloud
+  # image. Paying that on every fresh container would delay every session
+  # start, which is a worse trade than running unfiltered. Allowlisting
+  # github.com in the environment's network settings is the better fix; this is
+  # for when that is not available.
+  if [ "${RTK_BUILD_FROM_SOURCE:-0}" = "1" ] && command -v cargo >/dev/null 2>&1; then
+    echo "rtk: release download failed; building from source (a few minutes)." >&2
+    if cargo install --git https://github.com/rtk-ai/rtk --branch master --locked rtk >/dev/null 2>&1; then
+      echo "rtk: built and installed from source." >&2
+    else
+      echo "rtk: source build failed — continuing without it." >&2
+      exit 0
+    fi
+  else
+    echo "rtk: install failed — continuing without it (Bash output will not be filtered)." >&2
+    exit 0
+  fi
 fi
 
 # ~/.local/bin is on PATH in the cloud image, but not on every machine, and a
