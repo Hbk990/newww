@@ -48,7 +48,7 @@ is the next phase, and the largest remaining piece.
 `markReauthenticated` and `requireRecentAuth` also exist unused — the
 sensitive-operations list they were built for is not enforced yet.
 
-## Three things to be careful of
+## Four things to be careful of
 
 **Images do not survive a deploy.** The storage driver writes to
 `public/uploads`, which serverless hosts wipe. The admin warns about this on
@@ -66,6 +66,17 @@ triggers or `ON DELETE RESTRICT`, and it omits them silently. Always run
 id column when it has one — a comparison between two unrelated columns that
 silently returns zero. Name the outer table literally: `brands.id`. This bug
 made the attributes page report "None yet" for attributes that had options.
+
+**A committed hook rewrites every Bash command.** `.claude/settings.json`
+registers rtk (github.com/rtk-ai/rtk) as a `PreToolUse` hook, so an agent
+working in this repo sees `rtk git status` in place of `git status` and gets
+filtered output. That is deliberate — it cuts tokens sharply — but it means
+command output reaching the model is not raw. If output ever looks wrong,
+rtk issue #2176 is the open bug for exactly that, and
+`~/.config/rtk/config.toml` takes `[hooks]` / `exclude_commands` to exempt
+commands whose output is load-bearing here: `git`, `psql`, `playwright`.
+`.claude/hooks/install-rtk.sh` installs the binary and exits 0 on every path,
+so a session without rtk degrades to unfiltered output rather than failing.
 
 ## Open data questions
 
