@@ -79,6 +79,7 @@ export default async function Page({
           unit: attribute.unit,
           isFilterable: attribute.isFilterable,
           isComparable: attribute.isComparable,
+          isMulti: attribute.isMulti,
           position: attribute.position,
         }}
         submit={updateAttribute.bind(null, id)}

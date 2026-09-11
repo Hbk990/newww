@@ -65,7 +65,14 @@ export function AttributeForm({
   const [codeTouched, setCodeTouched] = useState(!autoCode);
 
   function set<K extends keyof AttributeInput>(key: K, value: AttributeInput[K]) {
-    setForm((previous) => ({ ...previous, [key]: value }));
+    setForm((previous) => ({
+      ...previous,
+      [key]: value,
+      // Leaving isMulti set while moving off a choice list would fail the save
+      // on a control the form has just hidden — an error with nothing to point
+      // at. Clear it with the change instead.
+      ...(key === "dataType" && value !== "enum" ? { isMulti: false } : {}),
+    }));
     // Clear this field's error as soon as it changes: leaving it up while the
     // value is being corrected makes the form feel broken.
     setErrors((previous) => {
@@ -96,6 +103,9 @@ export function AttributeForm({
   }
 
   const showUnit = form.dataType === "number";
+  // Multi-value is constrained to choice lists in the database, so the control
+  // only exists where it can be true.
+  const showMulti = form.dataType === "enum";
 
   return (
     <form onSubmit={onSubmit} className="mt-5 max-w-2xl space-y-5">
@@ -191,7 +201,18 @@ export function AttributeForm({
           label="Include when comparing products"
           hint="Appears as a row in a side-by-side comparison."
         />
+        {showMulti ? (
+          <Toggle
+            checked={form.isMulti}
+            onChange={(v) => set("isMulti", v)}
+            label="A product can have several of these"
+            hint="For a spec that is genuinely a set — “Compatible with: USB-C, Lightning”."
+          />
+        ) : null}
       </div>
+      {errors.isMulti ? (
+        <p className="-mt-3 text-xs text-warn">{errors.isMulti}</p>
+      ) : null}
 
       <Field
         label="Sort position"

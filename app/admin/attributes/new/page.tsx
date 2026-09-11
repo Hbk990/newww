@@ -32,6 +32,7 @@ export default async function Page() {
           unit: null,
           isFilterable: true,
           isComparable: false,
+          isMulti: false,
           position: 0,
         }}
         submit={createAttribute}

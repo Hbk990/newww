@@ -51,7 +51,13 @@ const attributeInput = z.object({
     .nullable(),
   isFilterable: z.boolean(),
   isComparable: z.boolean(),
+  isMulti: z.boolean(),
   position: z.coerce.number().int().min(0).max(9999),
+}).refine((v) => !v.isMulti || v.dataType === "enum", {
+  // Mirrors attribute_definitions_multi_requires_enum, so the form says why
+  // instead of surfacing a constraint violation.
+  path: ["isMulti"],
+  message: "Only a choice list can hold several values.",
 });
 
 export type AttributeInput = z.infer<typeof attributeInput>;
@@ -137,6 +143,29 @@ export async function updateAttribute(
         ok: false,
         error: `Can't change the type: ${used?.n} product${used?.n === 1 ? "" : "s"} already use this attribute. Clear those values first, or create a new attribute.`,
         fieldErrors: { dataType: "In use by existing products." },
+      };
+    }
+  }
+
+  /**
+   * Turning multi off is the mirror of changing the type: the database check
+   * only fires on writes to `product_attributes`, so flipping the flag while
+   * products already hold several values leaves rows the single-value trigger
+   * would now reject — visible only the next time someone edits one of them.
+   */
+  if (before.isMulti && !input.isMulti) {
+    const [worst] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(productAttributes)
+      .where(eq(productAttributes.attributeId, id))
+      .groupBy(productAttributes.productId)
+      .orderBy(sql`count(*) desc`)
+      .limit(1);
+    if ((worst?.n ?? 0) > 1) {
+      return {
+        ok: false,
+        error: `Can't switch to a single value: a product already has ${worst?.n} of these. Remove the extras first.`,
+        fieldErrors: { isMulti: "A product holds several values." },
       };
     }
   }
@@ -292,6 +321,22 @@ export async function deleteOption(
     .from(attributeOptions)
     .where(eq(attributeOptions.id, optionId));
   if (!before) return { ok: true };
+
+  /**
+   * The composite foreign key is ON DELETE RESTRICT, so the database would
+   * refuse this anyway — but as a raw constraint violation. Checking first
+   * turns it into a sentence that says how many products are affected.
+   */
+  const [used] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(productAttributes)
+    .where(eq(productAttributes.optionId, optionId));
+  if ((used?.n ?? 0) > 0) {
+    return {
+      ok: false,
+      error: `${used?.n} product${used?.n === 1 ? "" : "s"} use "${before.value}". Change them first, or rename this option instead of deleting it.`,
+    };
+  }
 
   await db.transaction(async (tx) => {
     await tx.delete(attributeOptions).where(eq(attributeOptions.id, optionId));
