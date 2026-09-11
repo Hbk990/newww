@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+# A second push to the same branch makes the first run's answer irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Lint, types and unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      # Fails the build on a high or critical advisory only. The one moderate
+      # finding today is esbuild's dev-server advisory reached through
+      # drizzle-kit, which never serves anything here — and `npm audit fix`
+      # "resolves" it by downgrading drizzle-kit from 0.31 to 0.18, which would
+      # break every migration in drizzle/.
+      - run: npm audit --audit-level=high
+
+  e2e:
+    name: Browser tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: drphone_e2e
+        ports: ["5432:5432"]
+        # Without the health check the first migration races the server's
+        # startup and fails with "the database system is starting up".
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/drphone_e2e
+      E2E_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/drphone_e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Every migration, in order, against an empty database — which is the
+      # only check that catches a migration that works on a developer's
+      # already-populated database and nowhere else.
+      - run: npm run db:migrate
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

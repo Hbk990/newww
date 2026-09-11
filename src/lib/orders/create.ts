@@ -11,6 +11,8 @@ import {
   variants,
 } from "@/db/schema";
 
+import { effectivePrice, hashRequest } from "./pricing";
+
 /** A line as the caller asks for it — the price is never taken from the client. */
 export type OrderLineRequest = { variantId: string; quantity: number };
 
@@ -254,30 +256,6 @@ export async function createOrder(
   }
 }
 
-/**
- * A sale price counts only inside its window.
- *
- * The window is always complete when a sale price is set — the
- * `variants_sale_window_complete` check makes the price and both dates all
- * null or all present — so there is no "sale with no end date" to handle. The
- * null guards below are for the no-sale case only.
- */
-function effectivePrice(
-  row: {
-    priceCents: number;
-    salePriceCents: number | null;
-    saleStartsAt: Date | null;
-    saleEndsAt: Date | null;
-  },
-  now: Date,
-): number {
-  if (row.salePriceCents === null || !row.saleStartsAt || !row.saleEndsAt) {
-    return row.priceCents;
-  }
-  const live = row.saleStartsAt <= now && now <= row.saleEndsAt;
-  return live ? row.salePriceCents : row.priceCents;
-}
-
 class OrderError extends Error {
   constructor(
     readonly code: OrderFailure,
@@ -382,23 +360,4 @@ function raisedStockMessage(
     current = (current as { cause?: unknown }).cause;
   }
   return null;
-}
-
-/**
- * A stable fingerprint of the order being asked for.
- *
- * Not a cryptographic hash — it only has to differ when the request differs,
- * so that reusing a key for a different basket is caught.
- */
-function hashRequest(request: CreateOrderRequest): string {
-  const lines = [...request.lines]
-    .map((l) => `${l.variantId}:${l.quantity}`)
-    .sort()
-    .join("|");
-  return [
-    request.email.trim().toLowerCase(),
-    request.phone.replace(/\s+/g, ""),
-    request.shippingCents,
-    lines,
-  ].join("::");
 }

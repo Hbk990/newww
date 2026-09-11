@@ -295,6 +295,10 @@ function Editor({
               slug: isNew ? slugify(e.target.value) : draft.slug,
             })
           }
+          // The field appears because the user just clicked to open this
+          // editor, so focus is where they are already looking. The rule
+          // guards against stealing focus on page load, a different thing.
+          // eslint-disable-next-line jsx-a11y/no-autofocus
           autoFocus
           maxLength={80}
           className="mt-1 w-full rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm"

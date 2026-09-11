@@ -19,3 +19,9 @@ npm-debug.log*
 # Uploaded product images. The local driver writes here; production uses a
 # bucket, and committing a catalog of photos would bloat the repo.
 /public/uploads/
+
+# Playwright output. Traces and screenshots from a failed run are for looking
+# at locally, not for keeping.
+/test-results/
+/playwright-report/
+/blob-report/

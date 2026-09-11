@@ -1,0 +1,19 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    # Nine runtime dependencies: a weekly digest is a short read, not a flood.
+    open-pull-requests-limit: 5
+    groups:
+      # React, Next and their types move together; separate PRs for each one
+      # produce a set that cannot be merged in any order.
+      react-and-next:
+        patterns: ["next", "react", "react-dom", "@types/react", "@types/react-dom", "eslint-config-next"]
+      dev-tooling:
+        dependency-type: development
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly

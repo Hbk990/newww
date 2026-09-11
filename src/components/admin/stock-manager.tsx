@@ -215,6 +215,10 @@ export function StockManager({ rows }: { rows: StockRow[] }) {
                           if (e.key === "Enter") startTracking();
                           if (e.key === "Escape") setOpening(null);
                         }}
+                        // The field appears because the user just clicked to open this
+                        // editor, so focus is where they are already looking. The rule
+                        // guards against stealing focus on page load, a different thing.
+                        // eslint-disable-next-line jsx-a11y/no-autofocus
                         autoFocus
                         inputMode="numeric"
                         placeholder="count"
