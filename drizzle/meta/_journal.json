@@ -99,6 +99,13 @@
       "when": 1789104832602,
       "tag": "0013_decouple_history",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1789109237748,
+      "tag": "0014_attribute_inheritance",
+      "breakpoints": true
     }
   ]
 }

@@ -207,6 +207,22 @@ resolve their rules into rows at write time rather than being evaluated per
 request. In both cases the write side absorbs the work so the read side does
 almost none.
 
+### Category attributes are assigned once and inherit downward
+`attribute_definitions` holds the specs that are filterable but are not variant
+axes — wattage, mAh, material. `category_attributes` attaches them to a
+category, and because the eight parent groups are themselves rows in
+`categories`, an attribute attached to a group covers every child under it.
+Resolution is the `attributes_for_category()` function: a recursive walk up
+`parent_id` where the nearest assignment wins, so a child that re-declares an
+attribute overrides its group's `is_required` and `position` instead of showing
+it twice. The returned `inherited` flag is what lets the admin grey out a row
+and say where it came from.
+
+Without this the owner would attach every attribute to all 52 leaf categories
+by hand and keep 52 rows in sync forever. The walk is bounded to ten levels:
+`parent_id` is self-referencing with nothing preventing a cycle, and a cycle
+would otherwise spin the query forever rather than return.
+
 ### Server rendering, and no client fetching for catalog pages
 Product and category pages are Server Components reading Postgres directly —
 no API round trip, no client-side data fetch, no loading spinner, and no JSON
