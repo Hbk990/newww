@@ -5,6 +5,7 @@ import { notifications } from "@/db/schema";
 import { Breadcrumbs } from "@/components/admin/breadcrumbs";
 import { MobileNav } from "@/components/admin/mobile-nav";
 import { Sidebar } from "@/components/admin/sidebar";
+import { ToastProvider } from "@/components/admin/toast";
 import { TopBar } from "@/components/admin/top-bar";
 import { NAV, NAV_FOOTER, QUICK_CREATE } from "@/lib/admin/nav";
 import { signOut } from "@/lib/auth/actions";
@@ -36,9 +37,9 @@ export default async function AdminLayout({
   })).filter((section) => section.items.length > 0);
 
   const footer = NAV_FOOTER.filter((item) => can(user, item.permission));
-  const createItems = QUICK_CREATE.filter((item) => can(user, item.permission)).map(
-    ({ label, href }) => ({ label, href }),
-  );
+  const createItems = QUICK_CREATE.filter((item) =>
+    can(user, item.permission),
+  ).map(({ label, href }) => ({ label, href }));
 
   const [unread] = await db
     .select({ n: count() })
@@ -46,23 +47,25 @@ export default async function AdminLayout({
     .where(eq(notifications.status, "queued"));
 
   return (
-    <div className="flex min-h-svh">
-      <Sidebar sections={sections} footer={footer} />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar
-          createItems={createItems}
-          unread={unread?.n ?? 0}
-          name={user.username ?? user.name ?? user.email}
-          role={user.role}
-          signOut={signOut}
-        />
-        {/* Bottom padding clears the mobile nav bar. */}
-        <main className="min-w-0 flex-1 px-4 pb-24 pt-5 md:px-6 md:pb-10">
-          <Breadcrumbs />
-          {children}
-        </main>
+    <ToastProvider>
+      <div className="flex min-h-svh">
+        <Sidebar sections={sections} footer={footer} />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <TopBar
+            createItems={createItems}
+            unread={unread?.n ?? 0}
+            name={user.username ?? user.name ?? user.email}
+            role={user.role}
+            signOut={signOut}
+          />
+          {/* Bottom padding clears the mobile nav bar. */}
+          <main className="min-w-0 flex-1 px-4 pb-24 pt-5 md:px-6 md:pb-10">
+            <Breadcrumbs />
+            {children}
+          </main>
+        </div>
+        <MobileNav sections={sections} footer={footer} />
       </div>
-      <MobileNav sections={sections} footer={footer} />
-    </div>
+    </ToastProvider>
   );
 }
