@@ -2,8 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ProductForm } from "@/components/admin/product-form";
+import { FitmentPicker } from "@/components/admin/fitment-picker";
 import { ProductImages } from "@/components/admin/product-images";
 import { comboKey } from "@/lib/admin/variant-combos";
+import { loadFitment } from "@/lib/admin/fitment-actions";
 import { loadImages } from "@/lib/admin/image-actions";
 import { formOptions, loadProduct } from "@/lib/admin/product-form-actions";
 import { requirePermission } from "@/lib/auth/guards";
@@ -25,11 +27,13 @@ export default async function Page({
   // attribute editor: this page sits inside the admin's Suspense boundary.
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
 
-  const [loaded, { brandRows, categoryRows, deviceRows }, images] = await Promise.all([
-    loadProduct(id),
-    formOptions(),
-    loadImages(id),
-  ]);
+  const [loaded, { brandRows, categoryRows, deviceRows }, images, fitment] =
+    await Promise.all([
+      loadProduct(id),
+      formOptions(),
+      loadImages(id),
+      loadFitment(id),
+    ]);
   if (!loaded) notFound();
 
   const { product, axes, variants: rows, categoryIds } = loaded;
@@ -40,7 +44,9 @@ export default async function Page({
         ← Products
       </Link>
       <div className="mt-2 flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-xl font-semibold tracking-tight">{product.title}</h1>
+        <h1 className="text-xl font-semibold tracking-tight">
+          {product.title}
+        </h1>
         <span className="font-mono text-xs text-muted">/p/{product.slug}</span>
       </div>
       <p className="mt-1 text-sm text-muted">
@@ -53,7 +59,11 @@ export default async function Page({
         categories={[...categoryRows].sort((a, b) => a.position - b.position)}
         devices={[...deviceRows]
           .sort((a, b) => a.name.localeCompare(b.name))
-          .map(({ id: deviceId, name, family }) => ({ id: deviceId, name, family }))}
+          .map(({ id: deviceId, name, family }) => ({
+            id: deviceId,
+            name,
+            family,
+          }))}
         showCost={can(user, "products.view_cost")}
         images={images.map((img, i) => ({
           id: img.id,
@@ -95,6 +105,13 @@ export default async function Page({
       />
 
       <ProductImages productId={id} rows={images} durable={imagesAreDurable} />
+
+      <FitmentPicker
+        productId={id}
+        devices={fitment.devices}
+        selectedIds={fitment.selectedIds}
+        fromAxis={fitment.fromAxis}
+      />
     </>
   );
 }

@@ -648,6 +648,26 @@ export async function updateProduct(
       // --- variants
       const deviceAxis = input.options.findIndex((o) => o.kind === "device_fit");
 
+      /*
+       * The product-wide device set, read before any variant is touched.
+       *
+       * Used to give a newly added variant the same fitment as its siblings.
+       * Without it, adding a 4th cable length would leave that length fitting
+       * nothing while the other three fit 24 phones — invisible at product
+       * level, because the rollup is a DISTINCT across variants, and wrong the
+       * moment anything reads fitment per variant.
+       */
+      const inheritedFit =
+        deviceAxis >= 0
+          ? []
+          : (
+              await tx
+                .selectDistinct({ id: variantDeviceFit.deviceModelId })
+                .from(variantDeviceFit)
+                .innerJoin(variants, eq(variants.id, variantDeviceFit.variantId))
+                .where(eq(variants.productId, id))
+            ).map((r) => r.id);
+
       for (const [position, v] of input.variants.entries()) {
         let variantId = v.id;
         if (variantId) {
@@ -669,7 +689,17 @@ export async function updateProduct(
           // The combination can move when an axis is added, so the links are
           // rewritten rather than patched.
           await tx.delete(variantOptions).where(eq(variantOptions.variantId, variantId));
-          await tx.delete(variantDeviceFit).where(eq(variantDeviceFit.variantId, variantId));
+          /*
+           * Fitment is only this function's to rewrite when a device axis owns
+           * it. Without one it belongs to the fitment picker, which writes the
+           * same device set to every variant — and clearing it here meant
+           * editing a product's title silently wiped every device it fitted.
+           */
+          if (deviceAxis >= 0) {
+            await tx
+              .delete(variantDeviceFit)
+              .where(eq(variantDeviceFit.variantId, variantId));
+          }
         } else {
           const [row] = await tx
             .insert(variants)
@@ -687,6 +717,15 @@ export async function updateProduct(
           await tx
             .insert(inventory)
             .values({ variantId, available: v.available, track: false });
+          if (inheritedFit.length > 0) {
+            const fresh = row.id;
+            await tx.insert(variantDeviceFit).values(
+              inheritedFit.map((deviceModelId) => ({
+                variantId: fresh,
+                deviceModelId,
+              })),
+            );
+          }
         }
 
         const chosen = v.combo

@@ -91,10 +91,42 @@ export function VariantGrid({
     const first = rows.find((r) => !r.leaving);
     setAxes(next);
 
-    const wanted = combos.map((combo) => {
+    /*
+     * "I sold it one way, now I stock two colours."
+     *
+     * A product with no options has a single row keyed "". Adding the first
+     * option produces keys like "Black", none of which match it, so without
+     * this the original variant is orphaned — deleted, or kept as a hidden
+     * tombstone if it had sold — and its SKU, price and history are replaced
+     * by a freshly generated row. Reusing its id makes the first combination
+     * *be* that variant.
+     *
+     * Deliberately narrow: only when the previous state was exactly one
+     * unsaved-axis row. With several rows there is no non-arbitrary way to say
+     * which new combination each becomes, and guessing would silently
+     * reassign real prices.
+     */
+    const orphanedDefaults = rows.filter((r) => r.id && r.key === "");
+    // Keyed off the row, not off axes.length: clicking "Add an option" creates
+    // an axis with no values, which expands to zero combinations and orphans
+    // the default row one render before any value is typed. By the time
+    // "Black" arrives there is already an axis, so counting axes would miss it.
+    const soleDefault =
+      orphanedDefaults.length === 1 ? orphanedDefaults[0] : null;
+
+    const wanted: Row[] = combos.map((combo, comboIndex) => {
       const key = comboKey(next, combo);
       const existing = previous.get(key);
       if (existing) return { ...existing, combo, leaving: false };
+      if (soleDefault && comboIndex === 0) {
+        return {
+          ...soleDefault,
+          combo,
+          key,
+          title: key || soleDefault.title,
+          leaving: false,
+        };
+      }
       return {
         combo,
         key,
@@ -117,8 +149,9 @@ export function VariantGrid({
      * The save then deletes them, except any that have been sold.
      */
     const wantedKeys = new Set(wanted.map((r) => r.key));
+    const reusedId = wanted.find((r) => r.id === soleDefault?.id)?.id;
     const orphans = rows
-      .filter((r) => r.id && !wantedKeys.has(r.key))
+      .filter((r) => r.id && !wantedKeys.has(r.key) && r.id !== reusedId)
       .map((r) => ({ ...r, leaving: true }));
 
     setRows([...wanted, ...orphans]);
