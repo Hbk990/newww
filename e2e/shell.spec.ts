@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import postgres from "postgres";
 
+import { storageStateFor } from "./global-setup";
+
 const sql = postgres(
   process.env.E2E_DATABASE_URL ?? process.env.DATABASE_URL ?? "",
   { max: 1 },
@@ -168,5 +170,83 @@ test.describe("on a phone", () => {
     await tabs.getByRole("link", { name: "Shop" }).click();
     await expect(page).toHaveURL(/\/categories$/);
     await expect(page.getByRole("heading", { name: "E2E Gadgets" })).toBeVisible();
+  });
+});
+
+test.describe("the footer", () => {
+  test("carries the delivery prices, the aisles and the account links", async ({
+    page,
+  }) => {
+    await page.goto("/categories");
+
+    const footer = page.getByRole("contentinfo");
+    await expect(footer).toBeVisible();
+
+    /*
+     * The delivery table is the reason this footer exists: the fee to each
+     * zone, from the same rows checkout charges from, so nobody has to reach
+     * the last screen to find out what it costs to reach them.
+     */
+    await expect(footer.getByText("Beirut", { exact: true })).toBeVisible();
+    await expect(footer.getByText("$2.00")).toBeVisible();
+    await expect(footer.getByText("Rest of Lebanon")).toBeVisible();
+    await expect(footer.getByText(/Akkar/)).toBeVisible();
+
+    // The aisles come from the same loader as the menu, so a new group appears
+    // in both without anyone editing markup.
+    await expect(
+      footer.getByRole("link", { name: "E2E Gadgets" }),
+    ).toBeVisible();
+    await expect(
+      footer.getByRole("link", { name: "Shop by phone" }),
+    ).toBeVisible();
+
+    // A guest is offered the two ways in, not the account pages.
+    await expect(footer.getByRole("link", { name: "Sign in" })).toBeVisible();
+    await expect(
+      footer.getByRole("link", { name: "Create an account" }),
+    ).toBeVisible();
+    // exact: role-name matching is a case-insensitive substring match, and
+    // "Create an account" contains "Account".
+    await expect(
+      footer.getByRole("link", { name: "Account", exact: true }),
+    ).toHaveCount(0);
+
+    await expect(
+      footer.getByText("Prices in US dollars · Cash on delivery only"),
+    ).toBeVisible();
+  });
+
+  test("offers WhatsApp only when a number is set", async ({ page }) => {
+    const link = page
+      .getByRole("contentinfo")
+      .getByRole("link", { name: /WhatsApp/ });
+
+    await sql`update store_settings set whatsapp_number = null`;
+    await page.goto("/categories");
+    await expect(link).toHaveCount(0);
+
+    await sql`update store_settings set whatsapp_number = '+961 70 111 222'`;
+    await page.goto("/categories");
+    await expect(link).toHaveAttribute("href", "https://wa.me/96170111222");
+
+    await sql`update store_settings set whatsapp_number = null`;
+  });
+
+  test.describe("signed in", () => {
+    test.use({ storageState: storageStateFor("customer") });
+
+    test("swaps the sign-in links for the account ones", async ({ page }) => {
+      await page.goto("/categories");
+      const footer = page.getByRole("contentinfo");
+
+      await expect(
+        footer.getByRole("link", { name: "Account", exact: true }),
+      ).toBeVisible();
+      await expect(
+        footer.getByRole("link", { name: "Saved items" }),
+      ).toBeVisible();
+      await expect(footer.getByRole("link", { name: "Sign in" })).toHaveCount(0);
+    });
   });
 });

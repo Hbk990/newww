@@ -112,6 +112,17 @@ body {
   --brand-red-deep: #ce0606;
   --whatsapp: #1fae63;
 
+  /*
+   * For type on the dark footer, which stays dark in both themes.
+   *
+   * The deep red that carries small text on white is far too dark on near
+   * black, and the pure brand red is not much better; the WhatsApp green has
+   * the same problem. These two are the light-on-dark counterparts, and they
+   * are theme-independent on purpose — the surface they sit on never changes.
+   */
+  --on-dark-red: #ff6b6b;
+  --on-dark-green: #3ddc8a;
+
   --accent: var(--brand-red-deep);
   --accent-soft: #fff0f0;
   --on-accent: #ffffff;
@@ -135,6 +146,8 @@ body {
 @theme inline {
   --color-brand-red: var(--brand-red);
   --color-whatsapp: var(--whatsapp);
+  --color-on-dark-red: var(--on-dark-red);
+  --color-on-dark-green: var(--on-dark-green);
 }
 
 /* The hero scale from the brand work: display type is the loudest thing on the

@@ -1,9 +1,11 @@
 import { Outfit } from "next/font/google";
 
 import { BottomBar } from "@/components/shop/bottom-bar";
+import { SiteFooter } from "@/components/shop/site-footer";
 import { SiteHeader } from "@/components/shop/site-header";
 import { currentUser } from "@/lib/auth/session";
 import { canAny } from "@/lib/auth/permissions";
+import { deliveryZones } from "@/lib/storefront/footer";
 import { basketCount, loadNav } from "@/lib/storefront/nav";
 import { storefrontSettings } from "@/lib/storefront/settings";
 
@@ -71,10 +73,11 @@ export default async function ShopLayout({
     }
   }
 
-  const [groups, basket, user] = await Promise.all([
+  const [groups, basket, user, zones] = await Promise.all([
     loadNav(),
     basketCount(),
     currentUser(),
+    deliveryZones(),
   ]);
 
   /*
@@ -112,7 +115,22 @@ export default async function ShopLayout({
         storeName={settings.storeName}
         announcements={announcements}
       />
-      <div className="pb-16 md:pb-0">{children}</div>
+      {/*
+        The footer sits inside the padded region with the page, so the tab bar
+        fixed over the bottom of a phone screen cannot cover its last line.
+      */}
+      <div className="pb-16 md:pb-0">
+        {children}
+        <SiteFooter
+          storeName={settings.storeName}
+          phone={settings.phone}
+          whatsappNumber={settings.whatsappNumber}
+          freeDeliveryThresholdCents={settings.freeDeliveryThresholdCents}
+          groups={groups}
+          zones={zones}
+          signedIn={user !== null}
+        />
+      </div>
       <BottomBar basketCount={basket} />
     </div>
   );

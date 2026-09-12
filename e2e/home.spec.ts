@@ -87,7 +87,10 @@ test("the hero states what the shop is and what it holds", async ({ page }) => {
   ).toBeVisible();
   // The count is the real one, rendered on the server.
   await expect(page.getByText(/things for the phone in your hand/)).toBeVisible();
-  await expect(page.getByText("Cash on delivery anywhere in Lebanon")).toBeVisible();
+  // exact: the footer's own copy contains the same sentence.
+  await expect(
+    page.getByText("Cash on delivery anywhere in Lebanon", { exact: true }),
+  ).toBeVisible();
 });
 
 test("the phone finder leads to results for the model picked", async ({ page }) => {

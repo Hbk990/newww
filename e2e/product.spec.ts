@@ -142,7 +142,10 @@ test.describe("the product page, as a guest", () => {
   });
 
   test("offers WhatsApp only when a number is configured", async ({ page }) => {
-    const ask = page.getByRole("link", { name: /WhatsApp/ });
+    // Scoped to main: the footer carries its own WhatsApp link on every page.
+    const ask = page
+      .getByRole("main")
+      .getByRole("link", { name: /WhatsApp/ });
 
     await sql`update store_settings set whatsapp_number = null`;
     await page.goto(`/products/${slug}`);
