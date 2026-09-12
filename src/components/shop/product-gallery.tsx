@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { imageSrc, IMAGE_PLACEHOLDER } from "@/lib/shop/image-url";
 import type { ShopImage } from "@/lib/shop/product";
@@ -12,9 +12,8 @@ import type { ShopImage } from "@/lib/shop/product";
  * no width or height, and next/image needs either both or a `fill` parent with
  * a known aspect ratio. More to the point, none of the files exist yet — the
  * catalog was imported without its photos — and a 404 through the image
- * optimiser is a 500-ish error page for the whole route, where a broken <img>
- * is one onError away from a placeholder. This becomes next/image when real
- * photos land with dimensions.
+ * optimiser breaks the route, where a broken <img> is one placeholder away.
+ * This becomes next/image when real photos land with dimensions.
  */
 export function ProductGallery({
   images,
@@ -27,28 +26,31 @@ export function ProductGallery({
   // Which sources failed, so a retry is not attempted on every render.
   const [broken, setBroken] = useState<Record<string, true>>({});
 
-  const shown = images.length > 0 ? images : [{ url: IMAGE_PLACEHOLDER, alt: null, width: null, height: null }];
-  const current = shown[Math.min(active, shown.length - 1)] ?? shown[0];
-  const src = current ? imageSrc(current.url) : IMAGE_PLACEHOLDER;
-
-  const resolve = (url: string) => (broken[url] ? IMAGE_PLACEHOLDER : url);
-  const fail = (url: string) =>
+  const fail = useCallback((url: string) => {
     setBroken((prev) => (prev[url] ? prev : { ...prev, [url]: true }));
+  }, []);
+
+  const shown: ShopImage[] =
+    images.length > 0
+      ? images
+      : [{ url: IMAGE_PLACEHOLDER, alt: null, width: null, height: null }];
+  const current = shown[Math.min(active, shown.length - 1)] ?? shown[0];
+  const mainSrc = current ? imageSrc(current.url) : IMAGE_PLACEHOLDER;
 
   return (
-    <div>
-      <div className="overflow-hidden rounded-lg border border-line bg-surface">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={resolve(src)}
+    <div className="md:sticky md:top-6">
+      <div className="mx-auto max-w-md overflow-hidden rounded-xl border border-line bg-raised">
+        <Photo
+          src={mainSrc}
           alt={current?.alt ?? title}
-          onError={() => fail(src)}
+          broken={broken}
+          onFail={fail}
           className="aspect-square w-full object-contain"
         />
       </div>
 
       {shown.length > 1 ? (
-        <ul className="mt-3 flex gap-2 overflow-x-auto pb-1">
+        <ul className="mx-auto mt-3 flex max-w-md gap-2 overflow-x-auto pb-1">
           {shown.map((image, index) => {
             const thumb = imageSrc(image.url);
             return (
@@ -58,16 +60,16 @@ export function ProductGallery({
                   onClick={() => setActive(index)}
                   aria-current={index === active}
                   aria-label={`Photo ${index + 1} of ${shown.length}`}
-                  className={`block h-16 w-16 shrink-0 overflow-hidden rounded-md border ${
+                  className={`block size-16 shrink-0 overflow-hidden rounded-lg border bg-raised ${
                     index === active ? "border-accent" : "border-line"
                   }`}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={resolve(thumb)}
+                  <Photo
+                    src={thumb}
                     alt=""
-                    onError={() => fail(thumb)}
-                    className="h-full w-full object-contain"
+                    broken={broken}
+                    onFail={fail}
+                    className="size-full object-contain"
                   />
                 </button>
               </li>
@@ -76,5 +78,50 @@ export function ProductGallery({
         </ul>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * One <img> that falls back to the placeholder when its file is missing.
+ *
+ * `onError` alone is not enough and the first screenshots proved it: the markup
+ * is server-rendered, so the browser starts fetching before React hydrates. A
+ * 404 that arrives in that window fires an error event with no listener
+ * attached, it is never replayed, and the broken-image icon stays for good —
+ * which is what the whole catalog looks like today, since it was imported
+ * without its photos.
+ *
+ * The ref callback closes that window: on mount, an image that has finished
+ * loading with no intrinsic width has already failed.
+ */
+function Photo({
+  src,
+  alt,
+  broken,
+  onFail,
+  className,
+}: {
+  src: string;
+  alt: string;
+  broken: Record<string, true>;
+  onFail: (src: string) => void;
+  className: string;
+}) {
+  const check = useCallback(
+    (node: HTMLImageElement | null) => {
+      if (node && node.complete && node.naturalWidth === 0) onFail(src);
+    },
+    [onFail, src],
+  );
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      ref={check}
+      src={broken[src] ? IMAGE_PLACEHOLDER : src}
+      alt={alt}
+      onError={() => onFail(src)}
+      className={className}
+    />
   );
 }
