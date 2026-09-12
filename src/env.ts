@@ -46,6 +46,14 @@ export const env = {
    * holds off every live cart in the shop.
    */
   cronSecret: process.env.CRON_SECRET ?? null,
+  /**
+   * Brevo's transactional API key, for MAIL_TRANSPORT=brevo.
+   *
+   * Optional here rather than required, because the transport is chosen
+   * separately — and `sendMail` refuses to run with the brevo transport and no
+   * key rather than failing later at the first send.
+   */
+  brevoApiKey: process.env.BREVO_API_KEY ?? null,
   nodeEnv: process.env.NODE_ENV ?? "development",
   get isProduction(): boolean {
     return this.nodeEnv === "production";

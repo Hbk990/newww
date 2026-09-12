@@ -23,7 +23,7 @@ when nothing is wrong.
 
 ## What works
 
-**Foundations** — 62 tables over 20 migrations; email and Google sign-in;
+**Foundations** — 62 tables over 26 migrations; email and Google sign-in;
 server-side sessions; 31 permissions over three roles (customer, staff, admin);
 an append-only audit log the database refuses to update or delete; the admin
 shell with navigation, breadcrumbs, mobile layout, toasts and an error boundary.
@@ -35,18 +35,41 @@ Categories, Brands and Devices screens.
 
 ## What does not work yet
 
-Nothing sells. There is no storefront, no cart, no checkout and no order
-screen. Twelve admin screens are still placeholders: orders, customers,
-reviews, promotions, stock, stock counts, staff, settings and the audit log
-viewer.
+The shop sells. A visitor can fill a basket, check out, and the order arrives
+awaiting its confirmation call — stock claimed, delivery priced by governorate,
+the cart retired. Cancelling or refusing an order puts counted stock back.
 
-Most importantly: **`claim_stock`, `return_stock` and `next_order_number` are
-written and tested but have no callers.** The database can already reserve
-stock, number an order and return a refused delivery. Nothing asks it to. That
-is the next phase, and the largest remaining piece.
+What is still missing, in the order it matters:
 
-`markReauthenticated` and `requireRecentAuth` also exist unused — the
-sensitive-operations list they were built for is not enforced yet.
+**There is no catalog storefront.** No product pages, no category or search
+pages, no "shop by device". `/cart` and `/checkout` exist and work, but nothing
+yet puts anything into a basket except a test. The cart line shows a product
+title as plain text because `/products/[slug]` does not exist for it to link
+to. This is the frontend work, and it is waiting on the owner's notes.
+
+**Email needs a key.** `MAIL_TRANSPORT=brevo` is implemented but unverified
+against the live API — this environment cannot reach api.brevo.com. Set
+`BREVO_API_KEY`, verify the `MAIL_FROM` domain with Brevo, and send one real
+message before trusting it. With `MAIL_TRANSPORT=console` the app throws in
+production rather than silently dropping verification emails.
+
+**Seven admin screens are still placeholders:** the audit log viewer,
+customers and customers/new, promotions, reviews, staff, and stock counts.
+None of them block selling.
+
+**No dispatch record.** An order moves to delivered without recording what
+physically left, so partial shipments are not modelled. `fulfillments` and
+`fulfillment_items` are untouched.
+
+**No return after delivery.** `NEXT_STATUS` gives `delivered` no onward moves
+and `refunds` is untouched. Money has changed hands by then, so it is a refund
+rather than a stock return, and that flow does not exist. A refusal *before*
+delivery is handled.
+
+**Delivery prices are placeholders.** Migration 0023 seeded $2 Beirut, $3 Mount
+Lebanon, $5 elsewhere. Nobody quoted those — replace them under Delivery zones.
+`is_private` is also still on, so the shop sends `noindex` until someone turns
+it off in Settings.
 
 ## Four things to be careful of
 

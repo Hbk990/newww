@@ -1,5 +1,7 @@
 import { env } from "@/env";
 
+import { sendViaBrevo } from "./brevo";
+
 export type Mail = {
   to: string;
   subject: string;
@@ -38,10 +40,26 @@ export async function sendMail(mail: Mail): Promise<void> {
       );
       return;
 
+    case "brevo": {
+      /*
+       * Checked here rather than at module load, so a missing key is an error
+       * naming the mail configuration instead of a failure somewhere in the
+       * middle of registration.
+       */
+      if (!env.brevoApiKey) {
+        throw new Error(
+          "MAIL_TRANSPORT=brevo needs BREVO_API_KEY. Get one from " +
+            "Brevo > SMTP & API > API keys.",
+        );
+      }
+      await sendViaBrevo(mail, env.brevoApiKey, env.mailFrom);
+      return;
+    }
+
     default:
       throw new Error(
         `Unknown MAIL_TRANSPORT "${env.mailTransport}". ` +
-          `Supported: console. Add a provider in src/lib/mail/.`,
+          `Supported: console, brevo. Add a provider in src/lib/mail/.`,
       );
   }
 }
