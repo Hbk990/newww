@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useId, useState } from "react";
+import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 import type { FormState } from "@/lib/auth/actions";
@@ -185,8 +185,20 @@ export function Divider({ label }: { label: string }) {
 }
 
 /**
- * Wraps a server action so errors render next to the form instead of replacing
+ * Wraps a server action so errors render beside the form instead of replacing
  * the page, and so what was typed survives a failed submit.
+ *
+ * That second part needs code. React 19 resets an uncontrolled form once its
+ * action returns — including when the action returns an error — so by default a
+ * wrong verification code also wipes the email and the password that were typed
+ * with it, and the customer starts the whole form again. On a phone, on a shop
+ * account they only wanted so they could order, that is where people give up.
+ *
+ * So the values are snapshotted on the way out and written back if the action
+ * came back with an error. Passwords are deliberately left out of the snapshot:
+ * retyping one is expected, and keeping it in memory to restore it is a risk
+ * with no benefit. Only empty fields are refilled, so a value React did keep is
+ * never overwritten.
  */
 export function ActionForm({
   action,
@@ -195,10 +207,39 @@ export function ActionForm({
   action: (prev: FormState, form: FormData) => Promise<FormState>;
   children: React.ReactNode;
 }) {
-  const [state, formAction] = useActionState(action, null);
+  const form = useRef<HTMLFormElement>(null);
+  const typed = useRef<Record<string, string>>({});
+
+  const [state, formAction] = useActionState(
+    async (previous: FormState, data: FormData) => {
+      const snapshot: Record<string, string> = {};
+      for (const [name, value] of data.entries()) {
+        if (typeof value === "string" && !name.toLowerCase().includes("password")) {
+          snapshot[name] = value;
+        }
+      }
+      typed.current = snapshot;
+      return action(previous, data);
+    },
+    null,
+  );
+
+  useEffect(() => {
+    if (!state?.error || !form.current) return;
+    for (const [name, value] of Object.entries(typed.current)) {
+      const field = form.current.elements.namedItem(name);
+      if (
+        field instanceof HTMLInputElement &&
+        field.type !== "password" &&
+        field.value === ""
+      ) {
+        field.value = value;
+      }
+    }
+  }, [state]);
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
+    <form ref={form} action={formAction} className="flex flex-col gap-4">
       {state?.error ? (
         <p
           role="alert"
