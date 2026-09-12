@@ -1,7 +1,9 @@
+import { ReauthNotice } from "@/components/admin/reauth-notice";
 import { SettingsForm } from "@/components/admin/settings-form";
 import { loadSettings } from "@/lib/admin/settings-actions";
 import { requirePermission } from "@/lib/auth/guards";
 import { can } from "@/lib/auth/permissions";
+import { isRecentlyAuthenticated } from "@/lib/auth/reauth";
 
 export const metadata = { title: "Settings · DRPHONE" };
 
@@ -25,6 +27,15 @@ export default async function Page() {
     );
   }
 
+  /*
+   * Two things have to be true to edit: the permission, and a password entered
+   * recently. Separating them means someone who can edit but has gone stale
+   * gets a prompt they can act on, rather than a form that throws them to the
+   * confirm screen when they press Save and loses what they typed.
+   */
+  const permitted = can(user, "settings.edit");
+  const fresh = isRecentlyAuthenticated(user);
+
   return (
     <>
       <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
@@ -33,7 +44,9 @@ export default async function Page() {
         the threshold that makes them free.
       </p>
 
-      <SettingsForm settings={settings} canEdit={can(user, "settings.edit")} />
+      {permitted && !fresh ? <ReauthNotice next="/admin/settings" /> : null}
+
+      <SettingsForm settings={settings} canEdit={permitted && fresh} />
     </>
   );
 }

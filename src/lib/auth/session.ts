@@ -60,6 +60,15 @@ export async function createSession(
     expiresAt,
     ipAddress: meta.ipAddress ?? null,
     userAgent: meta.userAgent ?? null,
+    /*
+     * Signing in counts as entering the password, because it is.
+     *
+     * Without this a user who signed in five seconds ago is asked for their
+     * password again the moment they open Settings — which teaches people to
+     * type it reflexively, the opposite of what the prompt is for. The window
+     * runs from here, so the check is "recently", not "twice".
+     */
+    reauthenticatedAt: new Date(),
   });
 
   // Denormalized onto the user so "when was this account last used" survives

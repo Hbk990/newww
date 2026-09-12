@@ -1,7 +1,9 @@
+import { ReauthNotice } from "@/components/admin/reauth-notice";
 import { ShippingManager } from "@/components/admin/shipping-manager";
 import { loadShipping } from "@/lib/admin/shipping-actions";
 import { can } from "@/lib/auth/permissions";
 import { requirePermission } from "@/lib/auth/guards";
+import { isRecentlyAuthenticated } from "@/lib/auth/reauth";
 
 export const metadata = { title: "Delivery zones · DRPHONE" };
 
@@ -19,11 +21,15 @@ export default async function ShippingPage() {
         orders.
       </p>
 
+      {can(user, "settings.edit") && !isRecentlyAuthenticated(user) ? (
+        <ReauthNotice next="/admin/shipping" />
+      ) : null}
+
       <ShippingManager
         zones={zones}
         rates={rates}
         uncovered={uncovered}
-        canEdit={can(user, "settings.edit")}
+        canEdit={can(user, "settings.edit") && isRecentlyAuthenticated(user)}
       />
     </>
   );

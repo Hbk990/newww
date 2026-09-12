@@ -111,9 +111,18 @@ export default async function globalSetup(): Promise<void> {
       // run and leave someone wondering why a test database has hundreds.
       await sql`delete from sessions where user_id = ${user.id}`;
 
+      /*
+       * reauthenticated_at is set, because createSession sets it — signing in
+       * IS entering the password, so a fresh session is recently
+       * authenticated. A minted session without it would be a state the app
+       * never produces, and every spec touching Settings or Delivery zones
+       * would bounce to the confirm screen.
+       *
+       * e2e/reauth.spec.ts deliberately makes a session stale to test the gate.
+       */
       await sql`
-        insert into sessions (user_id, token_hash, expires_at)
-        values (${user.id}, ${tokenHash}, now() + interval '1 day')
+        insert into sessions (user_id, token_hash, expires_at, reauthenticated_at)
+        values (${user.id}, ${tokenHash}, now() + interval '1 day', now())
       `;
 
       await writeFile(

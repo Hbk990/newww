@@ -82,10 +82,10 @@ export async function loadSettings() {
 /**
  * Saves the one settings row.
  *
- * `settings.edit` is listed in REAUTH_REQUIRED, but `requireRecentAuth` still
- * has no callers anywhere in the project — that is step 13 of the remaining
- * work. Until it is wired, this is guarded by permission alone, the same as
- * every other admin write. Worth knowing rather than assuming otherwise.
+ * `settings.edit` is in REAUTH_REQUIRED, so `requirePermission` also demands a
+ * password entered within the last fifteen minutes and redirects to
+ * /admin/confirm otherwise. Nothing extra is needed here — the check lives in
+ * the one gate every admin page and action already passes through.
  */
 export async function saveSettings(
   raw: SettingsInput,
