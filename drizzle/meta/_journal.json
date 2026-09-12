@@ -176,6 +176,13 @@
       "when": 1789173150752,
       "tag": "0024_store_settings_row",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1789173902797,
+      "tag": "0025_return_stock_symmetry",
+      "breakpoints": true
     }
   ]
 }

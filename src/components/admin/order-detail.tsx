@@ -250,7 +250,9 @@ export function OrderDetail({
                   >
                     {to === "delivered"
                       ? "Delivered — cash collected"
-                      : `Mark ${STATUS_LABELS[to]?.toLowerCase() ?? to}`}
+                      : to === "returned"
+                        ? "Came back — refused or nobody home"
+                        : `Mark ${STATUS_LABELS[to]?.toLowerCase() ?? to}`}
                   </button>
                 ))}
 
@@ -259,8 +261,9 @@ export function OrderDetail({
                   <div className="rounded-md border border-warn p-2 text-xs">
                     <p>Cancel this order?</p>
                     <p className="mt-1 text-muted">
-                      Stock taken for it is not yet returned — that comes with
-                      the refused-delivery work.
+                      Any counted stock taken for it goes back on the shelf, and
+                      the ledger records why. This cannot be undone — a
+                      cancelled order has no way back.
                     </p>
                     <div className="mt-2 flex gap-2">
                       <button

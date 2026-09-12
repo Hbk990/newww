@@ -24,14 +24,16 @@ export const REASON_VALUES = ADJUST_REASONS.map((r) => r.value);
 /**
  * Labels for every reason that can appear in the ledger.
  *
- * Wider than the list above: the order pipeline writes `sale` and
- * `refused_delivery`, and switching counting on writes `opening_count`. None
- * of those are offered on the adjustment form but all three show in history.
+ * Wider than the list above: the order pipeline writes `sale`,
+ * `refused_delivery` and `cancellation`, and switching counting on writes
+ * `opening_count`. None of those are offered on the adjustment form but all
+ * four show in history.
  */
 export const REASON_LABELS: Record<string, string> = {
   ...Object.fromEntries(ADJUST_REASONS.map((r) => [r.value, r.label])),
   sale: "Sold",
   refused_delivery: "Delivery refused",
+  cancellation: "Order cancelled",
   opening_count: "Opening count",
   restock: "Returned to stock",
 };

@@ -223,6 +223,45 @@ export async function advanceStatus(
       .set({ status: to as "confirmed", ...extra })
       .where(eq(orders.id, id));
 
+    /*
+     * An order that will not be delivered gives its stock back.
+     *
+     * Until now nothing called return_stock at all, so every cancellation
+     * leaked units permanently: claim_stock had taken them at checkout and
+     * nothing ever put them back. The damage was invisible until a stock count
+     * disagreed with the shelf, and with cash on delivery a refusal is ordinary
+     * traffic rather than an edge case.
+     *
+     * Inside this transaction, so the status change and the stock movement
+     * cannot happen apart. Returning without recording the cancellation would
+     * inflate stock against an order still live; recording it without the
+     * return is the leak this fixes.
+     *
+     * No double-return is possible: NEXT_STATUS gives `cancelled` and
+     * `returned` no onward moves, so an order reaches either at most once.
+     *
+     * return_stock is a no-op for untracked variants, which is most of the
+     * catalog — the loop is cheap and its correctness lives in the function.
+     */
+    if (to === "cancelled" || to === "returned") {
+      const lines = await tx
+        .select({
+          variantId: orderItems.variantId,
+          quantity: orderItems.quantity,
+        })
+        .from(orderItems)
+        .where(eq(orderItems.orderId, id));
+
+      const reason = to === "returned" ? "refused_delivery" : "cancellation";
+      for (const line of lines) {
+        // A line whose variant was deleted since has nothing to return to.
+        if (!line.variantId) continue;
+        await tx.execute(
+          sql`select return_stock(${line.variantId}, ${line.quantity}, ${id}, ${reason})`,
+        );
+      }
+    }
+
     await tx.insert(orderEvents).values({
       orderId: id,
       type: `status_${to}`,
