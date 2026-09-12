@@ -1,11 +1,25 @@
 import type { Metadata } from "next";
 
+import { storefrontSettings } from "@/lib/storefront/settings";
+
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: "DRPHONE",
-  description: "Phone accessories, audio, gaming and home electronics.",
-};
+/**
+ * `isPrivate` is honoured here rather than per page, because a page that
+ * forgets it is a page that gets indexed — and being indexed half-built is
+ * slow and awkward to undo. Covering the admin area too is no loss; it should
+ * never have been indexed either.
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await storefrontSettings();
+  return {
+    title: settings.storeName,
+    description: "Phone accessories, audio, gaming and home electronics.",
+    robots: settings.isPrivate
+      ? { index: false, follow: false, nocache: true }
+      : undefined,
+  };
+}
 
 export default function RootLayout({
   children,
