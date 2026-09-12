@@ -93,3 +93,55 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/**
+ * The retail shop's brand scope.
+ *
+ * Red on white with black display type, taken from the brand guideline. Scoped
+ * to `[data-shop]` rather than changing the root tokens, because the admin is a
+ * working tool and should stay in its calm blue — a bright red "delete" next to
+ * a bright red "save" is how mistakes happen.
+ *
+ * Only `--accent` and its companions are remapped. Everything else (ink, line,
+ * surface) keeps working, so every utility class already in use carries over
+ * and dark mode still functions.
+ */
+[data-shop] {
+  --brand-red: #ff0000;
+  /* Pure red fails AA on white below roughly 19px, so small text uses this. */
+  --brand-red-deep: #ce0606;
+  --whatsapp: #1fae63;
+
+  --accent: var(--brand-red-deep);
+  --accent-soft: #fff0f0;
+  --on-accent: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) [data-shop] {
+    /* On a dark ground the deep red goes muddy; the bright one has the contrast. */
+    --accent: #ff4d4d;
+    --accent-soft: oklch(0.27 0.08 25);
+    --on-accent: oklch(0.16 0.01 260);
+  }
+}
+
+:root[data-theme="dark"] [data-shop] {
+  --accent: #ff4d4d;
+  --accent-soft: oklch(0.27 0.08 25);
+  --on-accent: oklch(0.16 0.01 260);
+}
+
+@theme inline {
+  --color-brand-red: var(--brand-red);
+  --color-whatsapp: var(--whatsapp);
+}
+
+/* The hero scale from the brand work: display type is the loudest thing on the
+   page, and it is set in the brand font rather than the UI stack. */
+[data-shop] .display {
+  font-family: var(--font-display, inherit);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 0.95;
+}

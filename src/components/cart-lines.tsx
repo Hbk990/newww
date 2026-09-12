@@ -1,5 +1,6 @@
 "use client";
 
+import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -43,13 +44,14 @@ export function CartLines({
         {lines.map((line) => (
           <li key={line.variantId} className="flex flex-wrap gap-4 py-4">
             <div className="min-w-48 flex-1">
-              {/*
-                Plain text, not a link: there is no /products/[slug] route yet
-                and `typedRoutes` rejects a link to one. It becomes a link when
-                the storefront product page exists — productSlug is already
-                carried on the line for that.
-              */}
-              <p className="font-medium">{line.productTitle}</p>
+              <p className="font-medium">
+                <Link
+                  href={`/products/${line.productSlug}` as Route}
+                  className="underline-offset-4 hover:underline"
+                >
+                  {line.productTitle}
+                </Link>
+              </p>
               <p className="text-sm text-muted">
                 {line.variantTitle}
                 {line.sku ? ` · ${line.sku}` : null}

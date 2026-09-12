@@ -92,7 +92,13 @@ test("a basket becomes an order, and the stock moves with it", async ({
     page.getByText("E2E Checkout Widget", { exact: true }),
   ).toBeVisible();
 
-  await page.getByRole("link", { name: "Checkout" }).click();
+  /*
+   * exact: true — the basket now links each product title to its page, and this
+   * product is called "E2E Checkout Widget". Role-name matching is a substring
+   * match by default, so the loose locator finds the product link as well as
+   * the checkout button.
+   */
+  await page.getByRole("link", { name: "Checkout", exact: true }).click();
   await expect(page).toHaveURL("/checkout");
 
   await page.getByLabel("Phone").fill("+961 70 123 456");

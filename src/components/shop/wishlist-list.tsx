@@ -1,5 +1,7 @@
 "use client";
 
+import type { Route } from "next";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTransition } from "react";
 
@@ -20,12 +22,14 @@ export function WishlistList({ items }: { items: WishlistEntry[] }) {
       {items.map((item) => (
         <li key={item.productId} className="flex items-start gap-4 py-4">
           <div className="min-w-0 flex-1">
-            {/*
-              Plain text, not a link: /products/[slug] does not exist yet and
-              typedRoutes rejects a link to it. `slug` is carried on the entry
-              ready for when it does.
-            */}
-            <p className="font-medium">{item.title}</p>
+            <p className="font-medium">
+              <Link
+                href={`/products/${item.slug}` as Route}
+                className="underline-offset-4 hover:underline"
+              >
+                {item.title}
+              </Link>
+            </p>
             <p className="text-sm text-muted">
               from {money(item.minPriceCents)}
               {item.inStock ? "" : " · out of stock"}
