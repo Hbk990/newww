@@ -19,7 +19,10 @@ import { users } from "./identity";
  *
  * Server-side rather than in the cookie itself so stock can be reserved against
  * it and so a cart survives a device change once the user signs in. `userId` is
- * null for guests, which must work: guest checkout is the common path.
+ * null while a guest browses, which must keep working: ordering needs an
+ * account, but filling a basket does not — asking for one before someone has
+ * chosen anything loses the sale. `adoptGuestCart` moves the basket across at
+ * sign-in.
  */
 export const carts = pgTable(
   "carts",

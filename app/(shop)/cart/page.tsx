@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { CartLines } from "@/components/cart-lines";
+import { currentUser } from "@/lib/auth/session";
 import { loadCart } from "@/lib/cart/cart";
 
 export const metadata = { title: "Basket · DRPHONE" };
@@ -12,7 +13,7 @@ export const metadata = { title: "Basket · DRPHONE" };
 export const dynamic = "force-dynamic";
 
 export default async function CartPage() {
-  const cart = await loadCart();
+  const [cart, user] = await Promise.all([loadCart(), currentUser()]);
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-12">
@@ -28,7 +29,11 @@ export default async function CartPage() {
           </p>
         </>
       ) : (
-        <CartLines lines={cart.lines} subtotalCents={cart.subtotalCents} />
+        <CartLines
+          lines={cart.lines}
+          subtotalCents={cart.subtotalCents}
+          signedIn={user !== null}
+        />
       )}
     </main>
   );

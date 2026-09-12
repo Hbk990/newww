@@ -1,5 +1,6 @@
 "use client";
 
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import Script from "next/script";
 import { useEffect, useRef, useState } from "react";
@@ -30,8 +31,11 @@ declare global {
 export function GoogleSignIn({
   label,
   clientId,
+  next,
 }: {
   label: string;
+  /** Where to land afterwards. Already validated by the page passing it. */
+  next?: string;
   // Passed from the server rather than read from NEXT_PUBLIC_*, so the client
   // id lives in exactly one environment variable instead of two that can drift
   // apart. It is public either way — it ships to the browser by design.
@@ -57,7 +61,9 @@ export function GoogleSignIn({
           // The cookie arrived on that response, so every cached server render
           // is now stale — `refresh` is what discards it. Navigating without it
           // would land on a page still rendered as signed out.
-          router.replace("/");
+          // Back to whatever asked for the sign-in, already validated by the
+          // page that passed it here.
+          router.replace((next ?? "/") as Route);
           router.refresh();
         } else {
           setError("Google sign-in didn't work. Try your email instead.");
@@ -74,7 +80,7 @@ export function GoogleSignIn({
     });
 
     window.google.accounts.id.prompt();
-  }, [ready, clientId, label, router]);
+  }, [ready, clientId, label, next, router]);
 
   // Without a client id configured there is nothing to show, and an inert
   // button is worse than none.

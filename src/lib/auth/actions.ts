@@ -1,14 +1,17 @@
 "use server";
 
 import { and, eq, isNull, sql } from "drizzle-orm";
+import type { Route } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { db } from "@/db";
+import { adoptGuestCart } from "@/lib/cart/cart";
 import { users, verificationCodes } from "@/db/schema";
 import { sendMail, verificationEmail } from "@/lib/mail";
 
 import { checkPasswordLength, hashPassword, verifyPassword } from "./password";
+import { safeShopReturn } from "./return-to";
 import {
   createSession,
   currentUser,
@@ -139,8 +142,32 @@ export async function register(
   // half-way through without a second cookie.
   const { ip: ip2, userAgent } = await requestContext();
   await createSession(userId, { ipAddress: ip2, userAgent });
+  // Same reason as sign-in: a guest who registers at checkout keeps the basket
+  // that sent them there.
+  await adoptGuestCart(userId);
 
-  redirect("/verify");
+  /*
+   * Verification carries the destination forward in the URL, so someone who
+   * registered from a basket at checkout is returned to it after entering the
+   * code rather than starting again from the home page.
+   */
+  const back = returnTo(form);
+  redirect(
+    back === "/" ? "/verify" : (`/verify?next=${encodeURIComponent(back)}` as Route),
+  );
+}
+
+/**
+ * The path a form asked to return to, once it has been checked.
+ *
+ * Every one of these flows can start from somewhere that matters — a basket at
+ * checkout, a product page — and dropping someone on the home page after they
+ * sign in means making them find their way back to what they were doing. The
+ * value is validated rather than trusted; see safeShopReturn.
+ */
+function returnTo(form: FormData): Route {
+  const raw = form.get("next");
+  return safeShopReturn(typeof raw === "string" ? raw : undefined) as Route;
 }
 
 // ---------------------------------------------------------------- verify
@@ -211,7 +238,7 @@ export async function verifyEmail(
     .where(eq(users.id, user.id));
 
   await recordAttempt("code", user.email, ip, true);
-  redirect("/");
+  redirect(returnTo(form));
 }
 
 export async function resendCode(): Promise<FormState> {
@@ -280,7 +307,17 @@ export async function signIn(
 
   await recordAttempt("password", identifier, ip, true);
   await createSession(row.id, { ipAddress: ip, userAgent });
-  redirect("/");
+  /*
+   * The basket they built as a guest becomes theirs.
+   *
+   * Signing in at checkout and finding an empty basket is the moment a shopper
+   * is least forgiving, and it is exactly the moment the account requirement
+   * creates. Called at every point a session is created, rather than inside
+   * createSession: cart.ts reads the session, so the dependency has to run this
+   * way round.
+   */
+  await adoptGuestCart(row.id);
+  redirect(returnTo(form));
 }
 
 /**

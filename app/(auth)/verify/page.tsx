@@ -1,15 +1,23 @@
+import type { Route } from "next";
 import { redirect } from "next/navigation";
 
 import { ActionForm, Field, Submit } from "@/components/auth-form";
 import { ResendCode } from "@/components/resend-code";
 import { verifyEmail } from "@/lib/auth/actions";
 import { requireUser } from "@/lib/auth/guards";
+import { safeShopReturn } from "@/lib/auth/return-to";
 
 export const metadata = { title: "Confirm your email · DRPHONE" };
 
-export default async function VerifyPage() {
+export default async function VerifyPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const user = await requireUser();
-  if (user.emailVerified) redirect("/");
+  // Where registration was heading before the code got in the way.
+  const next = safeShopReturn((await searchParams).next);
+  if (user.emailVerified) redirect(next as Route);
 
   return (
     <>
@@ -22,6 +30,7 @@ export default async function VerifyPage() {
       </p>
 
       <ActionForm action={verifyEmail}>
+        <input type="hidden" name="next" value={next} />
         <Field
           label="Verification code"
           name="code"

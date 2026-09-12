@@ -1,4 +1,5 @@
 import { REAUTH_WINDOW_MINUTES } from "./permissions";
+import { safeReturnTo } from "./return-to";
 import type { SessionUser } from "./session";
 
 /**
@@ -21,16 +22,11 @@ export function isRecentlyAuthenticated(
 /**
  * Where to send someone after they confirm.
  *
- * Validated rather than trusted: an unchecked `next` is an open redirect, and
- * a confirmation screen is exactly where someone would try to plant one —
- * "confirm your password, then continue to evil.example". Only paths inside
- * the admin area are allowed, so the worst a tampered value can do is send a
- * staff member to a different admin page.
+ * Delegates to `safeReturnTo`, which holds the rules and the tests for them —
+ * this only names the admin area as the allowed prefix and the fallback. An
+ * unchecked `next` is an open redirect, and a confirmation screen is exactly
+ * where someone would try to plant one.
  */
 export function safeNext(next: string | undefined): string {
-  if (!next) return "/admin";
-  // "//evil.example" is protocol-relative and would leave the site.
-  if (!next.startsWith("/admin") || next.startsWith("//")) return "/admin";
-  if (next.includes("\\")) return "/admin";
-  return next;
+  return safeReturnTo(next, { fallback: "/admin", allow: ["/admin"] });
 }

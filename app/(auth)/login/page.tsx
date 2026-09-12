@@ -1,16 +1,30 @@
+import type { Route } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { GoogleSignIn } from "@/components/google-sign-in";
 import { ActionForm, Field, Submit } from "@/components/auth-form";
 import { signIn } from "@/lib/auth/actions";
+import { safeShopReturn } from "@/lib/auth/return-to";
 import { currentUser } from "@/lib/auth/session";
 import { env } from "@/env";
 
 export const metadata = { title: "Sign in · DRPHONE" };
 
-export default async function LoginPage() {
-  if (await currentUser()) redirect("/");
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  /*
+   * `next` is where they were going when they were asked to sign in — the
+   * checkout, most often. It is carried on the form, on the Google button and
+   * on the link to registration, and validated on the way back out in
+   * safeShopReturn, never trusted as given.
+   */
+  const next = safeShopReturn((await searchParams).next);
+  if (await currentUser()) redirect(next as Route);
+  const carry = next === "/" ? "" : `?next=${encodeURIComponent(next)}`;
 
   return (
     <>
@@ -19,9 +33,14 @@ export default async function LoginPage() {
         Use your email address or your username.
       </p>
 
-      <GoogleSignIn label="Continue with Google" clientId={env.googleClientId} />
+      <GoogleSignIn
+        label="Continue with Google"
+        clientId={env.googleClientId}
+        next={next}
+      />
 
       <ActionForm action={signIn}>
+        <input type="hidden" name="next" value={next} />
         <Field
           label="Email or username"
           name="identifier"
@@ -45,7 +64,10 @@ export default async function LoginPage() {
       </p>
       <p className="mt-2 text-sm text-muted">
         No account yet?{" "}
-        <Link href="/register" className="text-ink underline underline-offset-4">
+        <Link
+          href={`/register${carry}` as Route}
+          className="text-ink underline underline-offset-4"
+        >
           Create one
         </Link>
       </p>

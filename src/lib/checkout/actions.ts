@@ -8,6 +8,7 @@ import { db } from "@/db";
 import { cartItems } from "@/db/schema";
 import { currentUser } from "@/lib/auth/session";
 import { CART_COOKIE, currentCart, loadCart } from "@/lib/cart/cart";
+import { rememberAddress } from "@/lib/checkout/address";
 import { createOrder } from "@/lib/orders/create";
 import { LEBANON_REGIONS } from "@/lib/shipping/regions";
 import { quoteShipping } from "@/lib/shipping/quote";
@@ -18,6 +19,8 @@ export type CheckoutResult =
 
 const details = z.object({
   email: z.email("A valid email address is needed."),
+  /** Who the courier asks for at the door. */
+  name: z.string().trim().min(2, "A name is needed for the delivery.").max(80),
   /** Lebanese mobiles are +961 then 7 or 8 digits; kept loose for landlines. */
   phone: z
     .string()
@@ -54,6 +57,27 @@ export async function placeOrder(
   idempotencyKey: string,
   raw: CheckoutDetails,
 ): Promise<CheckoutResult> {
+  /*
+   * An order needs an account, and this is where that is true.
+   *
+   * The checkout page redirects a guest to sign in, but a page guard only
+   * governs the page: a server action is an endpoint, and anything holding a
+   * cart cookie could post to it. Checked first, before validation or any
+   * database work, so an unauthenticated caller learns nothing about the
+   * basket or the shape of the form.
+   *
+   * Staff-created orders are unaffected — the admin's manual order form calls
+   * createOrder directly, which is how a phone order for someone without an
+   * account still works.
+   */
+  const user = await currentUser();
+  if (!user) {
+    return {
+      ok: false,
+      error: "Please sign in to place your order — it keeps your details for next time.",
+    };
+  }
+
   const parsed = details.safeParse(raw);
   if (!parsed.success) {
     const fieldErrors: Record<string, string> = {};
@@ -106,8 +130,6 @@ export async function placeOrder(
     };
   }
 
-  const user = await currentUser();
-
   const result = await createOrder(idempotencyKey, {
     email: input.email,
     phone: input.phone,
@@ -122,13 +144,30 @@ export async function placeOrder(
     shippingCents: quote.priceCents,
     customerNote: input.note,
     source: "web",
-    userId: user?.id ?? null,
+    userId: user.id,
     // The cart's own holds sit inside inventory.reserved, so createOrder
     // releases them before claiming or the order is refused its own stock.
     cartId: cart.id,
   });
 
   if (!result.ok) return { ok: false, error: result.error };
+
+  /*
+   * Keep the details for next time. After the order, never before: this is a
+   * convenience, and it must not be able to fail an order that has already
+   * claimed stock — rememberAddress swallows its own errors for the same
+   * reason.
+   *
+   * The order keeps its own snapshot of the address, so editing this later
+   * cannot rewrite where a past parcel went.
+   */
+  await rememberAddress(user.id, {
+    name: input.name,
+    phone: input.phone,
+    line1: input.line1,
+    city: input.city,
+    region: input.region,
+  });
 
   /*
    * The cookie goes once the cart is converted.

@@ -1,9 +1,11 @@
+import type { Route } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { GoogleSignIn } from "@/components/google-sign-in";
 import { ActionForm, Field, Submit } from "@/components/auth-form";
 import { register } from "@/lib/auth/actions";
+import { safeShopReturn } from "@/lib/auth/return-to";
 import { currentUser } from "@/lib/auth/session";
 import { env } from "@/env";
 import { PASSWORD_MIN } from "@/lib/auth/password";
@@ -11,20 +13,34 @@ import { USERNAME_MAX, USERNAME_MIN } from "@/lib/auth/username";
 
 export const metadata = { title: "Create an account · DRPHONE" };
 
-export default async function RegisterPage() {
-  if (await currentUser()) redirect("/");
+export default async function RegisterPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const next = safeShopReturn((await searchParams).next);
+  if (await currentUser()) redirect(next as Route);
+  const carry = next === "/" ? "" : `?next=${encodeURIComponent(next)}`;
 
   return (
     <>
       <h1 className="text-2xl font-semibold tracking-tight">Create an account</h1>
+      {/* Guest checkout is gone: an order needs an account, so the details and
+          the order history have somewhere to live. Saying why beats a bare
+          requirement. */}
       <p className="mt-2 mb-7 text-sm text-muted">
-        You can also check out as a guest — an account just saves your details
-        and order history.
+        An account is needed to order — it keeps your delivery details and your
+        past orders, so the next one takes two taps.
       </p>
 
-      <GoogleSignIn label="Sign up with Google" clientId={env.googleClientId} />
+      <GoogleSignIn
+        label="Sign up with Google"
+        clientId={env.googleClientId}
+        next={next}
+      />
 
       <ActionForm action={register}>
+        <input type="hidden" name="next" value={next} />
         <Field
           label="Email"
           name="email"
@@ -57,7 +73,10 @@ export default async function RegisterPage() {
 
       <p className="mt-6 text-sm text-muted">
         Already have an account?{" "}
-        <Link href="/login" className="text-ink underline underline-offset-4">
+        <Link
+          href={`/login${carry}` as Route}
+          className="text-ink underline underline-offset-4"
+        >
           Sign in
         </Link>
       </p>

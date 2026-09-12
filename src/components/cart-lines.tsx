@@ -14,9 +14,12 @@ const money = (cents: number) =>
 export function CartLines({
   lines,
   subtotalCents,
+  signedIn,
 }: {
   lines: CartLine[];
   subtotalCents: number;
+  /** Ordering needs an account, so the basket says so before the form does. */
+  signedIn: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -147,12 +150,30 @@ export function CartLines({
               Remove the unavailable items to continue.
             </p>
           ) : (
-            <Link
-              href="/checkout"
-              className="mt-3 inline-block rounded-md bg-accent px-4 py-2 text-sm font-medium text-on-accent"
-            >
-              Checkout
-            </Link>
+            <>
+              <Link
+                href={
+                  signedIn
+                    ? "/checkout"
+                    : ("/login?next=%2Fcheckout" as Route)
+                }
+                className="mt-3 inline-block rounded-md bg-accent px-4 py-2 text-sm font-medium text-on-accent"
+              >
+                {signedIn ? "Checkout" : "Sign in to order"}
+              </Link>
+              {/*
+                Said here rather than at the form: a shopper who is going to
+                need an account should find that out with their basket in front
+                of them, not after typing an address. The basket itself comes
+                with them — signing in moves it onto the account.
+              */}
+              {signedIn ? null : (
+                <p className="mt-2 max-w-56 text-xs text-muted">
+                  An account keeps your delivery details and your orders. Your
+                  basket comes with you.
+                </p>
+              )}
+            </>
           )}
         </div>
       </div>

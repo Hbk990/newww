@@ -44,8 +44,19 @@ export const orders = pgTable(
     id: uuid().primaryKey().defaultRandom(),
     // Human-facing, e.g. "1042".
     orderNumber: text().notNull().unique(),
+    /*
+     * Nullable, deliberately, even though the storefront now requires an
+     * account to order.
+     *
+     * Two cases keep it so: a staff member taking an order over the phone for
+     * someone with no account, which `admin/orders/new` does through
+     * createOrder; and a deleted account, where `set null` must not take the
+     * order rows with it — an order is a record of something that happened and
+     * has to outlive the customer's login.
+     */
     userId: uuid().references(() => users.id, { onDelete: "set null" }),
-    // Standalone, because guest checkout has no user row to read it from.
+    // Standalone, so an order keeps the address it was placed with even after
+    // the account is gone or its details change.
     email: text().notNull(),
 
     status: orderStatus().notNull().default("new"),

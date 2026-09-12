@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 import postgres from "postgres";
 
+import { ACCOUNTS, storageStateFor } from "./global-setup";
+
 /**
  * Checkout, end to end, with the database checked afterwards.
  *
@@ -8,6 +10,9 @@ import postgres from "postgres";
  * the point: an order that renders a thank-you page while leaving stock
  * unclaimed, or a cart still active, or a hold still held, looks completely
  * correct to the shopper and is wrong in the ways that cost money.
+ *
+ * Signed in throughout, because ordering now requires an account. The guest
+ * side of that rule is covered in e2e/account-required.spec.ts.
  */
 const url = process.env.E2E_DATABASE_URL ?? process.env.DATABASE_URL ?? "";
 
@@ -21,8 +26,19 @@ const CART_TOKEN = `e2e-cart-${stamp}`;
 
 let variantId = "";
 let cartId = "";
+let customerId = "";
+
+test.use({ storageState: storageStateFor("customer") });
 
 test.beforeAll(async () => {
+  const [user] = await sql<{ id: string }[]>`
+    select id from users where email = ${ACCOUNTS.customer.email}
+  `;
+  customerId = user!.id;
+  // The checkout keeps the address it was given; start from nothing so the
+  // form is not prefilled by a previous run.
+  await sql`delete from addresses where user_id = ${customerId}`;
+
   const [product] = await sql<{ id: string }[]>`
     insert into products (slug, title, status)
     values (${SLUG}, 'E2E Checkout Widget', 'active')
@@ -56,6 +72,7 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
+  await sql`delete from addresses where user_id = ${customerId}`;
   await sql`delete from cart_items where cart_id = ${cartId}`;
   await sql`select release_cart_reservations(${cartId})`;
   await sql`delete from carts where id = ${cartId}`;
@@ -101,6 +118,7 @@ test("a basket becomes an order, and the stock moves with it", async ({
   await page.getByRole("link", { name: "Checkout", exact: true }).click();
   await expect(page).toHaveURL("/checkout");
 
+  await page.getByLabel("Name").fill("E2E Customer");
   await page.getByLabel("Phone").fill("+961 70 123 456");
   await page.getByLabel("Email").fill("e2e-checkout@drphone.test");
   await page.getByLabel("Street address").fill("Hamra Street 12");
@@ -120,6 +138,27 @@ test("a basket becomes an order, and the stock moves with it", async ({
 
   const orderNumber = new URL(page.url()).searchParams.get("order");
   expect(orderNumber, "no order number in the URL").toBeTruthy();
+
+  /*
+   * The details are kept for next time — the reason an account is required at
+   * all. One row, marked default, holding what was typed above.
+   */
+  const saved = await sql<
+    { name: string; phone: string; line1: string; city: string; region: string; is_default: boolean }[]
+  >`
+    select name, phone, line1, city, region, is_default
+    from addresses where user_id = ${customerId}
+  `;
+  expect(saved).toEqual([
+    {
+      name: "E2E Customer",
+      phone: "+961 70 123 456",
+      line1: "Hamra Street 12",
+      city: "Hamra",
+      region: "Beirut",
+      is_default: true,
+    },
+  ]);
 
   const [order] = await sql<
     {

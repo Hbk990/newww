@@ -10,10 +10,19 @@ import type { ShippingQuote } from "@/lib/shipping/quote";
 const money = (cents: number) =>
   `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
+export type CheckoutPrefill = {
+  email: string;
+  name: string;
+  phone: string;
+  line1: string;
+  city: string;
+  region: Region | "";
+};
+
 export function CheckoutForm({
   subtotalCents,
   quotes,
-  defaultEmail,
+  prefill,
 }: {
   subtotalCents: number;
   /**
@@ -25,15 +34,23 @@ export function CheckoutForm({
    * price ever being computed somewhere the shopper could edit it.
    */
   quotes: Record<string, ShippingQuote>;
-  defaultEmail: string | null;
+  /**
+   * The details this customer ordered with last time, or empty strings.
+   *
+   * Prefilled rather than merely remembered: an account exists so that nobody
+   * types their address twice, and a form that arrives already filled in is
+   * the only version of that promise a customer can see.
+   */
+  prefill: CheckoutPrefill;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [email, setEmail] = useState(defaultEmail ?? "");
-  const [phone, setPhone] = useState("");
-  const [line1, setLine1] = useState("");
-  const [city, setCity] = useState("");
-  const [region, setRegion] = useState<Region | "">("");
+  const [name, setName] = useState(prefill.name);
+  const [email, setEmail] = useState(prefill.email);
+  const [phone, setPhone] = useState(prefill.phone);
+  const [line1, setLine1] = useState(prefill.line1);
+  const [city, setCity] = useState(prefill.city);
+  const [region, setRegion] = useState<Region | "">(prefill.region);
   const [note, setNote] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [failure, setFailure] = useState<string | null>(null);
@@ -56,6 +73,7 @@ export function CheckoutForm({
     start(async () => {
       const result = await placeOrder(keyRef.current, {
         email,
+        name,
         phone,
         line1,
         city,
@@ -81,6 +99,15 @@ export function CheckoutForm({
           {failure}
         </p>
       ) : null}
+
+      <Field label="Name" hint="Who the driver asks for." error={errors.name}>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          autoComplete="name"
+          className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm"
+        />
+      </Field>
 
       <Field
         label="Phone"

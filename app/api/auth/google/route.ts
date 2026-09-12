@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { userIdentities, users } from "@/db/schema";
 import { verifyGoogleIdToken } from "@/lib/auth/google";
 import { createSession } from "@/lib/auth/session";
+import { adoptGuestCart } from "@/lib/cart/cart";
 import { clientIp, isThrottled, recordAttempt } from "@/lib/auth/throttle";
 
 /**
@@ -59,6 +60,9 @@ export async function POST(request: Request): Promise<Response> {
 
   await recordAttempt("password", `google:${ip ?? "unknown"}`, ip, true);
   await createSession(userId, { ipAddress: ip, userAgent });
+  // The guest basket follows them in, exactly as it does on a password
+  // sign-in — otherwise "Continue with Google" at checkout empties it.
+  await adoptGuestCart(userId);
 
   return Response.json({ ok: true });
 }
