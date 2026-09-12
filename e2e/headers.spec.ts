@@ -32,6 +32,17 @@ test("the policy forbids framing, plugins and a rewritten base URL", async ({ pa
   expect(csp).toContain("object-src 'none'");
   expect(csp).toContain("base-uri 'none'");
   expect(csp).toContain("form-action 'self'");
+
+  /*
+   * 'unsafe-eval' is allowed in development, where React's dev build needs it
+   * to rebuild stack traces, and must never reach a production bundle.
+   *
+   * This suite drives `next dev`, so the assertion runs the development side.
+   * next.config.ts keys the allowance off NODE_ENV, which the Next CLI sets —
+   * so the production branch cannot be switched on by an environment variable
+   * someone forgot.
+   */
+  expect(csp).toContain("'unsafe-eval'");
 });
 
 /*

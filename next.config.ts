@@ -26,9 +26,22 @@ const GOOGLE = ["https://accounts.google.com", "https://apis.google.com"];
  * `e2e/headers.spec.ts` loads the real pages and fails on any CSP violation,
  * so tightening this cannot silently break sign-in.
  */
+/*
+ * React's development build calls eval() to rebuild stack traces, and without
+ * it every page in `next dev` logs a CSP violation and the error overlay shows
+ * a permanent "1 Issue" badge — which sits exactly on top of the shop's tab bar
+ * at phone width and swallows taps on it.
+ *
+ * Allowed in development only. NODE_ENV is set by the Next CLI, not by us:
+ * `next dev` is "development", `next build` and `next start` are "production",
+ * so a production bundle can never carry this.
+ */
+const DEV_EVAL =
+  process.env.NODE_ENV === "production" ? "" : " 'unsafe-eval'";
+
 const csp = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' ${GOOGLE.join(" ")}`,
+  `script-src 'self' 'unsafe-inline'${DEV_EVAL} ${GOOGLE.join(" ")}`,
   // Tailwind and React both set inline styles; there is no nonce path for them.
   "style-src 'self' 'unsafe-inline'",
   // data: for inline placeholders, blob: for a locally previewed upload.
@@ -46,6 +59,16 @@ const csp = [
 const config: NextConfig = {
   // Product photos come from object storage; hosts get added when that is wired up.
   images: { remotePatterns: [] },
+
+  /*
+   * No route indicator.
+   *
+   * It is a floating badge in the bottom-left corner, and at phone width it
+   * lands exactly on the shop's tab bar, swallowing taps on Home and Shop —
+   * in a browser as much as in a test. Compile and runtime errors still
+   * surface; this only hides the static/dynamic badge.
+   */
+  devIndicators: false,
   typedRoutes: true,
 
   // The dev server refuses cross-origin requests for its own resources, and

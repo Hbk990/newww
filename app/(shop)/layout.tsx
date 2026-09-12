@@ -1,7 +1,10 @@
 import { Outfit } from "next/font/google";
 
+import { BottomBar } from "@/components/shop/bottom-bar";
+import { SiteHeader } from "@/components/shop/site-header";
 import { currentUser } from "@/lib/auth/session";
 import { canAny } from "@/lib/auth/permissions";
+import { basketCount, loadNav } from "@/lib/storefront/nav";
 import { storefrontSettings } from "@/lib/storefront/settings";
 
 /**
@@ -20,7 +23,7 @@ const display = Outfit({
 });
 
 /**
- * The storefront, and the gate in front of it.
+ * The storefront: the gate, the header, the tab bar.
  *
  * A route group rather than a middleware: reading the settings needs the
  * database, and the admin area must stay reachable while maintenance mode is
@@ -53,9 +56,7 @@ export default async function ShopLayout({
           data-shop
           className={`mx-auto max-w-lg px-6 py-20 text-center ${display.variable}`}
         >
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {settings.storeName}
-          </h1>
+          <h1 className="display text-3xl">{settings.storeName}</h1>
           <p className="mt-4 text-sm">
             {settings.maintenanceMessage ??
               "We are back shortly. Thank you for your patience."}
@@ -70,13 +71,49 @@ export default async function ShopLayout({
     }
   }
 
+  const [groups, basket, user] = await Promise.all([
+    loadNav(),
+    basketCount(),
+    currentUser(),
+  ]);
+
+  /*
+   * What the strip above the header says.
+   *
+   * Both of these are facts about how this shop works rather than marketing,
+   * which is why they are worth the nine pixels. The free-delivery line only
+   * appears once a threshold is actually set, so the strip never advertises an
+   * offer that does not exist.
+   */
+  const announcements = [
+    "Cash on delivery anywhere in Lebanon",
+    "We call to confirm every order before it is packed",
+  ];
+  if (settings.freeDeliveryThresholdCents) {
+    announcements.unshift(
+      `Free delivery over $${(settings.freeDeliveryThresholdCents / 100).toFixed(0)}`,
+    );
+  }
+
   /*
    * data-shop carries the brand palette, and the font variable rides along on
    * the same element so `.display` can pick it up anywhere inside the shop.
+   *
+   * pb-16 on the main region: the tab bar is fixed over the bottom of the
+   * viewport on phones, and without the padding it covers the last line of
+   * every page.
    */
   return (
     <div data-shop className={display.variable}>
-      {children}
+      <SiteHeader
+        groups={groups}
+        basketCount={basket}
+        signedIn={user !== null}
+        storeName={settings.storeName}
+        announcements={announcements}
+      />
+      <div className="pb-16 md:pb-0">{children}</div>
+      <BottomBar basketCount={basket} />
     </div>
   );
 }

@@ -5,6 +5,8 @@ export type StorefrontSettings = {
   storeName: string;
   phone: string | null;
   whatsappNumber: string | null;
+  /** Null when no threshold is set, which means nothing ships free. */
+  freeDeliveryThresholdCents: number | null;
   isPrivate: boolean;
   maintenanceMode: boolean;
   maintenanceMessage: string | null;
@@ -28,6 +30,7 @@ export async function storefrontSettings(): Promise<StorefrontSettings> {
       storeName: storeSettings.storeName,
       phone: storeSettings.phone,
       whatsappNumber: storeSettings.whatsappNumber,
+      freeDeliveryThresholdCents: storeSettings.freeDeliveryThresholdCents,
       isPrivate: storeSettings.isPrivate,
       maintenanceMode: storeSettings.maintenanceMode,
       maintenanceMessage: storeSettings.maintenanceMessage,
@@ -40,6 +43,7 @@ export async function storefrontSettings(): Promise<StorefrontSettings> {
       storeName: "DRPHONE",
       phone: null,
       whatsappNumber: null,
+      freeDeliveryThresholdCents: null,
       isPrivate: true,
       maintenanceMode: false,
       maintenanceMessage: null,

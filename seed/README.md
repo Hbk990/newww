@@ -34,6 +34,30 @@ nothing and leaves a hand-edited category name intact; `--force` updates all
 Result: 8 groups and 52 categories, down from 9 groups and 48 categories, with
 the junk drawer replaced by things people would actually browse.
 
+## Merged down to five groups, for the menu
+
+Eight groups do not fit a centred menu bar beside a search field and a basket,
+and three of them held 117 products between them. Their categories moved to the
+group a shopper would look in first:
+
+| Moved | To | Why |
+|---|---|---|
+| FM Transmitter, Jump Starter | Phones & Power | An FM transmitter plays a phone through a car radio; a jump starter is a power bank for a car. |
+| Network, Flash & Memory | Gaming & Computers | Both are computer accessories. |
+| Bag, Toys, TV Box | Home & Lifestyle | Nothing about them is a phone accessory. |
+
+Three groups were then empty and are gone: Toys/Lifestyle/Miscellaneous,
+Storage/Network/TV, Car Electronics. Two were renamed to fit a menu:
+`Mobile Accessories & Power` → **Phones & Power**, `Home & Personal Care` →
+**Home & Lifestyle** (it now holds bags and toys).
+
+Groups and categories are both ordered by how much of the catalog they hold, so
+Charge & Cable leads its group rather than Airtag.
+
+**Result: 5 groups, 52 categories, 44 of which have products.** The empty eight
+are kept, not deleted — `loadNav` leaves a category with no active products out
+of the menu, so each appears by itself the day it is stocked.
+
 ## What still needs your judgement
 
 **About 32 of the 90 `Mix Product` items do not cluster.** A treadmill, a

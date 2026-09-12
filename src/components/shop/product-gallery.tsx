@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useState } from "react";
 
-import { imageSrc, IMAGE_PLACEHOLDER } from "@/lib/shop/image-url";
+import { Photo } from "@/components/shop/photo";
+import { IMAGE_PLACEHOLDER } from "@/lib/shop/image-url";
 import type { ShopImage } from "@/lib/shop/product";
 
 /**
@@ -23,28 +24,21 @@ export function ProductGallery({
   title: string;
 }) {
   const [active, setActive] = useState(0);
-  // Which sources failed, so a retry is not attempted on every render.
-  const [broken, setBroken] = useState<Record<string, true>>({});
-
-  const fail = useCallback((url: string) => {
-    setBroken((prev) => (prev[url] ? prev : { ...prev, [url]: true }));
-  }, []);
-
   const shown: ShopImage[] =
     images.length > 0
       ? images
       : [{ url: IMAGE_PLACEHOLDER, alt: null, width: null, height: null }];
   const current = shown[Math.min(active, shown.length - 1)] ?? shown[0];
-  const mainSrc = current ? imageSrc(current.url) : IMAGE_PLACEHOLDER;
+  // Photo resolves the stored path and owns the missing-file fallback.
+  const mainUrl = current?.url ?? IMAGE_PLACEHOLDER;
 
   return (
     <div className="md:sticky md:top-6">
       <div className="mx-auto max-w-md overflow-hidden rounded-xl border border-line bg-raised">
         <Photo
-          src={mainSrc}
+          url={mainUrl}
           alt={current?.alt ?? title}
-          broken={broken}
-          onFail={fail}
+          eager
           className="aspect-square w-full object-contain"
         />
       </div>
@@ -52,7 +46,6 @@ export function ProductGallery({
       {shown.length > 1 ? (
         <ul className="mx-auto mt-3 flex max-w-md gap-2 overflow-x-auto pb-1">
           {shown.map((image, index) => {
-            const thumb = imageSrc(image.url);
             return (
               <li key={`${image.url}-${index}`}>
                 <button
@@ -65,10 +58,8 @@ export function ProductGallery({
                   }`}
                 >
                   <Photo
-                    src={thumb}
+                    url={image.url}
                     alt=""
-                    broken={broken}
-                    onFail={fail}
                     className="size-full object-contain"
                   />
                 </button>
@@ -78,50 +69,5 @@ export function ProductGallery({
         </ul>
       ) : null}
     </div>
-  );
-}
-
-/**
- * One <img> that falls back to the placeholder when its file is missing.
- *
- * `onError` alone is not enough and the first screenshots proved it: the markup
- * is server-rendered, so the browser starts fetching before React hydrates. A
- * 404 that arrives in that window fires an error event with no listener
- * attached, it is never replayed, and the broken-image icon stays for good —
- * which is what the whole catalog looks like today, since it was imported
- * without its photos.
- *
- * The ref callback closes that window: on mount, an image that has finished
- * loading with no intrinsic width has already failed.
- */
-function Photo({
-  src,
-  alt,
-  broken,
-  onFail,
-  className,
-}: {
-  src: string;
-  alt: string;
-  broken: Record<string, true>;
-  onFail: (src: string) => void;
-  className: string;
-}) {
-  const check = useCallback(
-    (node: HTMLImageElement | null) => {
-      if (node && node.complete && node.naturalWidth === 0) onFail(src);
-    },
-    [onFail, src],
-  );
-
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      ref={check}
-      src={broken[src] ? IMAGE_PLACEHOLDER : src}
-      alt={alt}
-      onError={() => onFail(src)}
-      className={className}
-    />
   );
 }
