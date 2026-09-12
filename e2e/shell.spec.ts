@@ -72,24 +72,31 @@ test("the menu opens on the group and lists only categories with stock", async (
   await page.goto("/");
 
   /*
+   * Scoped to the header throughout. The homepage now names these same
+   * categories in its aisle tiles and its hero deck, so an unscoped locator
+   * finds three "E2E Cables" links and cannot tell which is the menu's.
+   */
+  const header = page.getByRole("banner");
+
+  /*
    * The bar shows one-word labels for the five real groups and the category
    * name for anything else, so this seeded group appears under its own name.
    */
-  const trigger = page.getByRole("button", { name: "E2E Gadgets" });
+  const trigger = header.getByRole("button", { name: "E2E Gadgets" });
   await expect(trigger).toBeVisible();
   await expect(trigger).toHaveAttribute("aria-expanded", "false");
 
   await trigger.hover();
   await expect(trigger).toHaveAttribute("aria-expanded", "true");
 
-  const panel = page.getByRole("link", { name: "Shop all E2E Gadgets" });
+  const panel = header.getByRole("link", { name: "Shop all E2E Gadgets" });
   await expect(panel).toBeVisible();
-  await expect(page.getByRole("link", { name: /E2E Cables/ })).toBeVisible();
+  await expect(header.getByRole("link", { name: /E2E Cables/ })).toBeVisible();
 
   // The empty one is left out rather than leading to a dead page.
-  await expect(page.getByRole("link", { name: /E2E Nothing/ })).toHaveCount(0);
+  await expect(header.getByRole("link", { name: /E2E Nothing/ })).toHaveCount(0);
 
-  await page.getByRole("link", { name: /E2E Cables/ }).click();
+  await header.getByRole("link", { name: /E2E Cables/ }).click();
   await expect(page).toHaveURL(new RegExp(`/c/${catSlug}$`));
   await expect(
     page.getByRole("heading", { name: "E2E Cables", level: 1 }),
@@ -149,10 +156,11 @@ test.describe("on a phone", () => {
     await expect(tabs.getByRole("link", { name: "Basket" })).toBeVisible();
 
     // The hover bar is desktop-only; on a phone the group lives in the drawer.
-    await expect(page.getByRole("button", { name: "E2E Gadgets" })).toBeHidden();
+    const header = page.getByRole("banner");
+    await expect(header.getByRole("button", { name: "E2E Gadgets" })).toBeHidden();
 
     await page.getByRole("button", { name: "Menu" }).click();
-    await page.getByRole("link", { name: "E2E Cables" }).click();
+    await header.getByRole("link", { name: "E2E Cables" }).click();
     await expect(page).toHaveURL(new RegExp(`/c/${catSlug}$`));
 
     // Shop goes to a real page rather than opening a drawer, so it can be
