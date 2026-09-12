@@ -2,8 +2,14 @@ import type { Route } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import {
+  ActionForm,
+  Divider,
+  Field,
+  PasswordField,
+  Submit,
+} from "@/components/auth-form";
 import { GoogleSignIn } from "@/components/google-sign-in";
-import { ActionForm, Field, Submit } from "@/components/auth-form";
 import { signIn } from "@/lib/auth/actions";
 import { safeShopReturn } from "@/lib/auth/return-to";
 import { currentUser } from "@/lib/auth/session";
@@ -29,15 +35,25 @@ export default async function LoginPage({
   return (
     <>
       <h1 className="display text-2xl">Sign in</h1>
-      <p className="mt-2 mb-7 text-sm text-muted">
-        Use your email address or your username.
+      {/*
+        Says what this is for when they were sent here from the basket, rather
+        than leaving them to wonder why a shop wants an account.
+      */}
+      <p className="mt-2 text-sm text-muted">
+        {next === "/checkout"
+          ? "One step before your order. Your basket is waiting."
+          : "Use your email address or your username."}
       </p>
 
-      <GoogleSignIn
-        label="Continue with Google"
-        clientId={env.googleClientId}
-        next={next}
-      />
+      <div className="mt-6">
+        <GoogleSignIn
+          label="Continue with Google"
+          clientId={env.googleClientId}
+          next={next}
+        />
+      </div>
+
+      {env.googleClientId ? <Divider label="or" /> : <div className="h-6" />}
 
       <ActionForm action={signIn}>
         <input type="hidden" name="next" value={next} />
@@ -47,30 +63,34 @@ export default async function LoginPage({
           autoComplete="username"
           required
         />
-        <Field
+        <PasswordField
           label="Password"
           name="password"
-          type="password"
           autoComplete="current-password"
           required
         />
         <Submit label="Sign in" />
       </ActionForm>
 
-      <p className="mt-6 text-sm text-muted">
-        <Link href="/forgot" className="text-ink underline underline-offset-4">
-          Forgot your password?
-        </Link>
-      </p>
-      <p className="mt-2 text-sm text-muted">
-        No account yet?{" "}
-        <Link
-          href={`/register${carry}` as Route}
-          className="text-ink underline underline-offset-4"
-        >
-          Create one
-        </Link>
-      </p>
+      <div className="mt-6 space-y-2 text-sm text-muted">
+        <p>
+          <Link
+            href="/forgot"
+            className="text-ink underline underline-offset-4"
+          >
+            Forgot your password?
+          </Link>
+        </p>
+        <p>
+          No account yet?{" "}
+          <Link
+            href={`/register${carry}` as Route}
+            className="text-ink underline underline-offset-4"
+          >
+            Create one
+          </Link>
+        </p>
+      </div>
     </>
   );
 }

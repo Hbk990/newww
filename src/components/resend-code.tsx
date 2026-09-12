@@ -9,7 +9,7 @@ export function ResendCode() {
   const [message, setMessage] = useState<string | null>(null);
 
   return (
-    <div className="mt-6 text-sm text-muted">
+    <div className="mt-5 text-sm text-muted">
       <button
         type="button"
         disabled={pending}
@@ -24,7 +24,10 @@ export function ResendCode() {
         {pending ? "Sending…" : "Send another code"}
       </button>
       {message ? (
-        <p role="status" className="mt-2">
+        <p
+          role="status"
+          className="mt-2 rounded-lg border border-line bg-accent-soft px-3 py-2 text-sm text-ink"
+        >
           {message}
         </p>
       ) : null}

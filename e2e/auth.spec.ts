@@ -85,3 +85,71 @@ test.describe("who may see the admin area", () => {
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   });
 });
+
+test.describe("the sign-in screen itself", () => {
+  test("says why it is asking when the basket sent them", async ({ page }) => {
+    await page.goto("/login?next=%2Fcheckout");
+    await expect(
+      page.getByText("One step before your order. Your basket is waiting."),
+    ).toBeVisible();
+
+    // Arriving on its own, it says what to type instead.
+    await page.goto("/login");
+    await expect(
+      page.getByText("Use your email address or your username."),
+    ).toBeVisible();
+  });
+
+  test("carries the brand and a way back to the shop", async ({ page }) => {
+    await page.goto("/login");
+
+    /*
+     * These pages had no brand scope at all: they rendered in the admin's
+     * blue-grey with the system font, which is a different-looking website
+     * appearing in the middle of a purchase. `data-shop` is what carries the
+     * palette and the display face.
+     */
+    await expect(page.locator("[data-shop]").first()).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Back to the shop" }),
+    ).toBeVisible();
+    // And the case for having an account, which is the whole reason a shopper
+    // is being asked for one.
+    await expect(page.getByText("Cash on delivery")).toBeVisible();
+  });
+
+  test("the password can be read back before it is sent", async ({ page }) => {
+    await page.goto("/login");
+    const password = page.getByLabel("Password");
+
+    await password.fill("a-typed-password");
+    await expect(password).toHaveAttribute("type", "password");
+
+    await page.getByRole("button", { name: "Show" }).click();
+    await expect(password).toHaveAttribute("type", "text");
+
+    await page.getByRole("button", { name: "Hide" }).click();
+    await expect(password).toHaveAttribute("type", "password");
+  });
+
+  test("the code field asks the browser for six digits", async ({ page }) => {
+    await page.goto("/reset");
+    const code = page.getByLabel("Reset code");
+
+    // inputMode brings up the number pad; the pattern is what stops four
+    // digits ever reaching the server.
+    await expect(code).toHaveAttribute("inputmode", "numeric");
+    await expect(code).toHaveAttribute("pattern", "[0-9]{6}");
+    await expect(code).toHaveAttribute("autocomplete", "one-time-code");
+
+    await code.fill("1234");
+    expect(await code.evaluate((el) => (el as HTMLInputElement).checkValidity())).toBe(
+      false,
+    );
+    await code.fill("123456");
+    expect(await code.evaluate((el) => (el as HTMLInputElement).checkValidity())).toBe(
+      true,
+    );
+  });
+});
+

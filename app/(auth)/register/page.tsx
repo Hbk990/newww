@@ -2,14 +2,20 @@ import type { Route } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import {
+  ActionForm,
+  Divider,
+  Field,
+  PasswordField,
+  Submit,
+} from "@/components/auth-form";
 import { GoogleSignIn } from "@/components/google-sign-in";
-import { ActionForm, Field, Submit } from "@/components/auth-form";
 import { register } from "@/lib/auth/actions";
+import { PASSWORD_MIN } from "@/lib/auth/password";
 import { safeShopReturn } from "@/lib/auth/return-to";
 import { currentUser } from "@/lib/auth/session";
-import { env } from "@/env";
-import { PASSWORD_MIN } from "@/lib/auth/password";
 import { USERNAME_MAX, USERNAME_MIN } from "@/lib/auth/username";
+import { env } from "@/env";
 
 export const metadata = { title: "Create an account · DRPHONE" };
 
@@ -25,19 +31,22 @@ export default async function RegisterPage({
   return (
     <>
       <h1 className="display text-2xl">Create an account</h1>
-      {/* Guest checkout is gone: an order needs an account, so the details and
-          the order history have somewhere to live. Saying why beats a bare
-          requirement. */}
-      <p className="mt-2 mb-7 text-sm text-muted">
-        An account is needed to order — it keeps your delivery details and your
-        past orders, so the next one takes two taps.
+      {/* Guest checkout is gone, so this says why rather than stating a rule. */}
+      <p className="mt-2 text-sm text-muted">
+        {next === "/checkout"
+          ? "One step before your order, and your basket comes with you."
+          : "It takes a minute, and the next order takes two taps."}
       </p>
 
-      <GoogleSignIn
-        label="Sign up with Google"
-        clientId={env.googleClientId}
-        next={next}
-      />
+      <div className="mt-6">
+        <GoogleSignIn
+          label="Sign up with Google"
+          clientId={env.googleClientId}
+          next={next}
+        />
+      </div>
+
+      {env.googleClientId ? <Divider label="or" /> : <div className="h-6" />}
 
       <ActionForm action={register}>
         <input type="hidden" name="next" value={next} />
@@ -47,7 +56,7 @@ export default async function RegisterPage({
           type="email"
           autoComplete="email"
           required
-          hint="We'll send a 6-digit code to confirm it."
+          hint="We send a 6-digit code to confirm it."
         />
         <Field
           label="Username"
@@ -59,10 +68,9 @@ export default async function RegisterPage({
           pattern="[A-Za-z0-9_]+"
           hint="Letters, numbers and underscores."
         />
-        <Field
+        <PasswordField
           label="Password"
           name="password"
-          type="password"
           autoComplete="new-password"
           required
           minLength={PASSWORD_MIN}

@@ -1,9 +1,9 @@
 import type { Route } from "next";
 import { redirect } from "next/navigation";
 
-import { ActionForm, Field, Submit } from "@/components/auth-form";
+import { ActionForm, CodeField, Submit } from "@/components/auth-form";
 import { ResendCode } from "@/components/resend-code";
-import { verifyEmail } from "@/lib/auth/actions";
+import { signOut, verifyEmail } from "@/lib/auth/actions";
 import { requireUser } from "@/lib/auth/guards";
 import { safeShopReturn } from "@/lib/auth/return-to";
 
@@ -21,29 +21,40 @@ export default async function VerifyPage({
 
   return (
     <>
-      <h1 className="display text-2xl">
-        Confirm your email
-      </h1>
-      <p className="mt-2 mb-7 text-sm text-muted">
-        We sent a 6-digit code to <strong className="text-ink">{user.email}</strong>.
-        It expires in 10 minutes.
+      <h1 className="display text-2xl">Check your email</h1>
+      <p className="mt-2 text-sm text-muted">
+        A 6-digit code is on its way to{" "}
+        <strong className="font-medium text-ink">{user.email}</strong>. It
+        expires in ten minutes.
       </p>
 
-      <ActionForm action={verifyEmail}>
-        <input type="hidden" name="next" value={next} />
-        <Field
-          label="Verification code"
-          name="code"
-          inputMode="numeric"
-          autoComplete="one-time-code"
-          maxLength={6}
-          required
-          placeholder="000000"
-        />
-        <Submit label="Confirm" />
-      </ActionForm>
+      <div className="mt-6">
+        <ActionForm action={verifyEmail}>
+          <input type="hidden" name="next" value={next} />
+          <CodeField label="The code" hint="Six digits, from the email." />
+          <Submit label="Confirm" />
+        </ActionForm>
+      </div>
 
       <ResendCode />
+
+      {/*
+        Wrong address typed a minute ago, and no way out of this screen without
+        it: the account exists and holds that email, so the only fix is to sign
+        out and register again. Saying so is better than leaving someone stuck
+        on a code that will never arrive.
+      */}
+      <form action={signOut} className="mt-6 border-t border-line pt-5">
+        <p className="text-sm text-muted">
+          Typed the wrong address?{" "}
+          <button
+            type="submit"
+            className="text-ink underline underline-offset-4"
+          >
+            Sign out and start again
+          </button>
+        </p>
+      </form>
     </>
   );
 }
