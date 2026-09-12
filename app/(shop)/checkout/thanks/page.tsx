@@ -1,3 +1,4 @@
+import type { Route } from "next";
 import Link from "next/link";
 
 export const metadata = { title: "Order placed · DRPHONE" };
@@ -19,9 +20,7 @@ export default async function ThanksPage({
 
   return (
     <main className="mx-auto max-w-lg px-6 py-16">
-      <h1 className="text-2xl font-semibold tracking-tight">
-        Thank you — your order is in
-      </h1>
+      <h1 className="display text-3xl">Thank you — your order is in</h1>
 
       {order ? (
         <p className="mt-3 text-sm">
@@ -35,7 +34,20 @@ export default async function ThanksPage({
         when it arrives.
       </p>
 
-      <p className="mt-8 text-sm">
+      {/*
+        The order is now somewhere to go rather than a number to write down.
+        Still built from the query string: the link is only useful to whoever
+        owns the order, and the page behind it checks that for itself.
+      */}
+      <p className="mt-8 flex flex-wrap gap-4 text-sm">
+        {order ? (
+          <Link
+            href={`/account/orders/${order}` as Route}
+            className="font-medium text-accent underline underline-offset-4"
+          >
+            Follow this order
+          </Link>
+        ) : null}
         <Link href="/" className="underline underline-offset-4">
           Back to the shop
         </Link>

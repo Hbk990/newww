@@ -182,6 +182,14 @@ export function SiteFooter({
                   </li>
                   <li>
                     <Link
+                      href="/account/orders"
+                      className="opacity-80 underline-offset-4 hover:underline hover:opacity-100"
+                    >
+                      Orders
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
                       href="/account/addresses"
                       className="opacity-80 underline-offset-4 hover:underline hover:opacity-100"
                     >

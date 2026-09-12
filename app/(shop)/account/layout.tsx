@@ -14,6 +14,7 @@ import Link from "next/link";
  */
 const PAGES = [
   { href: "/account", label: "Overview" },
+  { href: "/account/orders", label: "Orders" },
   { href: "/account/addresses", label: "Addresses" },
   { href: "/account/wishlist", label: "Saved items" },
   { href: "/account/devices", label: "Your phones" },

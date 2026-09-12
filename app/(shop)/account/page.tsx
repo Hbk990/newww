@@ -23,6 +23,11 @@ export default async function AccountPage() {
 
   const links = [
     {
+      href: "/account/orders",
+      label: "Orders",
+      note: "Everything you have ordered, and what it cost",
+    },
+    {
       href: "/account/addresses",
       label: "Addresses",
       note: "Where we deliver, filled in for you at checkout",
@@ -55,13 +60,8 @@ export default async function AccountPage() {
         ))}
       </ul>
 
-      {/*
-        Orders are not linked yet: a customer-facing order history does not
-        exist. Saying so is better than a link that 404s, and it is on the list.
-      */}
       <p className="mt-6 text-sm text-muted">
-        Order history is not here yet. Call us with your order number and we
-        will look it up.
+        Paying is cash to the driver, so nothing here is ever charged to a card.
       </p>
     </>
   );

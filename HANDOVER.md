@@ -147,3 +147,32 @@ literals are checked. `src/components/admin/orders-table.tsx` shows the idiom.
 curated in the admin. It reports what it left alone; when that count is not
 zero, a category or brand with the same slug was already there and the file's
 version was ignored. Pass `--force` to update them.
+
+## A column in a `sql` template renders unqualified
+
+Inside a `sql` template in a **select list**, Drizzle renders a column as
+`"id"`, not `"orders"."id"`. At the top level that is correct and unambiguous.
+Inside a correlated subquery over another table it is a silent bug:
+
+```ts
+// Renders: where oi.order_id = "id"
+// "id" resolves to order_items.id, so this compares an order id to an item id.
+itemCount: sql<number>`(
+  select coalesce(sum(oi.quantity), 0)::int
+  from order_items oi where oi.order_id = ${orders.id}
+)`
+```
+
+It matches nothing, raises no error, and every row reads as empty — item counts
+of zero on orders that plainly have items. Write the outer column as plain SQL
+text instead (`where oi.order_id = orders.id`), and assert the value in a test:
+a spec that only checks the page renders will pass over this happily.
+
+## `sql<Date>` does not produce a Date
+
+`sql<T>` is a type assertion and nothing else. A raw expression comes back as
+whatever the driver decides — `coalesce(placed_at, created_at)` typed as
+`sql<Date>` arrives as a string, and the first `.toLocaleDateString()` on it
+takes the page down with a 500. Select the mapped columns and combine them in
+TypeScript, where Drizzle's own timestamp mapping applies.
+
