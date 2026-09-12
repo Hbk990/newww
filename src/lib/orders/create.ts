@@ -2,6 +2,7 @@ import { eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
+  carts,
   idempotencyKeys,
   inventory,
   orderEvents,
@@ -28,6 +29,17 @@ export type CreateOrderRequest = {
   userId?: string | null;
   /** Set for an order taken by staff, so the event names who took it. */
   actorId?: string | null;
+  /**
+   * The cart this order came out of, when it came from one.
+   *
+   * Not optional bookkeeping — it changes whether the order can be placed at
+   * all. `claim_stock` gates on `(on_hand - reserved) >= qty`, and a cart's own
+   * hold is inside `reserved`, so a web order would be refused its own stock.
+   * Given this, the holds are released and the cart retired inside the same
+   * transaction as the claim. Null for an order taken by hand, which never had
+   * a cart.
+   */
+  cartId?: string | null;
 };
 
 export type CreateOrderResult =
@@ -210,6 +222,24 @@ export async function createOrder(
       );
 
       /*
+       * The cart's holds go back before the stock is claimed, and both happen
+       * here so they cannot happen apart.
+       *
+       * claim_stock gates on (on_hand - reserved) >= qty. A cart holding two of
+       * the last two units is inside `reserved`, so claiming them without
+       * releasing first fails on stock the shopper already had — proven by case
+       * 13 of the reservation tests. Releasing in a separate transaction would
+       * be worse than the bug: between the release committing and the claim
+       * running, another shopper can take the units, and the customer who
+       * reached checkout first is the one who loses them.
+       */
+      if (request.cartId) {
+        await tx.execute(
+          sql`select release_cart_reservations(${request.cartId})`,
+        );
+      }
+
+      /*
        * Stock is claimed after the lines exist, so the ledger entry has an
        * order to point at. claim_stock does nothing for an untracked variant
        * beyond checking it is available — which is the common case here, since
@@ -219,6 +249,19 @@ export async function createOrder(
         await tx.execute(
           sql`select claim_stock(${line.variantId}, ${line.quantity}, ${order.id})`,
         );
+      }
+
+      /*
+       * The cart is retired in the same breath. Left active, it would keep its
+       * lines, reappear on the shopper's next visit as a basket they have
+       * already paid for, and sit in the abandoned-cart worklist waiting to be
+       * chased by email.
+       */
+      if (request.cartId) {
+        await tx
+          .update(carts)
+          .set({ status: "converted", updatedAt: now })
+          .where(eq(carts.id, request.cartId));
       }
 
       await tx.insert(orderEvents).values({
