@@ -183,6 +183,13 @@
       "when": 1789173902797,
       "tag": "0025_return_stock_symmetry",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1789219005719,
+      "tag": "0026_address_label",
+      "breakpoints": true
     }
   ]
 }

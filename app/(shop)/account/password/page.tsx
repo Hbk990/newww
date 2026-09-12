@@ -11,7 +11,7 @@ export default async function ChangePasswordPage() {
   const user = await requireUser();
 
   return (
-    <main className="mx-auto max-w-sm px-6 py-16">
+    <>
       <h1 className="text-2xl font-semibold tracking-tight">Change password</h1>
       <p className="mt-2 mb-7 text-sm text-muted">
         {user.mustChangePassword
@@ -38,6 +38,6 @@ export default async function ChangePasswordPage() {
         />
         <Submit label="Change password" />
       </ActionForm>
-    </main>
+    </>
   );
 }

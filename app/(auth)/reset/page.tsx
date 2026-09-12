@@ -7,7 +7,7 @@ export const metadata = { title: "Set a new password · DRPHONE" };
 export default function ResetPasswordPage() {
   return (
     <>
-      <h1 className="text-2xl font-semibold tracking-tight">
+      <h1 className="display text-2xl">
         Set a new password
       </h1>
       <p className="mt-2 mb-7 text-sm text-muted">

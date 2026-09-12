@@ -28,7 +28,7 @@ export default async function LoginPage({
 
   return (
     <>
-      <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
+      <h1 className="display text-2xl">Sign in</h1>
       <p className="mt-2 mb-7 text-sm text-muted">
         Use your email address or your username.
       </p>

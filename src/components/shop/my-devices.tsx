@@ -55,7 +55,10 @@ export function MyDevices({
       ) : null}
 
       {mine.length > 0 ? (
-        <ul className="mt-6 divide-y divide-line border-y border-line">
+        <ul
+          aria-label="Your saved phones"
+          className="mt-6 divide-y divide-line border-y border-line"
+        >
           {mine.map((device) => (
             <li
               key={device.deviceModelId}

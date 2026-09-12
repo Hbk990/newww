@@ -21,7 +21,7 @@ export default async function VerifyPage({
 
   return (
     <>
-      <h1 className="text-2xl font-semibold tracking-tight">
+      <h1 className="display text-2xl">
         Confirm your email
       </h1>
       <p className="mt-2 mb-7 text-sm text-muted">

@@ -11,7 +11,7 @@ export function Submit({ label }: { label: string }) {
     <button
       type="submit"
       disabled={pending}
-      className="mt-1 rounded-md bg-ink px-4 py-2.5 text-sm font-medium text-surface disabled:opacity-60"
+      className="mt-1 rounded-md bg-accent px-4 py-2.5 text-sm font-medium text-on-accent disabled:opacity-60"
     >
       {pending ? "Working…" : label}
     </button>
@@ -38,6 +38,9 @@ export function Field({
         name={name}
         type={type}
         className="rounded-md border border-line bg-surface px-3 py-2 text-sm"
+        /* aria-invalid is not set here: these forms report one error for the
+           whole submission rather than per field, so marking every input as
+           invalid would be a lie to a screen reader. */
         {...rest}
       />
       {hint ? <span className="text-xs text-muted">{hint}</span> : null}
@@ -63,7 +66,10 @@ export function ActionForm({
       {state?.error ? (
         <p
           role="alert"
-          className="rounded-md border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200"
+          /* The palette's own warning colour rather than hardcoded reds:
+             those were written before the shop had a red of its own, and two
+             reds on one page read as a mistake. */
+          className="rounded-md border border-warn px-3 py-2 text-sm text-warn"
         >
           {state.error}
         </p>
@@ -72,6 +78,9 @@ export function ActionForm({
         <p
           role="status"
           className="rounded-md border border-line bg-surface px-3 py-2 text-sm"
+        /* aria-invalid is not set here: these forms report one error for the
+           whole submission rather than per field, so marking every input as
+           invalid would be a lie to a screen reader. */
         >
           {state.notice}
         </p>

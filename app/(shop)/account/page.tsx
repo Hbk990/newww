@@ -22,13 +22,18 @@ export default async function AccountPage() {
   if (!user) redirect("/login?next=%2Faccount");
 
   const links = [
+    {
+      href: "/account/addresses",
+      label: "Addresses",
+      note: "Where we deliver, filled in for you at checkout",
+    },
     { href: "/account/wishlist", label: "Saved items", note: "Things you tapped the heart on" },
     { href: "/account/devices", label: "Your phones", note: "So we can tell you what fits" },
     { href: "/account/password", label: "Password", note: "Change it any time" },
   ] as const;
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
+    <>
       <h1 className="display text-3xl sm:text-4xl">Your account</h1>
       <p className="mt-2 text-muted">
         {user.name ?? user.username ?? user.email}
@@ -58,6 +63,6 @@ export default async function AccountPage() {
         Order history is not here yet. Call us with your order number and we
         will look it up.
       </p>
-    </main>
+    </>
   );
 }

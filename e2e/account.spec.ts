@@ -131,6 +131,12 @@ test.describe("my phones", () => {
   test("adding, promoting and removing phones keeps exactly one main", async ({
     page,
   }) => {
+    /*
+     * Scoped to the phone list. These pages moved inside the storefront route
+     * group, so they now carry the header, footer and account nav — and an
+     * unscoped listitem count picks up every link in all three.
+     */
+    const list = page.getByRole("list", { name: "Your saved phones" });
     await sql`delete from customer_devices where user_id = ${customerId}`;
     await page.goto("/account/devices");
     await expect(page.getByText("No phones added yet.")).toBeVisible();
@@ -147,7 +153,7 @@ test.describe("my phones", () => {
     // exact: true — the form's own hint quotes "work phone", so a loose match
     // finds the hint as well as the label.
     await expect(page.getByText("work phone", { exact: true })).toBeVisible();
-    await expect(page.getByRole("listitem")).toHaveCount(1);
+    await expect(list.getByRole("listitem")).toHaveCount(1);
     expect(await devices()).toEqual([{ id: modelIds[0], primary: true }]);
 
     /*
@@ -177,7 +183,7 @@ test.describe("my phones", () => {
     await select.selectOption(modelIds[1]!);
     await page.getByRole("button", { name: "Add phone" }).click();
     await expect(select).toHaveValue("");
-    await expect(page.getByRole("listitem")).toHaveCount(2);
+    await expect(list.getByRole("listitem")).toHaveCount(2);
     let rows = await devices();
     expect(rows).toHaveLength(2);
     expect(rows.filter((r) => r.primary)).toEqual([
@@ -189,7 +195,7 @@ test.describe("my phones", () => {
     await page.getByRole("button", { name: "Make main" }).click();
     // The badge moving to the second phone's row is the observable effect.
     await expect(
-      page.getByRole("listitem").filter({ hasText: "E2E Phone 2" }),
+      list.getByRole("listitem").filter({ hasText: "E2E Phone 2" }),
     ).toContainText("main phone");
     rows = await devices();
     expect(rows.filter((r) => r.primary)).toEqual([
@@ -201,13 +207,13 @@ test.describe("my phones", () => {
      * primary has no answer to "does it fit my phone?" even though they told us
      * about their phones.
      */
-    await page
+    await list
       .getByRole("listitem")
       .filter({ hasText: "main phone" })
       .getByRole("button", { name: /^Remove/ })
       .click();
 
-    await expect(page.getByRole("listitem")).toHaveCount(1);
+    await expect(list.getByRole("listitem")).toHaveCount(1);
     expect(await devices()).toEqual([{ id: modelIds[0], primary: true }]);
     await expect(page.getByText("main phone")).toBeVisible();
   });

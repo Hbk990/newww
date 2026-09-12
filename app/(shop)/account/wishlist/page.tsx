@@ -13,7 +13,7 @@ export default async function WishlistPage() {
   const items = await loadWishlist();
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
+    <>
       <h1 className="text-2xl font-semibold tracking-tight">Saved items</h1>
 
       {items.length === 0 ? (
@@ -31,6 +31,6 @@ export default async function WishlistPage() {
       ) : (
         <WishlistList items={items} />
       )}
-    </main>
+    </>
   );
 }

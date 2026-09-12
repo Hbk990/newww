@@ -8,7 +8,7 @@ export const metadata = { title: "Forgot password · DRPHONE" };
 export default function ForgotPasswordPage() {
   return (
     <>
-      <h1 className="text-2xl font-semibold tracking-tight">Forgot password</h1>
+      <h1 className="display text-2xl">Forgot password</h1>
       <p className="mt-2 mb-7 text-sm text-muted">
         We&rsquo;ll email you a 6-digit code to set a new one.
       </p>

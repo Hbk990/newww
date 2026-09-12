@@ -101,6 +101,15 @@ export const addresses = pgTable(
     userId: uuid()
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    /**
+     * What the customer calls this place: "Home", "The shop", "Mum".
+     *
+     * Separate from `name`, which is who the driver asks for. Both are needed
+     * and they answer different questions — a book listing two streets is hard
+     * to choose from at checkout, and one listing "Home" and "Work" is not.
+     * Optional, because the first address nobody needs to name.
+     */
+    label: text(),
     name: text().notNull(),
     line1: text().notNull(),
     line2: text(),

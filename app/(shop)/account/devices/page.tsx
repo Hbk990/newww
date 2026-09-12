@@ -14,7 +14,7 @@ export default async function DevicesPage() {
   ]);
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-12">
+    <>
       <h1 className="text-2xl font-semibold tracking-tight">My phones</h1>
       <p className="mt-2 text-sm text-muted">
         Tell us what you own and we will say whether a case or a cable fits it,
@@ -22,6 +22,6 @@ export default async function DevicesPage() {
       </p>
 
       <MyDevices mine={mine} choices={choices} />
-    </main>
+    </>
   );
 }

@@ -24,7 +24,7 @@ export default async function RegisterPage({
 
   return (
     <>
-      <h1 className="text-2xl font-semibold tracking-tight">Create an account</h1>
+      <h1 className="display text-2xl">Create an account</h1>
       {/* Guest checkout is gone: an order needs an account, so the details and
           the order history have somewhere to live. Saying why beats a bare
           requirement. */}
