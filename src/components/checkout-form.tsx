@@ -4,17 +4,27 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 
 import { placeOrder } from "@/lib/checkout/actions";
+import { LEBANON_REGIONS, type Region } from "@/lib/shipping/regions";
+import type { ShippingQuote } from "@/lib/shipping/quote";
 
 const money = (cents: number) =>
   `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
 
 export function CheckoutForm({
   subtotalCents,
-  deliveryCents,
+  quotes,
   defaultEmail,
 }: {
   subtotalCents: number;
-  deliveryCents: number;
+  /**
+   * A delivery quote per region we cover, priced on the server for this exact
+   * basket. Regions missing from it are not delivered to.
+   *
+   * Passed in whole rather than fetched as the shopper picks, so the fee
+   * updates the instant the select changes with no round trip — and without the
+   * price ever being computed somewhere the shopper could edit it.
+   */
+  quotes: Record<string, ShippingQuote>;
   defaultEmail: string | null;
 }) {
   const router = useRouter();
@@ -23,6 +33,7 @@ export function CheckoutForm({
   const [phone, setPhone] = useState("");
   const [line1, setLine1] = useState("");
   const [city, setCity] = useState("");
+  const [region, setRegion] = useState<Region | "">("");
   const [note, setNote] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [failure, setFailure] = useState<string | null>(null);
@@ -37,6 +48,8 @@ export function CheckoutForm({
    */
   const keyRef = useRef(crypto.randomUUID());
 
+  const quote = region ? quotes[region] : undefined;
+
   function submit(event: React.FormEvent) {
     event.preventDefault();
     setFailure(null);
@@ -46,6 +59,9 @@ export function CheckoutForm({
         phone,
         line1,
         city,
+        // The server re-quotes from this and ignores anything the page shows,
+        // so a tampered fee cannot reach the order.
+        region: region as Region,
         note: note || null,
       });
       if (!result.ok) {
@@ -99,7 +115,33 @@ export function CheckoutForm({
         />
       </Field>
 
-      <Field label="City" error={errors.city}>
+      <Field
+        label="Governorate"
+        hint="Sets the delivery fee."
+        error={errors.region}
+      >
+        <select
+          value={region}
+          onChange={(e) => setRegion(e.target.value as Region | "")}
+          className="w-full rounded-md border border-line bg-surface px-3 py-2 text-sm"
+        >
+          <option value="">Choose…</option>
+          {LEBANON_REGIONS.map((name) => {
+            // Named apart from the outer `quote`, which is the chosen region's.
+            const option = quotes[name];
+            return (
+              <option key={name} value={name} disabled={!option}>
+                {name}
+                {option
+                  ? ` — ${option.free ? "free delivery" : money(option.priceCents)}`
+                  : " — not delivered to yet"}
+              </option>
+            );
+          })}
+        </select>
+      </Field>
+
+      <Field label="City or town" error={errors.city}>
         <input
           value={city}
           onChange={(e) => setCity(e.target.value)}
@@ -125,18 +167,29 @@ export function CheckoutForm({
           <span className="tabular">{money(subtotalCents)}</span>
         </div>
         <div className="mt-1 flex justify-between">
-          <span className="text-muted">Delivery</span>
-          <span className="tabular">{money(deliveryCents)}</span>
+          <span className="text-muted">
+            Delivery{quote ? ` to ${quote.zoneName}` : ""}
+          </span>
+          <span className="tabular">
+            {quote ? (quote.free ? "Free" : money(quote.priceCents)) : "—"}
+          </span>
         </div>
         <div className="mt-2 flex justify-between border-t border-line pt-2 font-medium">
           <span>To pay on delivery</span>
-          <span className="tabular">{money(subtotalCents + deliveryCents)}</span>
+          {/*
+            Dashed until a governorate is chosen rather than showing the items
+            total as if it were the total. A figure that then grows at the last
+            moment is how a shop gets accused of a hidden charge.
+          */}
+          <span className="tabular">
+            {quote ? money(subtotalCents + quote.priceCents) : "—"}
+          </span>
         </div>
       </div>
 
       <button
         type="submit"
-        disabled={pending}
+        disabled={pending || !quote}
         className="w-full rounded-md bg-accent px-4 py-2.5 text-sm font-medium text-on-accent disabled:opacity-50"
       >
         {pending ? "Placing your order…" : "Place order"}

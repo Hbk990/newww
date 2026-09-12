@@ -7,10 +7,10 @@ import { z } from "zod";
 import { db } from "@/db";
 import { cartItems } from "@/db/schema";
 import { currentUser } from "@/lib/auth/session";
-import { CART_COOKIE, currentCart } from "@/lib/cart/cart";
+import { CART_COOKIE, currentCart, loadCart } from "@/lib/cart/cart";
 import { createOrder } from "@/lib/orders/create";
-
-import { PROVISIONAL_DELIVERY_FEE_CENTS } from "./fees";
+import { LEBANON_REGIONS } from "@/lib/shipping/regions";
+import { quoteShipping } from "@/lib/shipping/quote";
 
 export type CheckoutResult =
   | { ok: true; orderNumber: string; id: string; replayed: boolean }
@@ -26,6 +26,12 @@ const details = z.object({
     .max(30),
   line1: z.string().trim().min(3, "A street address is needed."),
   city: z.string().trim().min(2, "Which city?"),
+  /**
+   * A closed list, not free text: the zone lookup is an exact match against
+   * `shipping_zones.regions`, so "Mt Lebanon" would find no zone and the
+   * shopper would be told the shop does not deliver to them.
+   */
+  region: z.enum(LEBANON_REGIONS, "Choose your governorate."),
   note: z.string().trim().max(500).nullable(),
 });
 
@@ -83,14 +89,37 @@ export async function placeOrder(
     return { ok: false, error: "Your basket is empty." };
   }
 
+  /*
+   * The subtotal for the free-delivery test is priced here rather than taken
+   * from the form, for the same reason the lines are. loadCart prices every
+   * line at today's price, which is what createOrder will charge.
+   */
+  const priced = await loadCart();
+  if (!priced) return { ok: false, error: "Your basket is empty." };
+
+  const quote = await quoteShipping(input.region, priced.subtotalCents);
+  if (!quote) {
+    return {
+      ok: false,
+      error: `We do not deliver to ${input.region} yet. Call us and we will sort something out.`,
+      fieldErrors: { region: "Not covered by a delivery zone." },
+    };
+  }
+
   const user = await currentUser();
 
   const result = await createOrder(idempotencyKey, {
     email: input.email,
     phone: input.phone,
-    shippingAddress: { line1: input.line1, city: input.city, country: "LB" },
+    shippingAddress: {
+      line1: input.line1,
+      city: input.city,
+      region: input.region,
+      country: "LB",
+    },
     lines,
-    shippingCents: PROVISIONAL_DELIVERY_FEE_CENTS,
+    // Server-quoted from the zone, never sent by the client.
+    shippingCents: quote.priceCents,
     customerNote: input.note,
     source: "web",
     userId: user?.id ?? null,

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { ACCOUNTS, TEST_PASSWORD } from "./global-setup";
+import { storageStateFor } from "./global-setup";
 
 const REQUIRED = [
   "content-security-policy",
@@ -64,20 +64,26 @@ test("the policy does not block anything on the sign-in page", async ({ page }) 
   expect(violations, violations.join("\n")).toEqual([]);
 });
 
-test("the policy does not block anything in the admin area", async ({ page }) => {
-  const violations = watchForViolations(page);
+test.describe("in the admin area", () => {
+  // A pre-signed session, so this spec does not spend the login throttle's
+  // per-identifier budget on a test about response headers.
+  test.use({ storageState: storageStateFor("admin") });
 
-  await page.goto("/login");
-  await page.getByLabel("Email or username").fill(ACCOUNTS.admin.email);
-  await page.getByLabel("Password").fill(TEST_PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL("/");
+  test("the policy does not block anything in the admin area", async ({ page }) => {
+    const violations = watchForViolations(page);
 
-  for (const path of ["/admin", "/admin/products", "/admin/orders", "/admin/stock"]) {
-    await page.goto(path);
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  }
-  await page.waitForLoadState("networkidle");
+    for (const path of [
+      "/admin",
+      "/admin/products",
+      "/admin/orders",
+      "/admin/stock",
+      "/admin/shipping",
+    ]) {
+      await page.goto(path);
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    }
+    await page.waitForLoadState("networkidle");
 
-  expect(violations, violations.join("\n")).toEqual([]);
+    expect(violations, violations.join("\n")).toEqual([]);
+  });
 });

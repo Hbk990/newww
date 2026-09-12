@@ -29,3 +29,4 @@ npm-debug.log*
 # Per-machine Claude Code permission grants, written automatically. The shared
 # hook config in .claude/settings.json is committed; this one is personal.
 .claude/settings.local.json
+e2e/.auth/

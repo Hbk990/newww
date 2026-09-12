@@ -98,7 +98,10 @@ test("a basket becomes an order, and the stock moves with it", async ({
   await page.getByLabel("Phone").fill("+961 70 123 456");
   await page.getByLabel("Email").fill("e2e-checkout@drphone.test");
   await page.getByLabel("Street address").fill("Hamra Street 12");
-  await page.getByLabel("City").fill("Beirut");
+  await page.getByLabel("City or town").fill("Hamra");
+  // Beirut's zone rate is $2.00, seeded by migration 0023 — not the flat $3
+  // the provisional constant charged everywhere.
+  await page.getByLabel("Governorate").selectOption("Beirut");
 
   await page.getByRole("button", { name: "Place order" }).click();
 
@@ -137,8 +140,8 @@ test("a basket becomes an order, and the stock moves with it", async ({
     source: "web",
     email: "e2e-checkout@drphone.test",
     subtotal_cents: 5000,
-    shipping_cents: 300,
-    total_cents: 5300,
+    shipping_cents: 200,
+    total_cents: 5200,
   });
 
   const [item] = await sql<{ quantity: number; unit_price_cents: number }[]>`

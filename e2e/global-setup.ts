@@ -1,3 +1,7 @@
+import { createHash, randomBytes } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+
 import { hash } from "@node-rs/argon2";
 import postgres from "postgres";
 
@@ -21,6 +25,23 @@ export const ACCOUNTS = {
 } as const;
 
 export const TEST_PASSWORD = "Testpass123!";
+
+/**
+ * Where each role's pre-signed browser state is written.
+ *
+ * Specs that are not about signing in load one of these instead of driving the
+ * login form. That is not only faster: the login throttle counts every attempt,
+ * successful or not, and allows eight per identifier per fifteen minutes. With
+ * every spec signing in as admin, the suite locked itself out partway through —
+ * which is how this file came to exist.
+ */
+// process.cwd(), not import.meta.dirname: Playwright loads this file as
+// CommonJS, where import.meta is a syntax error. It always runs from the
+// project root, where playwright.config.ts lives.
+export const AUTH_DIR = path.join(process.cwd(), "e2e", ".auth");
+
+export const storageStateFor = (role: keyof typeof ACCOUNTS) =>
+  path.join(AUTH_DIR, `${role}.json`);
 
 export default async function globalSetup(): Promise<void> {
   const url = process.env.E2E_DATABASE_URL ?? process.env.DATABASE_URL;
@@ -67,6 +88,54 @@ export default async function globalSetup(): Promise<void> {
     }
 
     await sql`delete from auth_attempts`;
+
+    /*
+     * A session per role, written straight to the database and saved as
+     * Playwright storage state.
+     *
+     * Minted exactly as the app does — 32 random bytes, base64url in the
+     * cookie, SHA-256 hex in the table — so these are ordinary sessions and
+     * nothing about them is a special case the app has to know about.
+     */
+    await mkdir(AUTH_DIR, { recursive: true });
+    for (const [role, account] of Object.entries(ACCOUNTS)) {
+      const token = randomBytes(32).toString("base64url");
+      const tokenHash = createHash("sha256").update(token).digest("hex");
+
+      const [user] = await sql<{ id: string }[]>`
+        select id from users where email = ${account.email}
+      `;
+      if (!user) throw new Error(`no user row for ${account.email}`);
+
+      // Last run's session goes, so the table does not grow by three rows per
+      // run and leave someone wondering why a test database has hundreds.
+      await sql`delete from sessions where user_id = ${user.id}`;
+
+      await sql`
+        insert into sessions (user_id, token_hash, expires_at)
+        values (${user.id}, ${tokenHash}, now() + interval '1 day')
+      `;
+
+      await writeFile(
+        storageStateFor(role as keyof typeof ACCOUNTS),
+        JSON.stringify({
+          cookies: [
+            {
+              name: "drphone_session",
+              value: token,
+              domain: "127.0.0.1",
+              path: "/",
+              expires: Math.floor(Date.now() / 1000) + 86_400,
+              httpOnly: true,
+              secure: false,
+              sameSite: "Lax",
+            },
+          ],
+          origins: [],
+        }),
+        "utf8",
+      );
+    }
   } finally {
     await sql.end();
   }

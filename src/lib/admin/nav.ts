@@ -121,6 +121,12 @@ export const NAV: NavSection[] = [
     heading: "System",
     items: [
       {
+        label: "Delivery zones",
+        href: "/admin/shipping",
+        permission: "settings.view",
+        icon: "M3 7h11v8H3zM14 10h4l3 3v2h-7zM6.5 18.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3M17.5 18.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3",
+      },
+      {
         label: "Staff",
         href: "/admin/staff",
         permission: "users.manage",

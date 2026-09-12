@@ -162,6 +162,13 @@
       "when": 1789166544709,
       "tag": "0022_reservations",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1789172329904,
+      "tag": "0023_shipping_zones",
+      "breakpoints": true
     }
   ]
 }

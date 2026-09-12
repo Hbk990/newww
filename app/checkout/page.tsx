@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { CheckoutForm } from "@/components/checkout-form";
 import { currentUser } from "@/lib/auth/session";
 import { loadCart } from "@/lib/cart/cart";
-import { PROVISIONAL_DELIVERY_FEE_CENTS } from "@/lib/checkout/fees";
+import { quotesByRegion } from "@/lib/shipping/quote";
 
 export const metadata = { title: "Checkout · DRPHONE" };
 export const dynamic = "force-dynamic";
@@ -25,6 +25,10 @@ export default async function CheckoutPage() {
 
   const user = await currentUser();
 
+  // Priced for this basket, so a free-delivery threshold is reflected in the
+  // figure beside each governorate rather than appearing only after submitting.
+  const quotes = await quotesByRegion(cart.subtotalCents);
+
   return (
     <main className="mx-auto max-w-lg px-6 py-12">
       <h1 className="text-2xl font-semibold tracking-tight">Checkout</h1>
@@ -37,7 +41,7 @@ export default async function CheckoutPage() {
 
       <CheckoutForm
         subtotalCents={cart.subtotalCents}
-        deliveryCents={PROVISIONAL_DELIVERY_FEE_CENTS}
+        quotes={quotes}
         defaultEmail={user?.email ?? null}
       />
     </main>
