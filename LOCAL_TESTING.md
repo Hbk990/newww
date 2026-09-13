@@ -1,83 +1,83 @@
 # Running HUQA on your own machine
 
-You need **Node.js 22.13 or newer**. Nothing else — no XAMPP, no PHP, no MySQL.
-Check with `node -v`.
+Works on Windows, macOS and Linux. You need **Node.js 22.13 or newer** and
+nothing else — no XAMPP, no PHP, no MySQL.
 
-Everything below runs from the project folder. The database and uploaded images
-are created locally inside `.wrangler/`, so nothing touches a live site.
+Get it from [nodejs.org](https://nodejs.org) (the LTS button). Check it with
+`node -v`.
 
-## 1. Install
+## Open a terminal in the project folder
 
-```sh
-npm run install:ci
-```
+The folder is the one containing `package.json`.
 
-Takes a few minutes the first time.
+- **Windows** — open the folder in File Explorer, click the address bar, type
+  `powershell` and press Enter.
+- **macOS** — right-click the folder, Services, New Terminal at Folder.
 
-## 2. Build
-
-```sh
-npm run build
-```
-
-## 3. Create the local database
-
-Run these three, in this order:
+## Set it up
 
 ```sh
-node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_steep_pretty_boy.sql
-node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0001_empty_dust.sql
-node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0002_messy_toxin.sql
+npm run setup
 ```
 
-Only needed once. Skip this step next time.
+Installs dependencies, builds, and creates the local database. A few minutes the
+first time. Safe to run again — it skips whatever is already done.
 
-## 4. Start it
+> Do **not** run `npm run install:ci`. That is the hosting platform's installer:
+> a bash script that needs Linux `flock` and GNU `timeout`, so on Windows it
+> fails with `execvpe(/bin/bash) failed: No such file or directory`.
+> `npm run setup` replaces it.
+
+## Fill it with demo data (optional)
+
+```sh
+npm run demo
+```
+
+38 products across every shelf, three offers, five orders and four customer
+files — enough to click through the whole shop before you type in your own
+stock. The demo products have no photos; add those in the editor.
+
+Remove it all again with `npm run demo -- --clear`. It only ever touches the
+local `.wrangler` database, never a live site.
+
+## Start it
 
 ```sh
 npm start
 ```
 
-It prints a URL, normally `http://127.0.0.1:8787`. Open it.
+Open **http://127.0.0.1:8787**. Leave that terminal window open — closing it
+stops the site.
 
-## 5. (Optional) Fill it with demo data
+## Create your admin login
 
-```sh
-node scripts/seed-demo.mjs
-```
+Go to **http://127.0.0.1:8787/admin** and pick a username and a password of at
+least 12 characters. **Copy the recovery code it shows you** — it appears once
+and is the only way back in if you forget the password.
 
-38 products across every shelf, three offers, five orders and four customer
-files — enough to click through the whole shop before you type in your own
-stock. The products have no photos; add those in the editor.
+Then open **Storefront** in the sidebar to set the WhatsApp number, the delivery
+fee, and the live/hidden switch. Until the shop is switched live, visitors see a
+"coming soon" page — that is expected, not a bug. (`npm run demo` switches it on
+for you.)
 
-Remove it all again with:
+## Day to day
 
-```sh
-node scripts/seed-demo.mjs --clear
-```
+- Starting it again later: just `npm start`.
+- After changing any code: `npm run build`, then `npm start`.
+- `npm run dev` instead gives you a server that reloads as you edit, on
+  http://127.0.0.1:5173.
 
-It only ever touches the local `.wrangler` database. Never run it against a
+## Starting completely fresh
+
+Delete the `.wrangler` folder and run `npm run setup` again. That wipes the local
+products, orders, customers, images and your admin login. It does not touch a
 live site.
 
-## 6. Set the shop up
+## If something goes wrong
 
-1. Go to **`/admin`** — for example `http://127.0.0.1:8787/admin`.
-2. Create a username and a password (12 characters or more).
-   **Copy the recovery code it shows you.** It appears once and is the only way
-   back in if you forget the password.
-3. In the left sidebar open **Storefront**, check the WhatsApp number and the
-   delivery fee, switch **"Your shop is live"** on, and save. (The demo seed
-   already switches it on for you.)
-4. Add a few products with **Add product**, then look at the shop on `/`.
-
-Until the shop is switched live it shows a "coming soon" page — that is expected, not a bug.
-
-## Working on it
-
-`npm run dev` gives you a development server that reloads as files change.
-After editing anything you want to see in `npm start`, run `npm run build` again.
-
-## Starting over
-
-Delete the `.wrangler` folder and redo step 3. That wipes the local products,
-orders, customers, images and your admin login. It does not touch a live site.
+- `execvpe(/bin/bash) failed` — you ran `install:ci`. Use `npm run setup`.
+- `Could not find pnpm 11.25.0` — run `npm install -g pnpm@11.25.0` once, then
+  `npm run setup` again.
+- `This project needs Node 22.13 or newer` — update Node from nodejs.org.
+- Anything else — copy the red error text and send it over.

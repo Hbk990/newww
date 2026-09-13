@@ -67,13 +67,16 @@ else needs the admin session. Drafts and photos of deleted products stay private
 
 ## Setup
 
-1. `npm run install:ci`
-2. `npm run build`
-3. Apply `drizzle/*.sql` in order (see *Local D1 migrations* below).
-4. Open `/admin` and create the admin username and password. **Save the recovery
-   code** — it is shown once and is the only way back in.
-5. Open **Storefront** in the sidebar, set the WhatsApp number and delivery fee,
+1. `npm run setup` — installs, builds, and creates the local database.
+   (`npm run install:ci` is the hosting platform's installer and needs Linux
+   `flock` and GNU `timeout`; it cannot run on Windows.)
+2. `npm run demo` for a catalogue to click through, or skip it.
+3. `npm start`, then open `/admin` and create the admin username and password.
+   **Save the recovery code** — it is shown once and is the only way back in.
+4. Open **Storefront** in the sidebar, set the WhatsApp number and delivery fee,
    then switch the shop live. Until then visitors see a "coming soon" page.
+
+See `LOCAL_TESTING.md` for the same thing spelled out step by step.
 
 The admin is protected by that username and password alone (five wrong tries
 locks it for fifteen minutes). Optionally set the `STORE_OWNER` binding to pin
