@@ -256,8 +256,8 @@ body{font-family:Arial,Helvetica,sans-serif;font-size:16px}button,a,input,textar
 .summary-grand{font-size:18px;font-weight:700;color:#171d25;padding-top:11px;border-top:1px solid var(--border)}
 .link-button{background:0;border:0;padding:0;font-size:13.5px;color:#3f5c2c;text-decoration:underline;font-weight:550}
 .checkout-done,.checkout-empty{text-align:center;max-width:540px;margin:60px auto;padding:40px 26px;background:#fff;border:1px solid var(--border);border-radius:20px}
-.checkout-done svg{color:#4b7e5b;margin:0 auto 18px}
-.checkout-empty svg{color:#9aa4b0;margin:0 auto 18px}
+.checkout-done>svg{color:#4b7e5b;margin:0 auto 18px}
+.checkout-empty>svg{color:#9aa4b0;margin:0 auto 18px}
 .checkout-done h1,.checkout-empty h1{font-size:26px;font-weight:650;letter-spacing:-.03em;margin-bottom:12px}
 .checkout-done p,.checkout-empty p{color:#66717e;line-height:1.65;font-size:15px;margin-bottom:24px}
 .whatsapp-cta{display:inline-flex;align-items:center;justify-content:center;gap:10px;width:100%;height:56px;border-radius:13px;background:#1fa855;color:#fff;font-size:16px;font-weight:650;text-decoration:none}

@@ -51,12 +51,12 @@ const products=[
   description:'Screen on the side, two power modes, 15,000 puffs in normal mode.',
   variants:flavours(['Miami Mint','Sour Apple Ice','Watermelon Ice',['Strawberry Banana',false]],'50mg')}),
 
- // ---- Disposables / 0mg ----
- product({name:'Elf Bar 0% Zero',brand:'Elf Bar',category:'Disposables / 0mg',price:12,
-  description:'All the flavour, no nicotine at all.',
-  variants:flavours(['Watermelon','Mango','Mint'],'0mg')}),
- product({name:'Vozol Zero Nic 6000',brand:'Vozol',category:'Disposables / 0mg',price:13,
-  variants:flavours(['Blueberry','Peach','Cola'],'0mg')}),
+ // ---- Disposables / 20mg ----
+ product({name:'Elf Bar 600 V2',brand:'Elf Bar',category:'Disposables / 20mg',price:12,
+  description:'Lighter salt, 600 puffs. The one to start on.',
+  variants:flavours(['Watermelon','Mango','Mint','Cherry Cola'],'20mg')}),
+ product({name:'Vozol Neon 800',brand:'Vozol',category:'Disposables / 20mg',price:13,
+  variants:flavours(['Blueberry','Peach Ice',['Cola',false]],'20mg')}),
 
  // ---- Machines ----
  product({name:'Voopoo Drag X2',brand:'Voopoo',category:'Machines',price:42,featured:true,

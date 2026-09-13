@@ -1,6 +1,7 @@
-export const categories=['Disposables / Shisha','Disposables / 50mg','Disposables / 0mg','Machines','Coils & accessories / Coils & pods','Coils & accessories / Accessories','Liquids / 3mg','Liquids / 12mg','Liquids / 18mg','Liquids / 25mg','Liquids / 50mg','Nicotine pouches'];
-// 20mg disposables predate the Shisha/50mg/0mg split; keep accepting them so old rows stay editable.
-export const legacyCategories=['Disposables / 20mg'];
+export const categories=['Disposables / Shisha','Disposables / 50mg','Disposables / 20mg','Machines','Coils & accessories / Coils & pods','Coils & accessories / Accessories','Liquids / 3mg','Liquids / 12mg','Liquids / 18mg','Liquids / 25mg','Liquids / 50mg','Nicotine pouches'];
+// Nicotine-free disposables are no longer a shelf; keep accepting the category so any
+// rows already saved under it stay editable.
+export const legacyCategories=['Disposables / 0mg'];
 export type Variant={id:string;label:string;strength:string;available:boolean};
 export type Product={id:string;name:string;brand:string;category:string;bottleSize?:string;price?:number;description:string;image:string;featured?:boolean;variants:Variant[];revision:number;updatedAt:number};
 export function distance(a:string,b:string){const d=Array.from({length:b.length+1},(_,i)=>i);for(let i=1;i<=a.length;i++){let prev=d[0];d[0]=i;for(let j=1;j<=b.length;j++){let old=d[j];d[j]=Math.min(d[j]+1,d[j-1]+1,prev+(a[i-1]===b[j-1]?0:1));prev=old;}}return d[b.length]}
@@ -38,7 +39,7 @@ export function variantCount(category:string,n:number){const word=category==='Ma
 // admin category shortcuts, so both sides always agree on where a product appears.
 export type Section={slug:string;title:string;blurb:string;categories:string[];facet:'kind'|'strength'|'brand'|'none'};
 export const sections:Section[]=[
- {slug:'disposables',title:'Disposables',blurb:'Ready-to-vape devices — shisha flavours, 50mg salt and nicotine-free.',categories:categories.filter(c=>c.startsWith('Disposables / ')).concat(legacyCategories),facet:'kind'},
+ {slug:'disposables',title:'Disposables',blurb:'Ready-to-vape devices — shisha flavours, 50mg and 20mg salt.',categories:categories.filter(c=>c.startsWith('Disposables / ')).concat(legacyCategories),facet:'kind'},
  {slug:'liquids',title:'E-Liquids',blurb:'Pick your nicotine strength, then your brand and flavour.',categories:categories.filter(c=>c.startsWith('Liquids / ')),facet:'strength'},
  {slug:'machines',title:'Machines',blurb:'Mods, kits and pod systems — every model in your colour.',categories:['Machines'],facet:'none'},
  {slug:'coils',title:'Coils & Pods',blurb:'Replacement coils and pods, sorted by brand.',categories:['Coils & accessories / Coils & pods'],facet:'brand'},
