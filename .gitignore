@@ -50,3 +50,6 @@ tsconfig.tsbuildinfo
 
 # server data (database, product photos, orders, customer files)
 /data/
+
+# PHP shop runtime data (catalogue, orders, customers, photos)
+/php/data/
