@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import vinext from "vinext";
 import { defineConfig } from "vite";
 import hostingConfig from "./.openai/hosting.json";
@@ -9,6 +10,21 @@ const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
 
 const { d1, r2 } = hostingConfig;
 
+// cloudflare.json names the real database, bucket and Worker for `npm run deploy`.
+// Leave its d1.id empty and the build keeps the placeholder, which is all local
+// development needs — Miniflare invents a database either way.
+type DeployTarget = { workerName?: string; d1?: { name?: string; id?: string }; r2?: { bucket?: string } };
+let deployTarget: DeployTarget = {};
+try {
+  deployTarget = JSON.parse(readFileSync(new URL("./cloudflare.json", import.meta.url), "utf8"));
+} catch {
+  // Not configured yet; local development does not need it.
+}
+const databaseId = deployTarget.d1?.id?.trim() || SITE_CREATOR_PLACEHOLDER_DATABASE_ID;
+const databaseName = deployTarget.d1?.name?.trim() || "site-creator-d1";
+const bucketName = deployTarget.r2?.bucket?.trim() || "site-creator-r2";
+const workerName = deployTarget.workerName?.trim();
+
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 const managedLinux = readExecutionProfile() === "managed-linux";
@@ -16,12 +32,13 @@ const managedLinux = readExecutionProfile() === "managed-linux";
 const localBindingConfig = {
   main: "vinext/server/fetch-handler",
   compatibility_flags: ["nodejs_compat"],
+  ...(workerName ? { name: workerName } : {}),
   d1_databases: d1
     ? [
         {
           binding: d1,
-          database_name: "site-creator-d1",
-          database_id: SITE_CREATOR_PLACEHOLDER_DATABASE_ID,
+          database_name: databaseName,
+          database_id: databaseId,
         },
       ]
     : [],
@@ -29,7 +46,7 @@ const localBindingConfig = {
     ? [
         {
           binding: r2,
-          bucket_name: "site-creator-r2",
+          bucket_name: bucketName,
         },
       ]
     : [],

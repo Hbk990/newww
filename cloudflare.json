@@ -1,0 +1,10 @@
+{
+  "workerName": "huqa-shop",
+  "d1": {
+    "name": "huqa",
+    "id": ""
+  },
+  "r2": {
+    "bucket": "huqa-images"
+  }
+}

@@ -76,7 +76,15 @@ else needs the admin session. Drafts and photos of deleted products stay private
 4. Open **Storefront** in the sidebar, set the WhatsApp number and delivery fee,
    then switch the shop live. Until then visitors see a "coming soon" page.
 
-See `LOCAL_TESTING.md` for the same thing spelled out step by step.
+See `LOCAL_TESTING.md` for the same thing spelled out step by step, and
+`DEPLOY.md` for putting it online.
+
+## Publishing
+
+`npm run deploy` builds, migrates the live database and publishes to Cloudflare.
+It reads `cloudflare.json` for the Worker name, D1 database and R2 bucket; fill
+that in once after creating them (`DEPLOY.md` has the commands). With its `d1.id`
+left empty the build keeps a placeholder, which is all local development needs.
 
 The admin is protected by that username and password alone (five wrong tries
 locks it for fifteen minutes). Optionally set the `STORE_OWNER` binding to pin

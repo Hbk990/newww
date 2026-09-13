@@ -10,13 +10,11 @@ import {spawnSync} from 'node:child_process';
 import {existsSync} from 'node:fs';
 
 const win = process.platform === 'win32';
-const CONFIG = 'dist/server/wrangler.json', STATE = '.wrangler/state';
+const CONFIG = 'dist/server/wrangler.json';
 const step = m => console.log('\n== ' + m);
 const fail = (...lines) => { console.error('\nSetup stopped.\n' + lines.join('\n') + '\n'); process.exit(1); };
 
 const node = (args, opts = {}) => spawnSync(process.execPath, args, {stdio: 'inherit', ...opts});
-const wrangler = (args, opts = {}) =>
-  node(['--import', './scripts/sites-env.mjs', './node_modules/wrangler/bin/wrangler.js', ...args], opts);
 
 // 1. Node version
 const [major, minor] = process.versions.node.split('.').map(Number);
@@ -91,41 +89,11 @@ if (!existsSync(CONFIG)) {
   fail(`The build did not produce ${CONFIG}. Copy the output above and send it over.`);
 }
 
-// 5. Database — apply only the migrations this database is missing, so running
-// setup again is harmless.
+// 5. Database
 step('Preparing the local database');
-function query(sql) {
-  const r = wrangler(['d1', 'execute', 'DB', '--local', '--config', CONFIG, '--persist-to', STATE, '--json', '--command', sql],
-                     {stdio: ['ignore', 'pipe', 'pipe']});
-  if (r.status !== 0) return null;
-  const text = (r.stdout || '').toString();
-  try { return JSON.parse(text.slice(text.indexOf('[')))[0].results; } catch { return null; }
-}
-const hasTable = name => {
-  const rows = query(`SELECT name FROM sqlite_master WHERE type='table' AND name='${name}'`);
-  return Array.isArray(rows) && rows.length > 0;
-};
-const hasColumn = (table, column) => {
-  const rows = query(`SELECT 1 AS hit FROM pragma_table_info('${table}') WHERE name='${column}'`);
-  return Array.isArray(rows) && rows.length > 0;
-};
-
-const migrations = [
-  ['drizzle/0000_steep_pretty_boy.sql', () => hasTable('products')],
-  ['drizzle/0001_empty_dust.sql', () => hasColumn('admins', 'recovery_hash')],
-  ['drizzle/0002_messy_toxin.sql', () => hasTable('bundles')],
-];
-let applied = 0;
-for (const [file, done] of migrations) {
-  if (done()) { console.log(`already applied: ${file}`); continue; }
-  if (wrangler(['d1', 'execute', 'DB', '--local', '--config', CONFIG, '--persist-to', STATE, '--file', file],
-               {stdio: ['ignore', 'pipe', 'inherit']}).status !== 0) {
-    fail(`Could not apply ${file}.`, 'Delete the .wrangler folder and run `npm run setup` again.');
-  }
-  console.log(`applied: ${file}`);
-  applied++;
-}
-if (!applied) console.log('Database was already set up.');
+const {migrate} = await import('./migrate.mjs');
+try { migrate({remote: false}); }
+catch (e) { fail(e.message, 'Delete the .wrangler folder and run `npm run setup` again.'); }
 
 console.log(`
 Ready.
