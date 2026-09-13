@@ -42,11 +42,44 @@ if (!pnpm) {
 }
 console.log('Using: ' + pnpm.join(' '));
 
-// 3. Dependencies
-step('Installing dependencies (a few minutes the first time)');
-if (spawnSync(pnpm[0], [...pnpm.slice(1), 'install', '--frozen-lockfile'], {stdio: 'inherit', shell: win}).status !== 0) {
-  fail('Dependency install failed.',
-       'If the error mentions the network, check your connection and run `npm run setup` again.');
+// 3. Dependencies. Several packages are 30-40 MB, and pnpm's one-minute default
+// request timeout gives up on them over a slow link. Wait much longer, retry
+// hard, and pull fewer files at once so each gets the whole connection. Anything
+// already fetched stays in the project's pnpm store, so a retry resumes.
+const NETWORK = {
+  npm_config_fetch_timeout: '900000',
+  npm_config_fetch_retries: '10',
+  npm_config_fetch_retry_mintimeout: '10000',
+  npm_config_fetch_retry_maxtimeout: '120000',
+};
+const ATTEMPTS = 4;
+step('Installing dependencies');
+console.log('About 1 GB to download, so the first run takes a while. If the connection');
+console.log('drops it picks up where it left off — leave it running.\n');
+let installed = false;
+for (let attempt = 1; attempt <= ATTEMPTS && !installed; attempt++) {
+  // Narrow the pipe further each time: fewer parallel downloads, more bandwidth each.
+  const concurrency = attempt === 1 ? '4' : attempt === 2 ? '2' : '1';
+  if (attempt > 1) {
+    console.log(`\nThe connection gave out. Resuming — attempt ${attempt} of ${ATTEMPTS}, ${concurrency} file(s) at a time.`);
+    console.log('Nothing already downloaded is lost.\n');
+  }
+  const r = spawnSync(pnpm[0], [...pnpm.slice(1), 'install', '--frozen-lockfile'], {
+    stdio: 'inherit',
+    shell: win,
+    env: {...process.env, ...NETWORK, npm_config_network_concurrency: concurrency},
+  });
+  installed = r.status === 0;
+}
+if (!installed) {
+  fail('Dependency install did not finish — the downloads kept timing out.',
+       '',
+       'Run `npm run setup` again. It resumes from what it already has, so each',
+       'attempt gets further. Do not delete the project folder between tries —',
+       'the downloads are cached inside it.',
+       '',
+       'On a very weak connection, try it on a different network or leave it',
+       'running overnight.');
 }
 
 // 4. Build

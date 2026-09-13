@@ -20,8 +20,14 @@ The folder is the one containing `package.json`.
 npm run setup
 ```
 
-Installs dependencies, builds, and creates the local database. A few minutes the
-first time. Safe to run again — it skips whatever is already done.
+Installs dependencies, builds, and creates the local database. Safe to run again
+— it skips whatever is already done.
+
+**The first run downloads about 1 GB**, so on a slow connection it takes a
+while. Some packages are 30-40 MB each. If a download times out, setup retries
+on its own and resumes from what it already has; if it still gives up, just run
+`npm run setup` again and it gets further each time. **Do not delete the project
+folder between attempts** — the downloads are cached inside it.
 
 > Do **not** run `npm run install:ci`. That is the hosting platform's installer:
 > a bash script that needs Linux `flock` and GNU `timeout`, so on Windows it
@@ -80,4 +86,9 @@ live site.
 - `Could not find pnpm 11.25.0` — run `npm install -g pnpm@11.25.0` once, then
   `npm run setup` again.
 - `This project needs Node 22.13 or newer` — update Node from nodejs.org.
+- `TimeoutError: The operation was aborted due to timeout` — your connection
+  dropped mid-download. Run `npm run setup` again; it resumes. Repeat until it
+  finishes.
+- `ERR_PNPM_NO_LOCKFILE` or similar — you are in the wrong folder. You need the
+  one containing `package.json`.
 - Anything else — copy the red error text and send it over.
