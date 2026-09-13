@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import {Link} from '@/components/shop/link';
 import {ArrowRight,Truck,MessageCircle,ShieldCheck,Flame} from 'lucide-react';
 import {loadShop} from './shopdata';
 import {inStock,money,sections,isHuqaBrand,priceBundle} from './model';

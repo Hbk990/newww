@@ -1,5 +1,5 @@
 'use client';
-import Link from 'next/link';
+import {Link} from './link';
 import {useMemo,useState} from 'react';
 import {ShoppingBag,Check,Gift,MessageCircle} from 'lucide-react';
 import {Bundle,Product,Variant,inStock,money,priceBundle,variantCount,variantLabel,variantWord} from '@/app/model';

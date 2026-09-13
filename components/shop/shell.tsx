@@ -1,6 +1,5 @@
 'use client';
-import Link from 'next/link';
-import {useRouter} from 'next/navigation';
+import {Link,navigate} from './link';
 import {useEffect,useRef,useState,useSyncExternalStore,ReactNode} from 'react';
 import {ChevronDown,AtSign,MapPin,Clock,Menu,Search,ShoppingBag,Trash2,X,Minus,Plus,MessageCircle} from 'lucide-react';
 import {Bundle,Product,Store,deliveryCost,displayPhone,disposableKinds,inStock,liquidStrengths,money,normalize} from '@/app/model';
@@ -50,14 +49,13 @@ function AgeGate(){
 }
 
 function SearchBox({products,onNavigate}:{products:Product[];onNavigate?:()=>void}){
- const router=useRouter();
  const [query,setQuery]=useState('');
  const [open,setOpen]=useState(false);
  const box=useRef<HTMLDivElement>(null);
  const hits=query.trim().length>1?searchProducts(products,query).slice(0,6):[];
  const suggestion=query.trim().length>2&&!hits.length?correct(query,vocabulary(products)):null;
  useEffect(()=>{const away=(e:MouseEvent)=>{if(box.current&&!box.current.contains(e.target as Node))setOpen(false)};document.addEventListener('mousedown',away);return()=>document.removeEventListener('mousedown',away)},[]);
- const go=(q:string)=>{if(!q.trim())return;setOpen(false);onNavigate?.();router.push('/search?q='+encodeURIComponent(q.trim()))};
+ const go=(q:string)=>{if(!q.trim())return;setOpen(false);onNavigate?.();navigate('/search?q='+encodeURIComponent(q.trim()))};
  return <div className="shop-search" ref={box}>
   <form role="search" onSubmit={e=>{e.preventDefault();go(suggestion&&!hits.length?suggestion:query)}}>
    <Search size={17} aria-hidden/>
@@ -115,7 +113,6 @@ function MobileNav({entries,products}:{entries:NavEntry[];products:Product[]}){
 
 function CartSheet({store}:{store:Store}){
  const cart=useCart();
- const router=useRouter();
  const delivery=deliveryCost(store,cart.subtotal);
  return <Sheet open={cart.open} onOpenChange={cart.setOpen}>
   <SheetContent className="w-full sm:max-w-[460px] p-0 flex flex-col">
@@ -146,7 +143,7 @@ function CartSheet({store}:{store:Store}){
     <div className="cart-total cart-total-muted"><span>Delivery</span><strong>{delivery?money(delivery):'Free'}</strong></div>
     {store.freeDeliveryOver>0&&cart.subtotal<store.freeDeliveryOver&&<p className="cart-hint">Add {money(store.freeDeliveryOver-cart.subtotal)} more for free delivery.</p>}
     <div className="cart-total cart-total-grand"><span>Total</span><strong>{money(cart.subtotal+delivery)}</strong></div>
-    <Button className="h-12 w-full" disabled={cart.resolved.some(l=>!l.available)} onClick={()=>{cart.setOpen(false);router.push('/checkout')}}>Continue to checkout</Button>
+    <Button className="h-12 w-full" disabled={cart.resolved.some(l=>!l.available)} onClick={()=>{cart.setOpen(false);navigate('/checkout')}}>Continue to checkout</Button>
    </div>}
   </SheetContent>
  </Sheet>;

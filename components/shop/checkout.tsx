@@ -1,5 +1,5 @@
 'use client';
-import Link from 'next/link';
+import {Link} from './link';
 import {useState} from 'react';
 import {CircleCheck,MessageCircle,ShoppingBag,TriangleAlert} from 'lucide-react';
 import {Store,deliveryAreas,deliveryCost,money} from '@/app/model';

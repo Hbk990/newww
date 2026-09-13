@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import {Link} from '@/components/shop/link';
 import type {Metadata} from 'next';
 import {ArrowRight,Flame,Leaf,Award,MessageCircle} from 'lucide-react';
 import {loadShop} from '../shopdata';
