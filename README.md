@@ -1,3 +1,86 @@
+# HUQA — shop and inventory
+
+A public storefront plus the private admin that stocks it, running on vinext /
+Cloudflare Workers with D1 and R2.
+
+## Routes
+
+| Route | Who | What |
+|---|---|---|
+| `/` | anyone | Home: hero, shelves, live offers, featured products, HUQA band |
+| `/shop/<section>` | anyone | `disposables`, `liquids`, `machines`, `coils`, `accessories`, `pouches` |
+| `/product/<id>` | anyone | One product, flavour (and strength) picker, add to cart |
+| `/bundles` | anyone | Bundles and offers |
+| `/huqa` | anyone | The HUQA shisha brand page |
+| `/search?q=` | anyone | Fuzzy search that reruns a misspelt query against the catalogue |
+| `/checkout` | anyone | Address capture, then the WhatsApp hand-off |
+| `/admin` | username + password | Inventory, offers, orders, customers, storefront settings |
+
+Nav links carry a facet: `/shop/liquids?f=12mg` opens straight on that strength.
+
+## How the shelves are organised
+
+`app/model.ts` owns the category list and the `sections` table both sides read,
+so the shop and the admin can never disagree about where a product lives.
+
+- **Disposables** — Shisha, 50mg, 0mg. Each product carries its own flavours;
+  two products may share a flavour name and stay completely separate.
+- **E-Liquids** — choose 3/12/18/25/50mg, then the brand, then the flavour.
+  Bottle size (30/60/100/120ml) is required on every liquid.
+- **Machines** — one page, colours as variants.
+- **Coils & Pods** — grouped by brand (Voopoo, Smok, …).
+- **Accessories** — one page.
+- **Nicotine pouches** — one page; each model has flavours across two strengths,
+  and the product page picks flavour and strength on separate rows.
+
+`Disposables / 20mg` predates the current split. It no longer appears in the
+picker but still validates, so old rows stay editable until you recategorise them.
+
+## Ordering
+
+The cart lives in the browser (`localStorage`, shared across tabs). At checkout
+the browser posts the cart to `/api/order`, which **re-prices everything from the
+catalogue** — the browser never sets a price — checks stock, writes the order,
+and returns a `wa.me` link with the whole order written out. The customer taps it
+to send the message. Nothing is lost if they do not: the order is already saved
+and shows up under Orders.
+
+## Where data lives
+
+- **D1** — `products`, `bundles`, `snapshots` (change history), `admins`,
+  `sessions`, `storefront` (shop settings).
+- **R2** — product images by UUID, plus:
+  - `orders/<inverted-timestamp>-<ref>.json` — one file per order. The key is
+    inverted so a plain bucket listing comes back newest first.
+  - `customers/<phone>.json` — one file per customer, keyed by their number:
+    name, every address they have used, order history, totals, device ids.
+
+A phone number is the customer key because IP addresses are not dependable here
+— mobile carriers share them and home connections change. A random device id is
+stored in the browser as a secondary link.
+
+## Images
+
+`/api/image?id=` serves a photo publicly, cached forever, **only** when the shop
+is live and some product or bundle actually references that image. Everything
+else needs the admin session. Drafts and photos of deleted products stay private.
+
+## Setup
+
+1. `npm run install:ci`
+2. `npm run build`
+3. Apply `drizzle/*.sql` in order (see *Local D1 migrations* below).
+4. Open `/admin` and create the admin username and password. **Save the recovery
+   code** — it is shown once and is the only way back in.
+5. Open **Storefront** in the sidebar, set the WhatsApp number and delivery fee,
+   then switch the shop live. Until then visitors see a "coming soon" page.
+
+The admin is protected by that username and password alone (five wrong tries
+locks it for fifteen minutes). Optionally set the `STORE_OWNER` binding to pin
+the storefront to a specific owner row.
+
+---
+
 # vinext-starter
 
 A clean full-stack starter running on [vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and Drizzle support.

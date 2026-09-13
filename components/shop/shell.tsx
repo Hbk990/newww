@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import {useRouter} from 'next/navigation';
-import {useEffect,useRef,useState,ReactNode} from 'react';
+import {useEffect,useRef,useState,useSyncExternalStore,ReactNode} from 'react';
 import {ChevronDown,AtSign,MapPin,Clock,Menu,Search,ShoppingBag,Trash2,X,Minus,Plus,MessageCircle} from 'lucide-react';
 import {Bundle,Product,Store,deliveryCost,displayPhone,disposableKinds,inStock,liquidStrengths,money,normalize} from '@/app/model';
 import {Sheet,SheetContent,SheetHeader,SheetTitle,SheetDescription} from '@/components/ui/sheet';
@@ -26,17 +26,23 @@ function navigation(products:Product[]):NavEntry[]{
  ];
 }
 
+// The stored 18+ answer is another external store; the server snapshot says "confirmed"
+// so the overlay never flashes into the server-rendered HTML.
+const ageListeners=new Set<()=>void>();
+const ageSubscribe=(f:()=>void)=>{ageListeners.add(f);return()=>{ageListeners.delete(f)}};
+const ageSnapshot=()=>{try{return localStorage.getItem(AGE_KEY)==='yes'}catch{return true}};
+function confirmAge(){try{localStorage.setItem(AGE_KEY,'yes')}catch{/* private mode */}for(const f of ageListeners)f()}
+
 function AgeGate(){
- const [decided,setDecided]=useState<boolean|null>(null);
- useEffect(()=>{try{setDecided(localStorage.getItem(AGE_KEY)==='yes')}catch{setDecided(true)}},[]);
- if(decided===null||decided)return null;
+ const decided=useSyncExternalStore(ageSubscribe,ageSnapshot,()=>true);
+ if(decided)return null;
  return <div className="age-gate" role="dialog" aria-modal="true" aria-labelledby="age-gate-title">
   <div className="age-gate-card">
    <img src="/huqa-logo.jpeg" alt="HUQA" width={96} height={96}/>
    <h2 id="age-gate-title">Are you 18 or older?</h2>
    <p>This shop sells nicotine and tobacco products. You must be at least 18 years old to enter.</p>
    <div className="age-gate-actions">
-    <Button className="h-12 flex-1" onClick={()=>{try{localStorage.setItem(AGE_KEY,'yes')}catch{}setDecided(true)}}>Yes, I am 18 or older</Button>
+    <Button className="h-12 flex-1" onClick={confirmAge}>Yes, I am 18 or older</Button>
     <Button variant="outline" className="h-12 flex-1" onClick={()=>{location.href='https://www.google.com'}}>No</Button>
    </div>
   </div>
@@ -91,7 +97,7 @@ function NavBar({entries}:{entries:NavEntry[]}){
 function MobileNav({entries,products}:{entries:NavEntry[];products:Product[]}){
  const [open,setOpen]=useState(false);
  return <>
-  <button type="button" className="icon-button lg:hidden" aria-label="Open menu" onClick={()=>setOpen(true)}><Menu size={21}/></button>
+  <button type="button" className="icon-button menu-button" aria-label="Open menu" onClick={()=>setOpen(true)}><Menu size={21}/></button>
   <Sheet open={open} onOpenChange={setOpen}>
    <SheetContent side="left" className="w-[86vw] max-w-[380px] p-0 overflow-y-auto">
     <SheetHeader className="p-5 border-b"><SheetTitle>Browse HUQA</SheetTitle><SheetDescription>Everything in the shop.</SheetDescription></SheetHeader>
@@ -162,7 +168,7 @@ function Header({store,products}:{store:Store;products:Product[]}){
    <Link href="/" className="shop-brand" aria-label="HUQA home"><img src="/huqa-logo.jpeg" alt="" width={819} height={819}/><span><strong>{store.storeName}</strong><small>{store.tagline}</small></span></Link>
    <div className="shop-header-search"><SearchBox products={products}/></div>
    <div className="shop-header-actions">
-    <a className="icon-button hidden sm:grid" href={'https://wa.me/'+store.whatsapp} target="_blank" rel="noreferrer" aria-label="Chat on WhatsApp"><MessageCircle size={20}/></a>
+    <a className="icon-button whatsapp-button" href={'https://wa.me/'+store.whatsapp} target="_blank" rel="noreferrer" aria-label="Chat on WhatsApp"><MessageCircle size={20}/></a>
     <CartButton/>
    </div>
   </div>

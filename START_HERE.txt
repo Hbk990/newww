@@ -1,8 +1,10 @@
-HUQA internal inventory dashboard — complete source
+HUQA storefront and inventory dashboard — complete source
 
 This project uses React/Vinext, Cloudflare Workers, D1 (SQLite), and R2 image storage. It requires this runtime; it is not a PHP/XAMPP project and cannot be uploaded directly to ordinary Hostinger shared hosting.
 
-Includes product and variant management, category dropdowns, liquid bottle sizes, editable USD prices, logo, admin credentials and recovery, image uploads, and inventory exports.
+Includes the public shop (browse, search, cart, WhatsApp checkout, 18+ gate) and the admin behind /admin: products and variants, bundles and offers, orders, customer files, storefront settings, admin credentials and recovery, image uploads, and inventory exports.
+
+Read README.md first: it explains the routes, how the shelves are organised, and where orders and customer files are stored.
 
 Install dependencies using the included pnpm lockfile. Consult README.md for runtime and deployment details. Database schema is in db/schema.ts; migrations are in drizzle/.
 

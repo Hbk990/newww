@@ -10,8 +10,10 @@ async function publiclyServable(id:string){
  if(!store.published)return null;
  const m=await db().prepare('SELECT type FROM images WHERE id=? AND owner=?').bind(id,OWNER).first();
  if(!m)return null;
- const needle='%/api/image?id='+id+'%';
- const used=await db().prepare('SELECT 1 FROM products WHERE owner=? AND data LIKE ? UNION ALL SELECT 1 FROM bundles WHERE owner=? AND data LIKE ? LIMIT 1').bind(OWNER,needle,OWNER,needle).first();
+ // instr(), not LIKE: SQLite rejects LIKE patterns longer than 50 bytes and a UUID
+ // reference is longer than that.
+ const needle='/api/image?id='+id;
+ const used=await db().prepare('SELECT 1 AS hit FROM products WHERE owner=? AND instr(data,?)>0 UNION ALL SELECT 1 AS hit FROM bundles WHERE owner=? AND instr(data,?)>0 LIMIT 1').bind(OWNER,needle,OWNER,needle).first();
  return used?String(m.type):null;
 }
 

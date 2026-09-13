@@ -1,6 +1,6 @@
 import {cookies} from 'next/headers';
 import {authenticated,db,HttpError,checkOrigin,failure,hashPassword,newSession,digest,OWNER,SESSION_COOKIE} from '../../server';
-import {categories,legacyCategories,Product,liquidBottleSize} from '../../model';
+import {categories,legacyCategories,Bundle,Product,liquidBottleSize} from '../../model';
 import {storeSettings,validateStore,validateBundle,catalog,bundleList} from '../../store';
 import {listOrders,listCustomers,setOrderStatus} from '../../orders';
 export const dynamic='force-dynamic';
@@ -50,8 +50,8 @@ export async function POST(req:Request){try{
   return response({product:p});
  }
  if(x.action==='delete'){
-  const used=await db().prepare('SELECT data FROM bundles WHERE owner=? AND data LIKE ? LIMIT 1').bind(OWNER,'%"productId":"'+x.id+'"%').first();
-  if(used)throw new HttpError(409,`"${JSON.parse(String((used as any).data)).name}" includes this product. Remove it from that offer first.`);
+  const used=await db().prepare('SELECT data FROM bundles WHERE owner=? AND instr(data,?)>0 LIMIT 1').bind(OWNER,'"productId":"'+x.id+'"').first<{data:string}>();
+  if(used)throw new HttpError(409,`"${(JSON.parse(used.data) as Bundle).name}" includes this product. Remove it from that offer first.`);
   const r=await db().batch([db().prepare('INSERT INTO snapshots(id,owner,product_id,data,action,created_at) SELECT ?,owner,id,data,?,? FROM products WHERE id=? AND owner=? AND revision=?').bind(crypto.randomUUID(),'deleted',Date.now(),x.id,OWNER,x.revision),db().prepare('DELETE FROM products WHERE id=? AND owner=? AND revision=?').bind(x.id,OWNER,x.revision)]);
   if(!r[1].meta.changes)throw new HttpError(409,'Product changed or was already removed. Refresh and try again.');
   return response({ok:true});

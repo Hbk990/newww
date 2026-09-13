@@ -16,8 +16,8 @@ const newRef=()=>'HQ-'+Array.from(crypto.getRandomValues(new Uint8Array(6)),b=>R
 async function readJson<T>(key:string):Promise<T|null>{const o=await bucket().get(key);return o?JSON.parse(await o.text()) as T:null}
 const writeJson=(key:string,value:unknown)=>bucket().put(key,JSON.stringify(value,null,2),{httpMetadata:{contentType:'application/json'}});
 
-export function validateContact(x:any):Contact{
- const field=(key:string,max:number,required=true)=>{const v=x?.[key];if(typeof v!=='string'||v.length>max)throw new HttpError(400,`Invalid ${key}.`);const t=v.trim();if(required&&!t)throw new HttpError(400,`Please fill in your ${key}.`);return t};
+export function validateContact(x:unknown):Contact{
+ const field=(key:string,max:number,required=true)=>{const v=x&&typeof x==='object'?(x as Record<string,unknown>)[key]:undefined;if(typeof v!=='string'||v.length>max)throw new HttpError(400,`Invalid ${key}.`);const t=v.trim();if(required&&!t)throw new HttpError(400,`Please fill in your ${key}.`);return t};
  const name=field('name',80);
  if(name.length<2)throw new HttpError(400,'Please enter your full name.');
  let phone:string;
@@ -33,7 +33,7 @@ export function validateContact(x:any):Contact{
 export function buildOrder(cart:unknown,contact:Contact,store:Store,products:Product[],bundles:Bundle[],deviceId:string,ip:string):Order{
  if(!Array.isArray(cart)||!cart.length||cart.length>40)throw new HttpError(400,'Your cart is empty or too large.');
  const lines:OrderLine[]=(cart as CartLine[]).map(entry=>{
-  const quantity=(entry as any)?.quantity;
+  const quantity=entry?.quantity;
   if(!Number.isInteger(quantity)||quantity<1||quantity>99)throw new HttpError(400,'Choose a quantity between 1 and 99.');
   if(entry?.kind==='bundle'){
    const bundle=bundles.find(b=>b.id===entry.bundleId&&b.active);

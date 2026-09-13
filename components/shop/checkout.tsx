@@ -22,8 +22,8 @@ export function Checkout({store}:{store:Store}){
   e.preventDefault();
   setBusy(true);setError('');
   try{
-   const r=await fetch('/api/order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contact,cart:cart.lines,deviceId:cart.deviceId})});
-   const j:any=await r.json();
+   const r=await fetch('/api/order',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contact,cart:cart.payload,deviceId:cart.deviceId()})});
+   const j=await r.json() as Placed&{error?:string};
    if(!r.ok)throw Error(j.error||'Your order could not be sent.');
    cart.clear();
    setPlaced(j);
