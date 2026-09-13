@@ -30,6 +30,9 @@ export const money=(value:number)=>'$'+value.toFixed(2);
 export const inStock=(p:Pick<Product,'variants'>)=>p.variants.some(v=>v.available);
 export function variantLabel(p:Pick<Product,'bottleSize'>,v:Pick<Variant,'label'|'strength'>){return [v.label,v.strength,p.bottleSize].filter(Boolean).join(' · ')}
 export const variantWord=(category:string)=>category==='Machines'?'Colour':category.startsWith('Coils & accessories')?'Option':category==='Nicotine pouches'?'Flavour & strength':'Flavour';
+// "3 colours", "6 options", "5 flavours" — the picker legend can say "Flavour & strength",
+// but a count needs a word that pluralises.
+export function variantCount(category:string,n:number){const word=category==='Machines'?'colour':category.startsWith('Coils & accessories')||category==='Nicotine pouches'?'option':'flavour';return `${n} ${word}${n===1?'':'s'}`}
 
 // Storefront sections drive the navigation menu, the category landing pages and the
 // admin category shortcuts, so both sides always agree on where a product appears.

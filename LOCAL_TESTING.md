@@ -40,17 +40,37 @@ npm start
 
 It prints a URL, normally `http://127.0.0.1:8787`. Open it.
 
-## 5. Set the shop up
+## 5. (Optional) Fill it with demo data
+
+```sh
+node scripts/seed-demo.mjs
+```
+
+38 products across every shelf, three offers, five orders and four customer
+files — enough to click through the whole shop before you type in your own
+stock. The products have no photos; add those in the editor.
+
+Remove it all again with:
+
+```sh
+node scripts/seed-demo.mjs --clear
+```
+
+It only ever touches the local `.wrangler` database. Never run it against a
+live site.
+
+## 6. Set the shop up
 
 1. Go to **`/admin`** — for example `http://127.0.0.1:8787/admin`.
 2. Create a username and a password (12 characters or more).
    **Copy the recovery code it shows you.** It appears once and is the only way
    back in if you forget the password.
 3. In the left sidebar open **Storefront**, check the WhatsApp number and the
-   delivery fee, switch **"Your shop is live"** on, and save.
+   delivery fee, switch **"Your shop is live"** on, and save. (The demo seed
+   already switches it on for you.)
 4. Add a few products with **Add product**, then look at the shop on `/`.
 
-Until step 3 the shop shows a "coming soon" page — that is expected, not a bug.
+Until the shop is switched live it shows a "coming soon" page — that is expected, not a bug.
 
 ## Working on it
 

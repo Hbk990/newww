@@ -3,7 +3,7 @@ import {notFound} from 'next/navigation';
 import type {Metadata} from 'next';
 import {ChevronRight} from 'lucide-react';
 import {loadShop} from '../../shopdata';
-import {inStock,money,sectionFor,variantWord} from '../../model';
+import {inStock,money,sectionFor,variantCount} from '../../model';
 import {ShopShell,ComingSoon} from '@/components/shop/shell';
 import {AddToCart,ProductGrid,StockBadge} from '@/components/shop/pieces';
 
@@ -48,7 +48,7 @@ export default async function ProductPage({params}:Props){
     <p className="detail-tags">
      <span>{product.category.replace(' / ',' · ')}</span>
      {product.bottleSize&&<span>{product.bottleSize}</span>}
-     <span>{product.variants.length} {variantWord(product.category).toLowerCase()}{product.variants.length===1?'':'s'}</span>
+     <span>{variantCount(product.category,product.variants.length)}</span>
     </p>
     <AddToCart product={product} whatsapp={store.whatsapp}/>
     {product.description&&<div className="detail-description"><h2>About this product</h2><p>{product.description}</p></div>}

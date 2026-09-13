@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import {useMemo,useState} from 'react';
 import {ShoppingBag,Check,Gift,MessageCircle} from 'lucide-react';
-import {Bundle,Product,Variant,inStock,money,priceBundle,variantLabel,variantWord} from '@/app/model';
+import {Bundle,Product,Variant,inStock,money,priceBundle,variantCount,variantLabel,variantWord} from '@/app/model';
 import {Button} from '@/components/ui/button';
 import {useCart} from './cart';
 
@@ -22,7 +22,7 @@ export function ProductCard({product}:{product:Product}){
   <div className="product-card-body">
    {product.brand&&<p className="product-card-brand">{product.brand}</p>}
    <h3><Link href={'/product/'+product.id}>{product.name}</Link></h3>
-   <p className="product-card-meta">{product.variants.length} {variantWord(product.category).toLowerCase()}{product.variants.length===1?'':'s'}{product.bottleSize?' · '+product.bottleSize:''}</p>
+   <p className="product-card-meta">{variantCount(product.category,product.variants.length)}{product.bottleSize?' · '+product.bottleSize:''}</p>
    <div className="product-card-foot">
     <strong>{money(product.price??0)}</strong>
     {single
