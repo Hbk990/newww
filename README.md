@@ -76,8 +76,24 @@ else needs the admin session. Drafts and photos of deleted products stay private
 4. Open **Storefront** in the sidebar, set the WhatsApp number and delivery fee,
    then switch the shop live. Until then visitors see a "coming soon" page.
 
-See `LOCAL_TESTING.md` for the same thing spelled out step by step, and
-`DEPLOY.md` for putting it online.
+See `LOCAL_TESTING.md` for the same thing spelled out step by step.
+
+## Running it on an ordinary server
+
+`server/` runs the built app on plain Node — no Cloudflare account. The build
+needs exactly one thing from the Workers runtime, `env` from `cloudflare:workers`,
+so a resolve hook (`server/hooks.mjs`) points that at a shim holding two bindings:
+a D1-shaped wrapper over `node:sqlite` and an R2-shaped wrapper over a folder.
+The app itself is untouched.
+
+    npm run setup:server    install, build, create the SQLite database
+    npm run serve:demo      demo catalogue (optional)
+    npm run serve           start on port 3000
+
+Data lives in `data/`: `huqa.sqlite` plus `files/` for photos, `files/orders/`
+and `files/customers/`. `HOSTINGER.md` covers a VPS end to end.
+
+`DEPLOY.md` covers the Cloudflare route instead, which needs no Node server.
 
 ## Publishing
 

@@ -13,6 +13,9 @@ import {join} from 'node:path';
 
 const OWNER='huqa', BUCKET='site-creator-r2', STATE='.wrangler/state', CONFIG='dist/server/wrangler.json';
 const clear=process.argv.includes('--clear');
+// --node writes straight to the SQLite file and data folder the Node server uses;
+// without it the demo data goes to the local Cloudflare preview instead.
+const nodeMode=process.argv.includes('--node');
 const work=mkdtempSync(join(tmpdir(),'huqa-seed-'));
 
 let counter=0;
@@ -205,11 +208,30 @@ if(!clear){
   ` WHERE NOT EXISTS(SELECT 1 FROM storefront WHERE owner=${q(OWNER)});`);
 }
 
-const sqlFile=join(work,'seed.sql');
-writeFileSync(sqlFile,statements.join('\n'));
-const wrangler=(args)=>execFileSync(process.execPath,['--import','./scripts/sites-env.mjs','./node_modules/wrangler/bin/wrangler.js',...args],{stdio:['ignore','pipe','pipe']});
+async function writeThroughNode(){
+ const {resolve,join:joinPath}=await import('node:path');
+ const {D1}=await import('../server/d1.mjs');
+ const {R2}=await import('../server/r2.mjs');
+ const dataDir=resolve(process.env.DATA_DIR||'data');
+ const db=new D1(joinPath(dataDir,'huqa.sqlite'));
+ const bucket=new R2(joinPath(dataDir,'files'));
+ try{
+  for(const statement of statements)await db.exec(statement);
+  for(const o of orders){
+   const key=orderKey(o);
+   if(clear)await bucket.delete(key); else await bucket.put(key,JSON.stringify(o,null,2));
+  }
+  for(const c of customers.values()){
+   const key=`customers/${c.phone}.json`;
+   if(clear)await bucket.delete(key); else await bucket.put(key,JSON.stringify(c,null,2));
+  }
+ }finally{db.close()}
+}
 
-try{
+function writeThroughWrangler(){
+ const sqlFile=join(work,'seed.sql');
+ writeFileSync(sqlFile,statements.join('\n'));
+ const wrangler=(args)=>execFileSync(process.execPath,['--import','./scripts/sites-env.mjs','./node_modules/wrangler/bin/wrangler.js',...args],{stdio:['ignore','pipe','pipe']});
  wrangler(['d1','execute','DB','--local','--config',CONFIG,'--persist-to',STATE,'--file',sqlFile]);
  for(const o of orders){
   const key=orderKey(o);
@@ -225,10 +247,16 @@ try{
   writeFileSync(f,JSON.stringify(c,null,2));
   wrangler(['r2','object','put',`${BUCKET}/${key}`,'--file',f,'--content-type','application/json','--local','--persist-to',STATE]);
  }
+}
+
+try{
+ if(nodeMode)await writeThroughNode(); else writeThroughWrangler();
 }catch(e){
  console.error('\nSeeding failed.\n');
  console.error(e.stderr?.toString()||e.message);
- console.error('\nRun `npm run build` first, and make sure you applied the files in drizzle/ (see LOCAL_TESTING.md step 3).');
+ console.error(nodeMode
+  ?'\nRun `npm run serve:migrate` first so the database exists.'
+  :'\nRun `npm run build` first, and make sure the database is set up (see LOCAL_TESTING.md).');
  rmSync(work,{recursive:true,force:true});
  process.exit(1);
 }

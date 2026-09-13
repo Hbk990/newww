@@ -1,0 +1,32 @@
+# Keeps the shop running and restarts it if it ever stops or the server reboots.
+# Install with:
+#   sudo cp deploy/huqa.service /etc/systemd/system/huqa.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now huqa
+[Unit]
+Description=HUQA shop
+After=network.target
+
+[Service]
+Type=simple
+User=huqa
+WorkingDirectory=/home/huqa/shop
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOST=127.0.0.1
+Environment=DATA_DIR=/home/huqa/shop/data
+ExecStart=/usr/bin/npm run serve
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# The shop only ever needs to write its own data folder.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/home/huqa/shop/data
+
+[Install]
+WantedBy=multi-user.target

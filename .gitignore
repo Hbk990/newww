@@ -47,3 +47,6 @@ next-env.d.ts
 
 # typescript incremental build state
 tsconfig.tsbuildinfo
+
+# server data (database, product photos, orders, customer files)
+/data/

@@ -10,6 +10,7 @@ import {spawnSync} from 'node:child_process';
 import {existsSync} from 'node:fs';
 
 const win = process.platform === 'win32';
+const serverMode = process.argv.includes('--node');
 const CONFIG = 'dist/server/wrangler.json';
 const step = m => console.log('\n== ' + m);
 const fail = (...lines) => { console.error('\nSetup stopped.\n' + lines.join('\n') + '\n'); process.exit(1); };
@@ -89,13 +90,28 @@ if (!existsSync(CONFIG)) {
   fail(`The build did not produce ${CONFIG}. Copy the output above and send it over.`);
 }
 
-// 5. Database
-step('Preparing the local database');
-const {migrate} = await import('./migrate.mjs');
-try { migrate({remote: false}); }
-catch (e) { fail(e.message, 'Delete the .wrangler folder and run `npm run setup` again.'); }
+// 5. Database. --node prepares the SQLite file the Node server uses; without it,
+// the Cloudflare preview database for `npm start`.
+step('Preparing the database');
+if (serverMode) {
+  const {migrateSqlite} = await import('../server/migrate.mjs');
+  const {resolve, join} = await import('node:path');
+  try { migrateSqlite(join(resolve(process.env.DATA_DIR || 'data'), 'huqa.sqlite')); }
+  catch (e) { fail(e.message); }
+} else {
+  const {migrate} = await import('./migrate.mjs');
+  try { migrate({remote: false}); }
+  catch (e) { fail(e.message, 'Delete the .wrangler folder and run `npm run setup` again.'); }
+}
 
-console.log(`
+console.log(serverMode ? `
+Ready.
+
+Next:
+
+    npm run serve:demo   fill the shop with demo products (optional)
+    npm run serve        start the server on port 3000
+` : `
 Ready.
 
 Next:

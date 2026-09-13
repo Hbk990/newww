@@ -1,0 +1,18 @@
+# Put your own domain on the first line, then:
+#   sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
+#   sudo systemctl reload caddy
+#
+# Caddy gets the HTTPS certificate and renews it on its own. Nothing else to do.
+your-domain.com, www.your-domain.com {
+	encode zstd gzip
+
+	# Product photos and orders can be a few megabytes; leave room.
+	request_body {
+		max_size 10MB
+	}
+
+	reverse_proxy 127.0.0.1:3000 {
+		header_up X-Forwarded-Host {host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}
