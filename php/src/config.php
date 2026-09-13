@@ -102,10 +102,25 @@ function base_url(): string {
     return ($https ? 'https://' : 'http://') . trim($host);
 }
 
-/** The shop lives at the site root unless it was uploaded into a subfolder. */
+/**
+ * The shop lives at the site root unless it was uploaded into a subfolder.
+ * Worked out from where these files actually sit inside the document root, which
+ * holds for every page. Deriving it from SCRIPT_NAME does not: PHP's built-in
+ * server reports the requested path there, so /shop/liquids would look as though
+ * it lived in a "shop" folder.
+ */
 function base_path(): string {
+    static $base = null;
+    if ($base !== null) return $base;
+
+    $appDir = str_replace('\\', '/', (string)realpath(dirname(__DIR__)));
+    $docRoot = str_replace('\\', '/', (string)realpath((string)($_SERVER['DOCUMENT_ROOT'] ?? '')));
+    if ($appDir !== '' && $docRoot !== '' && str_starts_with($appDir . '/', $docRoot . '/')) {
+        return $base = rtrim(substr($appDir, strlen($docRoot)), '/');
+    }
+
     $script = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/'));
-    return $script === '/' || $script === '.' ? '' : rtrim($script, '/');
+    return $base = ($script === '/' || $script === '.' ? '' : rtrim($script, '/'));
 }
 
 function url(string $path = '/'): string {

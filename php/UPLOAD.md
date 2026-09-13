@@ -14,7 +14,8 @@ change it in hPanel under **Advanced → PHP Configuration**.
 3. Upload `HUQA_Shop_PHP.zip`.
 4. Right-click it → **Extract**.
 5. Make sure `index.php` ends up **directly inside `public_html`**, not inside
-   another folder. If extracting made a folder, open it, select everything, and
+   another folder. (A subfolder works too — `public_html/shop` gives you
+   `your-domain.com/shop` — but the root is simpler.) If extracting made a folder, open it, select everything, and
    move it up one level. `public_html` should look like this:
 
 ```
@@ -115,15 +116,10 @@ wrong folder.
 `data/admin.json` in the File Manager and `/admin` will let you create the
 account again. That is also why nobody else should have File Manager access.
 
-## Testing it on your own computer first (optional)
+## Testing it on your own computer first
 
-If you have PHP installed:
-
-```sh
-php -S localhost:8000
-```
-
-Then open `http://localhost:8000`. Everything works the same.
+See `TESTING.md` — the easiest way on Windows is XAMPP, which you may already
+have.
 
 ## Moving it later
 

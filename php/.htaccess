@@ -5,7 +5,8 @@ DirectoryIndex index.php
 
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteBase /
+  # No RewriteBase on purpose: Apache then works out the folder itself, so this
+  # runs both at the site root and inside a subfolder like htdocs/huqa.
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d
   RewriteRule ^ - [L]

@@ -7,8 +7,9 @@ declare(strict_types=1);
 // the stylesheet and script. Hand real files straight back to it; a real host
 // does the same through .htaccess and never reaches this.
 if (PHP_SAPI === 'cli-server') {
-    $requested = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
-    $candidate = realpath(__DIR__ . '/' . ltrim(rawurldecode($requested), '/'));
+    // SCRIPT_FILENAME is already the resolved path of whatever was asked for,
+    // which is right whether the shop sits at the root or in a subfolder.
+    $candidate = realpath((string)($_SERVER['SCRIPT_FILENAME'] ?? ''));
     $inside = $candidate !== false && str_starts_with($candidate, __DIR__ . DIRECTORY_SEPARATOR);
     $private = $inside && preg_match('#^' . preg_quote(__DIR__ . DIRECTORY_SEPARATOR, '#') . '(src|data)#', $candidate);
     if ($inside && !$private && is_file($candidate) && basename($candidate) !== 'index.php') {
