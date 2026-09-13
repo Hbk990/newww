@@ -95,6 +95,10 @@ and `files/customers/`. `HOSTINGER.md` covers a VPS end to end.
 
 `DEPLOY.md` covers the Cloudflare route instead, which needs no Node server.
 
+`HOSTING.md` answers the recurring question of what can and cannot run this:
+PHP shared hosting cannot, whatever the plan is called, and the reason is not
+fixable in configuration.
+
 ## Publishing
 
 `npm run deploy` builds, migrates the live database and publishes to Cloudflare.
