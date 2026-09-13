@@ -1,0 +1,11 @@
+HUQA internal inventory dashboard — complete source
+
+This project uses React/Vinext, Cloudflare Workers, D1 (SQLite), and R2 image storage. It requires this runtime; it is not a PHP/XAMPP project and cannot be uploaded directly to ordinary Hostinger shared hosting.
+
+Includes product and variant management, category dropdowns, liquid bottle sizes, editable USD prices, logo, admin credentials and recovery, image uploads, and inventory exports.
+
+Install dependencies using the included pnpm lockfile. Consult README.md for runtime and deployment details. Database schema is in db/schema.ts; migrations are in drizzle/.
+
+The hosted database, uploaded product images, admin passwords, sessions, and customer data are not included. The HUQA brand logo is included.
+
+The existing hosting manifest identifies the current Site; do not use that project ID when deploying an independent copy.

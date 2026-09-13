@@ -1,0 +1,6 @@
+import {sqliteTable,text,integer,index} from 'drizzle-orm/sqlite-core';
+export const admins=sqliteTable('admins',{owner:text('owner').primaryKey(),username:text('username').notNull(),hash:text('hash').notNull(),salt:text('salt').notNull(),recoveryHash:text('recovery_hash'),failures:integer('failures').notNull().default(0),lockedUntil:integer('locked_until').notNull().default(0)});
+export const sessions=sqliteTable('sessions',{id:text('id').primaryKey(),owner:text('owner').notNull(),expires:integer('expires').notNull()},t=>[index('idx_sessions_owner').on(t.owner)]);
+export const products=sqliteTable('products',{id:text('id').primaryKey(),owner:text('owner').notNull(),data:text('data').notNull(),revision:integer('revision').notNull(),updatedAt:integer('updated_at').notNull()},t=>[index('idx_products_owner').on(t.owner)]);
+export const snapshots=sqliteTable('snapshots',{id:text('id').primaryKey(),owner:text('owner').notNull(),productId:text('product_id').notNull(),data:text('data').notNull(),action:text('action').notNull(),createdAt:integer('created_at').notNull()},t=>[index('idx_snapshots_owner_created').on(t.owner,t.createdAt)]);
+export const images=sqliteTable('images',{id:text('id').primaryKey(),owner:text('owner').notNull(),type:text('type').notNull()},t=>[index('idx_images_owner').on(t.owner)]);
