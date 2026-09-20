@@ -47,7 +47,7 @@ if (App\Support\Env::get('APP_ENV', 'production') === 'production') {
     if($debug)throw new RuntimeException('APP_DEBUG must be false in production.');
     if(!App\Support\Env::bool('SESSION_SECURE',true))throw new RuntimeException('SESSION_SECURE must be true in production.');
     $appUrl=App\Support\Env::get('APP_URL');$appHost=mb_strtolower((string)parse_url($appUrl,PHP_URL_HOST));if(!filter_var($appUrl,FILTER_VALIDATE_URL)||parse_url($appUrl,PHP_URL_SCHEME)!=='https'||in_array($appHost,['example.com','www.example.com'],true))throw new RuntimeException('APP_URL must be a valid HTTPS URL in production.');
-    if(App\Support\Env::get('MAIL_DRIVER','log')!=='mail')throw new RuntimeException('MAIL_DRIVER must be mail in production.');
+    if(!in_array(App\Support\Env::get('MAIL_DRIVER','log'),['mail','smtp'],true))throw new RuntimeException('MAIL_DRIVER must be mail or smtp in production.');
     if(!filter_var(App\Support\Env::get('MAIL_FROM'),FILTER_VALIDATE_EMAIL))throw new RuntimeException('MAIL_FROM must be a valid address in production.');
     foreach(['DB_DATABASE','DB_USERNAME','DB_PASSWORD']as$key)if(App\Support\Env::get($key)===''||($key==='DB_PASSWORD'&&App\Support\Env::get($key)==='change-me'))throw new RuntimeException($key.' must be configured in production.');
 }

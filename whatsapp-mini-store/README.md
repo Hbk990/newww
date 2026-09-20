@@ -17,7 +17,7 @@ Production-hardened V1 of a multi-tenant, WhatsApp-first mini-store platform. Ph
 4. Run `php bin/migrate.php`. Existing Phase 1 databases are upgraded safely by the new numbered migration.
 5. Run `php bin/create-super-admin.php` once from the command line.
 6. Make only `storage/logs`, `storage/cache/rate-limits`, and `storage/sessions` writable by PHP.
-7. Use `MAIL_DRIVER=mail` with a valid `MAIL_FROM` when Hostinger PHP mail is configured, or replace the small `Mailer` adapter with your SMTP/API provider. The `log` driver writes links to `storage/logs/mail.log` and is development-only.
+7. Prefer `MAIL_DRIVER=smtp` with `SMTP_HOST`/`SMTP_PORT`/`SMTP_ENCRYPTION`/`SMTP_USERNAME`/`SMTP_PASSWORD` set to a real transactional provider (or your host's SMTP relay) — verification and reset links are security-sensitive, and PHP's native `mail()` has weak deliverability with no visibility into failures. `MAIL_DRIVER=mail` remains available for hosts like Hostinger where PHP mail is already configured and SMTP is impractical. The `log` driver writes links to `storage/logs/mail.log` and is development-only.
 8. Set `APP_MARKETING_URL` to the public platform landing page used by the “Powered by” link.
 9. Serve over HTTPS and keep `SESSION_SECURE=true`.
 10. Keep `BILLING_PROVIDER=manual` until a real provider adapter is implemented. Run `php bin/process-subscriptions.php` every five minutes from cron so scheduled changes and lifecycle states are persisted promptly.
