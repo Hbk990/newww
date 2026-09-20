@@ -1,0 +1,1 @@
+<!doctype html><meta name="viewport" content="width=device-width"><title>Session expired</title><link rel="stylesheet" href="/assets/css/app.css"><main class="error-page"><h1>Your form expired</h1><p>Refresh the page and submit it again.</p><a class="button primary" href="/">Continue</a></main>

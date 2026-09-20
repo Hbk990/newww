@@ -1,0 +1,12 @@
+<?php
+namespace App\Controllers;
+use App\Core\{Auth,Request,Response,Session,View};
+use App\Repositories\{AdminPlanRepository,AdminStoreRepository};
+use App\Services\SuperAdminActionService;
+final class SuperAdminStoreController
+{
+    public function index(Request$request):void{Auth::requireSuperAdmin();$filters=['q'=>mb_substr(trim((string)$request->query('q')),0,120),'status'=>strtoupper((string)$request->query('status')),'plan'=>strtoupper((string)$request->query('plan')),'page'=>max(1,(int)$request->query('page',1))];if(!in_array($filters['status'],['','DRAFT','ACTIVE','SUSPENDED'],true))$filters['status']='';$result=(new AdminStoreRepository)->search($filters);if($filters['page']>$result['pages']&&$result['total']>0)Response::redirect('/sa/stores');View::render('super_admin/stores/index',['title'=>'Stores','result'=>$result,'filters'=>$filters,'plans'=>(new AdminPlanRepository)->all()],'admin');}
+    public function show(Request$request):void{Auth::requireSuperAdmin();$id=(int)$request->route('id');$repo=new AdminStoreRepository;$store=$repo->find($id);if(!$store)Response::abort(404);View::render('super_admin/stores/show',['title'=>'Store details','store'=>$store,'metrics'=>$repo->metrics($id),'members'=>$repo->members($id),'orders'=>$repo->recentOrders($id),'events'=>$repo->subscriptionEvents($id),'plans'=>(new AdminPlanRepository)->all()],'admin');}
+    public function status(Request$request):void{$admin=Auth::requireSuperAdmin();$id=(int)$request->route('id');$action=strtoupper((string)$request->input('action'));if(!in_array($action,['SUSPEND','REACTIVATE'],true))Response::abort(400);try{(new SuperAdminActionService)->setStoreSuspension((int)$admin['id'],$id,$action==='SUSPEND');}catch(\DomainException$e){Session::flash('error',$e->getMessage());Response::redirect('/sa/stores/'.$id,303);}Session::flash('success',$action==='SUSPEND'?'Store suspended.':'Store reactivated to its previous publication state.');Response::redirect('/sa/stores/'.$id,303);}
+    public function plan(Request$request):void{$admin=Auth::requireSuperAdmin();$id=(int)$request->route('id');$code=strtoupper(trim((string)$request->input('plan_code')));$days=max(1,min(3650,(int)$request->input('period_days',30)));try{(new SuperAdminActionService)->changeStorePlan((int)$admin['id'],$id,$code,$days);}catch(\DomainException$e){Session::flash('error',$e->getMessage());Response::redirect('/sa/stores/'.$id,303);}Session::flash('success','Store subscription updated with an audit trail.');Response::redirect('/sa/stores/'.$id,303);}
+}

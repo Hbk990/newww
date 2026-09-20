@@ -1,0 +1,7 @@
+Options -Indexes
+Options -ExecCGI
+<FilesMatch "\.(php[0-9]?|phtml|phar|cgi|pl|py|sh|htaccess)$">
+  Require all denied
+</FilesMatch>
+RemoveHandler .php .phtml .phar
+RemoveType .php .phtml .phar

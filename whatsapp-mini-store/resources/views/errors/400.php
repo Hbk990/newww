@@ -1,0 +1,1 @@
+<!doctype html><meta name="viewport" content="width=device-width"><title>Invalid request</title><link rel="stylesheet" href="/assets/css/app.css"><main class="error-page"><h1>Invalid or expired link</h1><p>This request can no longer be completed.</p><a class="button primary" href="/login">Return to sign in</a></main>

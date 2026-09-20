@@ -1,0 +1,14 @@
+{
+  "name": "ministore/platform",
+  "description": "Multi-tenant WhatsApp mini-store SaaS",
+  "type": "project",
+  "require": {
+    "php": ">=8.1",
+    "ext-pdo": "*",
+    "ext-mbstring": "*",
+    "ext-fileinfo": "*"
+  },
+  "autoload": {
+    "psr-4": {"App\\": "app/"}
+  }
+}

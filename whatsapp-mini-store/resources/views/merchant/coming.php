@@ -1,0 +1,2 @@
+<?php $details=['settings'=>['Later phase','Store configuration will expand here without duplicating onboarding.']];$detail=$details[$section]; ?>
+<section class="page-head"><div><p class="eyebrow"><?= e($detail[0]) ?></p><h1><?= e(ucfirst($section)) ?></h1></div></section><section class="empty-state panel"><div class="empty-icon">…</div><h2>This area is intentionally not simulated</h2><p><?= e($detail[1]) ?></p><a class="button secondary" href="/dashboard">Return to dashboard</a></section>
