@@ -19,9 +19,12 @@ final class WhatsAppService
             $lines[] = $item['quantity'] . ' × ' . $label . ' — ' . $order['currency_code'] . ' ' . $item['line_total'];
         }
         $lines[] = '';
-        if (!empty($order['discount_code_snapshot']) && (float) ($order['discount_amount'] ?? 0) > 0) {
+        $hasDiscountCode = !empty($order['discount_code_snapshot']) && (float) ($order['discount_amount'] ?? 0) > 0;
+        $hasOfferDiscount = !empty($order['offer_snapshot']) && (float) ($order['offer_discount_amount'] ?? 0) > 0;
+        if ($hasDiscountCode || $hasOfferDiscount) {
             $lines[] = 'Subtotal: ' . $order['currency_code'] . ' ' . $order['subtotal'];
-            $lines[] = 'Discount (' . $order['discount_code_snapshot'] . '): -' . $order['currency_code'] . ' ' . $order['discount_amount'];
+            if ($hasOfferDiscount) $lines[] = 'Offer (' . $order['offer_snapshot'] . '): -' . $order['currency_code'] . ' ' . $order['offer_discount_amount'];
+            if ($hasDiscountCode) $lines[] = 'Discount (' . $order['discount_code_snapshot'] . '): -' . $order['currency_code'] . ' ' . $order['discount_amount'];
         }
         $lines[] = 'Total: ' . $order['currency_code'] . ' ' . $order['total'];
         if (!empty($order['free_delivery'])) $lines[] = 'Free delivery code applied — please honor it.';

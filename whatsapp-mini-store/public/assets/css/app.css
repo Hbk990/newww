@@ -60,3 +60,5 @@
 @media(max-width:600px){.chip-composer .icon-button{width:auto;padding:0 16px}}
 .cancel-order-form{display:grid;gap:14px;padding-top:14px;margin-top:14px;border-top:1px solid var(--line)}.cancel-order-form .button{margin-top:0}
 .order-total.muted-row{padding-top:10px;font-size:.85rem;color:var(--muted)}.order-total.muted-row+.order-total.muted-row{padding-top:6px}.order-total.muted-row+.order-total:not(.muted-row){padding-top:16px}
+.offers-page-toggle{display:grid;gap:8px;margin-bottom:22px}.offers-page-toggle code{background:#f4f6f8;padding:2px 6px;border-radius:5px;font-size:.85em}
+.bundle-items{grid-column:1/-1;display:grid;gap:12px;padding-top:6px}.bundle-row{display:grid;grid-template-columns:1fr 100px auto;gap:12px;align-items:center;padding:12px 14px;background:#f8f9fb;border:1px solid var(--line);border-radius:10px}

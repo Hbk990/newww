@@ -1,5 +1,5 @@
 <?php
-use App\Controllers\{AnalyticsController,AuthController,CategoryController,CheckoutController,ComingSoonController,CustomerController,DiscountCodeController,ImportController,MerchantController,OnboardingController,OrderController,ProductController,SeoController,StoreDesignController,StorefrontAdminController,StorefrontController,StoreWorkspaceController,SubscriptionController,SuperAdminController,SuperAdminMerchantController,SuperAdminPlanController,SuperAdminStoreController,SuperAdminSystemController};
+use App\Controllers\{AnalyticsController,AuthController,CategoryController,CheckoutController,ComingSoonController,CustomerController,DiscountCodeController,ImportController,MerchantController,OfferController,OnboardingController,OrderController,ProductController,SeoController,StoreDesignController,StorefrontAdminController,StorefrontController,StoreWorkspaceController,SubscriptionController,SuperAdminController,SuperAdminMerchantController,SuperAdminPlanController,SuperAdminStoreController,SuperAdminSystemController};
 use App\Core\{Auth, Request, Response};
 
 $router->get('/', static function (Request $request): void {
@@ -53,6 +53,13 @@ $router->post('/merchant/discounts', [DiscountCodeController::class, 'store']);
 $router->get('/merchant/discounts/{id}/edit', [DiscountCodeController::class, 'edit']);
 $router->post('/merchant/discounts/{id}', [DiscountCodeController::class, 'update']);
 $router->post('/merchant/discounts/{id}/toggle', [DiscountCodeController::class, 'toggle']);
+$router->get('/merchant/offers', [OfferController::class, 'index']);
+$router->get('/merchant/offers/create', [OfferController::class, 'create']);
+$router->post('/merchant/offers', [OfferController::class, 'store']);
+$router->get('/merchant/offers/{id}/edit', [OfferController::class, 'edit']);
+$router->post('/merchant/offers/{id}', [OfferController::class, 'update']);
+$router->post('/merchant/offers/{id}/toggle', [OfferController::class, 'toggle']);
+$router->post('/merchant/offers-page-visibility', [OfferController::class, 'togglePage']);
 $router->get('/merchant/analytics', [AnalyticsController::class, 'index']);
 $router->get('/merchant/seo', [SeoController::class, 'form']);
 $router->post('/merchant/seo', [SeoController::class, 'update']);
@@ -87,6 +94,7 @@ $router->get('/sitemap.xml', [SeoController::class, 'sitemapIndex']);
 $router->get('/{storeSlug}/sitemap.xml', [SeoController::class, 'storeSitemap']);
 $router->get('/{storeSlug}/product/{productSlug}', [StorefrontController::class, 'product']);
 $router->get('/{storeSlug}/cart', [StorefrontController::class, 'cart']);
+$router->get('/{storeSlug}/offers', [StorefrontController::class, 'offers']);
 $router->get('/{storeSlug}/checkout', [CheckoutController::class, 'form']);
 $router->post('/{storeSlug}/checkout', [CheckoutController::class, 'create']);
 $router->get('/{storeSlug}/order/{reference}/continue', [CheckoutController::class, 'continue']);

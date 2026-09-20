@@ -31,11 +31,13 @@ final class OrderService
                 $items[] = ['product_id'=>(int)$product['id'],'category_id'=>$product['category_id']!==null?(int)$product['category_id']:null,'variant_id'=>$variant?(int)$variant['id']:null,'product_name'=>$product['name'],'product_slug'=>$product['slug'],'sku_snapshot'=>$variant['sku']??$product['sku'],'variant_label'=>$variant['label']??null,'unit_price'=>$unit,'quantity'=>$line['quantity'],'line_total'=>Money::fromMinor($lineMinor)];
             }
             $subtotal = Money::fromMinor($totalMinor); $customerId=(new CustomerRepository)->upsert($pdo,$storeId,$customer['name'],$customer['phone']);
+            $offer = (new OfferService)->resolve($pdo,$storeId,$items,$subtotal);
             $discount = (new DiscountService)->resolve($pdo,$storeId,$discountCode,$items,$subtotal,$customerId);
-            $discountAmount = $discount['discount_amount'] ?? '0.00'; $finalTotal = Money::fromMinor($totalMinor - Money::minor($discountAmount));
+            $discountAmount = $discount['discount_amount'] ?? '0.00'; $offerAmount = $offer['discount_amount'];
+            $combinedMinor = min(Money::minor($discountAmount)+Money::minor($offerAmount),$totalMinor); $finalTotal = Money::fromMinor($totalMinor - $combinedMinor);
             $reference = $this->reference($pdo);
-            $insert = $pdo->prepare("INSERT INTO orders (store_id,customer_id,reference,idempotency_key_hash,customer_name,customer_phone,delivery_address,notes,currency_code,subtotal,total,discount_code_id,discount_amount,discount_code_snapshot,free_delivery,status,placed_at,status_updated_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'NEW',UTC_TIMESTAMP(),UTC_TIMESTAMP(),UTC_TIMESTAMP(),UTC_TIMESTAMP())");
-            $insert->execute([$storeId,$customerId,$reference,$hash,$customer['name'],$customer['phone'],$customer['address'],$customer['notes'],$store['currency_code'],$subtotal,$finalTotal,$discount?(int)$discount['code']['id']:null,$discountAmount,$discount?$discount['code']['code']:null,$discount&&$discount['free_delivery']?1:0]); $orderId = (int)$pdo->lastInsertId();
+            $insert = $pdo->prepare("INSERT INTO orders (store_id,customer_id,reference,idempotency_key_hash,customer_name,customer_phone,delivery_address,notes,currency_code,subtotal,total,discount_code_id,discount_amount,discount_code_snapshot,free_delivery,offer_discount_amount,offer_snapshot,status,placed_at,status_updated_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'NEW',UTC_TIMESTAMP(),UTC_TIMESTAMP(),UTC_TIMESTAMP(),UTC_TIMESTAMP())");
+            $insert->execute([$storeId,$customerId,$reference,$hash,$customer['name'],$customer['phone'],$customer['address'],$customer['notes'],$store['currency_code'],$subtotal,$finalTotal,$discount?(int)$discount['code']['id']:null,$discountAmount,$discount?$discount['code']['code']:null,$discount&&$discount['free_delivery']?1:0,$offerAmount,$offer['snapshot']]); $orderId = (int)$pdo->lastInsertId();
             $itemInsert = $pdo->prepare('INSERT INTO order_items (store_id,order_id,product_id,variant_id,product_name,product_slug,sku_snapshot,variant_label,unit_price,quantity,line_total,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,UTC_TIMESTAMP())');
             $decrement = $pdo->prepare('UPDATE product_variants SET stock_quantity=stock_quantity-?,updated_at=UTC_TIMESTAMP() WHERE id=? AND store_id=? AND stock_quantity IS NOT NULL AND stock_quantity>=?');
             foreach ($items as $item) {
@@ -43,6 +45,7 @@ final class OrderService
                 if ($item['variant_id'] !== null && $this->hasFiniteStock($pdo,$storeId,$item['variant_id'])) { $decrement->execute([$item['quantity'],$item['variant_id'],$storeId,$item['quantity']]); if ($decrement->rowCount() !== 1) throw new \DomainException('Stock changed while ordering. Please review your cart.'); }
             }
             if ($discount) (new \App\Repositories\DiscountCodeRepository)->recordRedemption($pdo,$storeId,(int)$discount['code']['id'],$orderId,$customerId,$discountAmount);
+            if ($offer['applied']) { $offerRepo=new \App\Repositories\OfferRepository; foreach ($offer['applied'] as $a) $offerRepo->recordRedemption($pdo,$storeId,$a['offer_id'],$orderId,$a['discount_amount']); }
             $pdo->prepare("INSERT INTO order_status_history (store_id,order_id,status,changed_by_user_id,created_at) VALUES (?,?,'NEW',NULL,UTC_TIMESTAMP())")->execute([$storeId,$orderId]);
             $pdo->commit();try{(new AnalyticsEventService)->record($storeId,'order_created');}catch(\Throwable){}return ['id'=>$orderId,'reference'=>$reference];
         } catch (\PDOException $e) {

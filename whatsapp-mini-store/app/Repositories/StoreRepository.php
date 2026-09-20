@@ -76,6 +76,11 @@ final class StoreRepository
         $s=Database::connection()->prepare("SELECT su.store_id FROM store_users su WHERE su.user_id=? AND su.role='MERCHANT_OWNER' AND su.status='ACTIVE' ORDER BY su.store_id");$s->execute([$userId]);$ids=array_map('intval',$s->fetchAll(\PDO::FETCH_COLUMN));$free=(new \App\Repositories\SubscriptionRepository)->freePlan();$limit=(int)($free['limits']['stores']??1);foreach($ids as$id){$candidate=(int)((new PlanAccessService)->context($id,null,false,false)['limits']['stores']??1);if($candidate<0)return true;$limit=max($limit,$candidate);}return count($ids)<$limit;
     }
 
+    public function updateOffersPageEnabled(int $storeId, bool $enabled): void
+    {
+        Database::connection()->prepare('UPDATE stores SET offers_page_enabled=?,updated_at=UTC_TIMESTAMP() WHERE id=?')->execute([$enabled ? 1 : 0, $storeId]);
+    }
+
     public function setStatusForOwner(int$userId,int$storeId,string$status):bool
     {
         if(!in_array($status,['DRAFT','ACTIVE'],true))return false;$s=Database::connection()->prepare("UPDATE stores s JOIN store_users su ON su.store_id=s.id SET s.status=?,s.updated_at=UTC_TIMESTAMP() WHERE s.id=? AND su.user_id=? AND su.role='MERCHANT_OWNER' AND su.status='ACTIVE' AND s.status<>'SUSPENDED'");$s->execute([$status,$storeId,$userId]);$check=Database::connection()->prepare('SELECT status FROM stores WHERE id=?');$check->execute([$storeId]);return$check->fetchColumn()===$status;

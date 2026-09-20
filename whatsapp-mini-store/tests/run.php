@@ -285,5 +285,37 @@ $test('WhatsApp handoff message reflects applied discounts without trusting the 
     $wa=(string)file_get_contents(BASE_PATH.'/app/Services/WhatsAppService.php');$assert(str_contains($wa,'discount_code_snapshot')&&str_contains($wa,'discount_amount')&&str_contains($wa,'free_delivery'));
 });
 
+$test('Phase 14 migration adds offers, bundle items, redemptions, and an opt-in offers page', function () use ($assert): void {
+    $sql=(string)file_get_contents(BASE_PATH.'/database/migrations/013_phase14_offers.sql');
+    foreach(['offers_page_enabled','CREATE TABLE IF NOT EXISTS offers','CREATE TABLE IF NOT EXISTS offer_bundle_items','CREATE TABLE IF NOT EXISTS offer_redemptions','BUY_X_GET_Y','CATEGORY_BUY_N_GET_M','FIXED_BUNDLE','offer_discount_amount','offer_snapshot']as$needle)$assert(str_contains($sql,$needle),"Missing {$needle}");
+    $start=strpos($sql,'CREATE TABLE IF NOT EXISTS offer_redemptions');$block=substr($sql,$start,strpos($sql,');',$start)-$start);
+    $assert(!str_contains($block,'UNIQUE KEY'),'offer_redemptions must allow multiple offers per order, so order_id cannot be uniquely constrained');
+});
+$test('offer resolution covers buy-X-get-Y, category deals, and fixed bundles with no code required', function () use ($assert): void {
+    $service=(string)file_get_contents(BASE_PATH.'/app/Services/OfferService.php');
+    foreach(['FIXED_BUNDLE','BUY_X_GET_Y','CATEGORY_BUY_N_GET_M','applyFixedBundle','applyGroupDeal']as$needle)$assert(str_contains($service,$needle),"Missing {$needle}");
+});
+$test('when more items qualify than needed the cheapest units are always the discounted ones', function () use ($assert): void {
+    $service=(string)file_get_contents(BASE_PATH.'/app/Services/OfferService.php');
+    $assert(str_contains($service,"usort(\$keys, static fn(int \$a, int \$b): int => \$pool[\$a]['unit_minor'] <=> \$pool[\$b]['unit_minor'])"));
+});
+$test('offers apply automatically inside the order transaction alongside discount codes', function () use ($assert): void {
+    $orderService=(string)file_get_contents(BASE_PATH.'/app/Services/OrderService.php');
+    $assert(str_contains($orderService,'OfferService')&&str_contains($orderService,'OfferRepository')&&str_contains($orderService,'recordRedemption'));
+});
+$test('offer management is tenant scoped, validates bundle items, and can toggle the public offers page', function () use ($assert): void {
+    $controller=(string)file_get_contents(BASE_PATH.'/app/Controllers/OfferController.php');
+    $assert(str_contains($controller,'store_id')&&str_contains($controller,'togglePage')&&str_contains($controller,"count(\$bundleItems)<2"));
+    $routes=(string)file_get_contents(BASE_PATH.'/routes/web.php');$assert(str_contains($routes,'/merchant/offers')&&str_contains($routes,'/{storeSlug}/offers'));
+});
+$test('the storefront offers page is hidden unless the merchant opts in', function () use ($assert): void {
+    $controller=(string)file_get_contents(BASE_PATH.'/app/Controllers/StorefrontController.php');
+    $assert(str_contains($controller,"if(!\$store['offers_page_enabled'])Response::abort(404)"));
+});
+$test('WhatsApp handoff and merchant order view show the offer discount breakdown', function () use ($assert): void {
+    $wa=(string)file_get_contents(BASE_PATH.'/app/Services/WhatsAppService.php');$assert(str_contains($wa,'offer_snapshot')&&str_contains($wa,'offer_discount_amount'));
+    $view=(string)file_get_contents(BASE_PATH.'/resources/views/merchant/orders/show.php');$assert(str_contains($view,'offer_discount_amount')&&str_contains($view,'offer_snapshot'));
+});
+
 echo "\n{$passed} passed, {$failed} failed.\n";
 exit($failed === 0 ? 0 : 1);
