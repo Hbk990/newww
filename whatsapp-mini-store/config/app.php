@@ -29,7 +29,6 @@ return [
     ],
     'themes' => array_keys($themeCatalog),
     'theme_catalog' => $themeCatalog,
-    'onboarding_themes' => ['modern', 'luxury', 'playful'],
     'fonts' => ['system' => 'Clean Sans', 'editorial' => 'Editorial Serif', 'rounded' => 'Friendly Rounded'],
     'currencies' => ['USD', 'LBP', 'EUR', 'GBP'],
     'countries' => ['LB' => 'Lebanon', 'US' => 'United States', 'GB' => 'United Kingdom', 'FR' => 'France', 'AE' => 'United Arab Emirates'],

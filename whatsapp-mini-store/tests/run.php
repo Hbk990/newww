@@ -70,7 +70,7 @@ $test('clean storefront routes are registered after protected exact routes', fun
     $routes=(string)file_get_contents(BASE_PATH.'/routes/web.php');$assert(str_contains($routes,"'/{storeSlug}/product/{productSlug}'")&&str_contains($routes,"'/{storeSlug}/cart'"));$assert(strpos($routes,"'/sa'")<strpos($routes,"'/{storeSlug}'"));
 });
 $test('browser cart is namespaced per store and marked non-authoritative', function () use ($assert): void {
-    $js=(string)file_get_contents(BASE_PATH.'/public/assets/js/storefront.js');$view=(string)file_get_contents(BASE_PATH.'/resources/views/storefront/cart.php');$assert(str_contains($js,'ministore:cart:${storeSlug}:v1'));$assert(str_contains($view,'server will validate products'));
+    $js=(string)file_get_contents(BASE_PATH.'/public/assets/js/storefront.js');$view=(string)file_get_contents(BASE_PATH.'/resources/views/storefront/cart.php');$assert(str_contains($js,'ministore:cart:${storeSlug}:v1'));$assert(str_contains($view,'server validates products'));
 });
 $test('new reserved slugs protect storefront and merchant routes', function () use ($assert): void {
     foreach(['storefront','merchant','sa']as$slug)$assert(in_array($slug,config('app')['reserved_slugs'],true),"Missing {$slug}");
@@ -120,10 +120,13 @@ $test('slug changes reserve old addresses and public routes redirect permanently
     $stores=(string)file_get_contents(BASE_PATH.'/app/Repositories/StoreRepository.php');$public=(string)file_get_contents(BASE_PATH.'/app/Controllers/StorefrontController.php');$assert(str_contains($stores,'store_slug_redirects')&&str_contains($stores,'FOR UPDATE'));$assert(str_contains($public,'redirectTarget')&&str_contains($public,',301'));
 });
 $test('public customization is constrained to approved themes fonts and safe colors', function () use ($assert): void {
-    $app=config('app');$expected=['modern','luxury','playful','minimal','boutique','bold','editorial','natural','tech','streetwear','beauty','artisan','classic','vibrant','monochrome'];$assert($app['themes']===$expected);$assert(array_keys($app['theme_catalog'])===$expected);$assert($app['onboarding_themes']===['modern','luxury','playful']);$assert(array_keys($app['fonts'])===['system','editorial','rounded']);$assert(App\Support\Color::safeHex('#12abEF')==='#12ABEF');$assert(App\Support\Color::safeHex('red')==='#2F5BFF');$assert(in_array(App\Support\Color::contrastText('#FFFFFF'),['#FFFFFF','#111111'],true));
+    $app=config('app');$expected=['modern','luxury','playful','minimal','boutique','bold','editorial','natural','tech','streetwear','beauty','artisan','classic','vibrant','monochrome'];$assert($app['themes']===$expected);$assert(array_keys($app['theme_catalog'])===$expected);$assert(array_keys($app['fonts'])===['system','editorial','rounded']);$assert(App\Support\Color::safeHex('#12abEF')==='#12ABEF');$assert(App\Support\Color::safeHex('red')==='#2F5BFF');$assert(in_array(App\Support\Color::contrastText('#FFFFFF'),['#FFFFFF','#111111'],true));
 });
 $test('all controlled templates have selector previews and storefront rules', function () use ($assert): void {
     $app=config('app');$design=(string)file_get_contents(BASE_PATH.'/resources/views/merchant/design.php');$adminCss=(string)file_get_contents(BASE_PATH.'/public/assets/css/app.css');$storeCss=(string)file_get_contents(BASE_PATH.'/public/assets/css/storefront.css');foreach($app['themes']as$theme){$assert(isset($app['theme_catalog'][$theme]['name'],$app['theme_catalog'][$theme]['description']),"Missing metadata for {$theme}");$assert($theme==='modern'||str_contains($adminCss,".theme-{$theme}"),"Missing preview for {$theme}");$assert(in_array($theme,['modern','luxury','playful'],true)||str_contains($storeCss,"store-theme-{$theme}"),"Missing storefront rules for {$theme}");}$assert(str_contains($design,"\$app['theme_catalog']"));
+});
+$test('onboarding offers the full 15-template catalog, not a narrowed subset', function () use ($assert): void {
+    $app=config('app');$onboarding=(string)file_get_contents(BASE_PATH.'/resources/views/onboarding/create.php');$assert(str_contains($onboarding,"\$app['theme_catalog']"),'Onboarding must render every template in theme_catalog');$assert(!str_contains($onboarding,'onboarding_themes'),'Onboarding must not read a narrowed onboarding_themes list');$assert(!array_key_exists('onboarding_themes',$app),'onboarding_themes config should be removed once onboarding offers all templates');
 });
 $test('live preview removes previously selected dynamic theme classes', function () use ($assert): void {
     $js=(string)file_get_contents(BASE_PATH.'/public/assets/js/app.js');$assert(str_contains($js,"startsWith('theme-')")&&str_contains($js,'data-preview-theme'));
