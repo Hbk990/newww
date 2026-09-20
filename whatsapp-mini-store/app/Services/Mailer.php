@@ -7,11 +7,16 @@ final class Mailer
 {
     public function sendLink(string $email, string $subject, string $url): void
     {
+        $body = "Use the secure link below. It will expire automatically.\n\n{$url}\n\nIf you did not request this, ignore this email.";
+        $this->send($email, $subject, $body, $url);
+    }
+
+    public function send(string $email, string $subject, string $body, ?string $logUrl = null): void
+    {
         $driver = Env::get('MAIL_DRIVER', 'log');
         $email = str_replace(["\r", "\n"], '', $email);
-        $body = "Use the secure link below. It will expire automatically.\n\n{$url}\n\nIf you did not request this, ignore this email.";
         if ($driver === 'log') {
-            $line = sprintf("[%s] To: %s | %s | %s\n", gmdate('c'), $email, $subject, $url);
+            $line = sprintf("[%s] To: %s | %s | %s\n", gmdate('c'), $email, $subject, $logUrl ?? $body);
             error_log($line, 3, BASE_PATH . '/storage/logs/mail.log');
             return;
         }

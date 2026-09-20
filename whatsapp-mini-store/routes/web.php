@@ -22,6 +22,7 @@ $router->post('/email/resend', [AuthController::class, 'resendVerification']);
 $router->get('/onboarding', [OnboardingController::class, 'form']);
 $router->post('/onboarding', [OnboardingController::class, 'create']);
 $router->get('/dashboard', [MerchantController::class, 'dashboard']);
+$router->post('/merchant/low-stock-threshold', [MerchantController::class, 'updateLowStockThreshold']);
 $router->post('/merchant/stores/{id}/switch', [StoreWorkspaceController::class, 'switch']);
 $router->get('/categories', [CategoryController::class, 'index']);
 $router->get('/categories/create', [CategoryController::class, 'create']);

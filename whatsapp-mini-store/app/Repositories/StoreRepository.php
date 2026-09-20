@@ -6,6 +6,13 @@ use App\Services\PlanAccessService;
 
 final class StoreRepository
 {
+    public function find(int $id): ?array
+    {
+        $s = Database::connection()->prepare('SELECT * FROM stores WHERE id=? LIMIT 1');
+        $s->execute([$id]);
+        return $s->fetch() ?: null;
+    }
+
     public function slugExists(string $slug): bool
     {
         $s = Database::connection()->prepare('SELECT 1 FROM stores WHERE slug=? UNION SELECT 1 FROM store_slug_redirects WHERE old_slug=? LIMIT 1');
@@ -79,6 +86,20 @@ final class StoreRepository
     public function updateOffersPageEnabled(int $storeId, bool $enabled): void
     {
         Database::connection()->prepare('UPDATE stores SET offers_page_enabled=?,updated_at=UTC_TIMESTAMP() WHERE id=?')->execute([$enabled ? 1 : 0, $storeId]);
+    }
+
+    public function updateLowStockThreshold(int $storeId, int $threshold): void
+    {
+        Database::connection()->prepare('UPDATE stores SET low_stock_threshold=?,updated_at=UTC_TIMESTAMP() WHERE id=?')->execute([$threshold, $storeId]);
+    }
+
+    /** The store owner's email, used as a low-stock alert fallback when no public contact email is set. */
+    public function ownerEmail(int $storeId): ?string
+    {
+        $s = Database::connection()->prepare("SELECT u.email FROM users u JOIN store_users su ON su.user_id=u.id WHERE su.store_id=? AND su.role='MERCHANT_OWNER' AND su.status='ACTIVE' ORDER BY su.id LIMIT 1");
+        $s->execute([$storeId]);
+        $email = $s->fetchColumn();
+        return is_string($email) ? $email : null;
     }
 
     public function setStatusForOwner(int$userId,int$storeId,string$status):bool

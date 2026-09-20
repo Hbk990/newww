@@ -40,14 +40,15 @@ final class OrderService
             $insert->execute([$storeId,$customerId,$reference,$hash,$customer['name'],$customer['phone'],$customer['address'],$customer['notes'],$store['currency_code'],$subtotal,$finalTotal,$discount?(int)$discount['code']['id']:null,$discountAmount,$discount?$discount['code']['code']:null,$discount&&$discount['free_delivery']?1:0,$offerAmount,$offer['snapshot']]); $orderId = (int)$pdo->lastInsertId();
             $itemInsert = $pdo->prepare('INSERT INTO order_items (store_id,order_id,product_id,variant_id,product_name,product_slug,sku_snapshot,variant_label,unit_price,quantity,line_total,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,UTC_TIMESTAMP())');
             $decrement = $pdo->prepare('UPDATE product_variants SET stock_quantity=stock_quantity-?,updated_at=UTC_TIMESTAMP() WHERE id=? AND store_id=? AND stock_quantity IS NOT NULL AND stock_quantity>=?');
+            $stockTouched = false;
             foreach ($items as $item) {
                 $itemInsert->execute([$storeId,$orderId,$item['product_id'],$item['variant_id'],$item['product_name'],$item['product_slug'],$item['sku_snapshot'],$item['variant_label'],$item['unit_price'],$item['quantity'],$item['line_total']]);
-                if ($item['variant_id'] !== null && $this->hasFiniteStock($pdo,$storeId,$item['variant_id'])) { $decrement->execute([$item['quantity'],$item['variant_id'],$storeId,$item['quantity']]); if ($decrement->rowCount() !== 1) throw new \DomainException('Stock changed while ordering. Please review your cart.'); }
+                if ($item['variant_id'] !== null && $this->hasFiniteStock($pdo,$storeId,$item['variant_id'])) { $decrement->execute([$item['quantity'],$item['variant_id'],$storeId,$item['quantity']]); if ($decrement->rowCount() !== 1) throw new \DomainException('Stock changed while ordering. Please review your cart.'); $stockTouched = true; }
             }
             if ($discount) (new \App\Repositories\DiscountCodeRepository)->recordRedemption($pdo,$storeId,(int)$discount['code']['id'],$orderId,$customerId,$discountAmount);
             if ($offer['applied']) { $offerRepo=new \App\Repositories\OfferRepository; foreach ($offer['applied'] as $a) $offerRepo->recordRedemption($pdo,$storeId,$a['offer_id'],$orderId,$a['discount_amount']); }
             $pdo->prepare("INSERT INTO order_status_history (store_id,order_id,status,changed_by_user_id,created_at) VALUES (?,?,'NEW',NULL,UTC_TIMESTAMP())")->execute([$storeId,$orderId]);
-            $pdo->commit();try{(new AnalyticsEventService)->record($storeId,'order_created');}catch(\Throwable){}return ['id'=>$orderId,'reference'=>$reference];
+            $pdo->commit();try{(new AnalyticsEventService)->record($storeId,'order_created');}catch(\Throwable){}if($stockTouched)try{(new LowStockAlertService)->maybeNotify($storeId);}catch(\Throwable){}return ['id'=>$orderId,'reference'=>$reference];
         } catch (\PDOException $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             if ((string)$e->getCode()==='23000' && ($existing=$repo->findByIdempotency($storeId,$hash))) return $existing;

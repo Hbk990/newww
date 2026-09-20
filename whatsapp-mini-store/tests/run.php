@@ -317,5 +317,26 @@ $test('WhatsApp handoff and merchant order view show the offer discount breakdow
     $view=(string)file_get_contents(BASE_PATH.'/resources/views/merchant/orders/show.php');$assert(str_contains($view,'offer_discount_amount')&&str_contains($view,'offer_snapshot'));
 });
 
+$test('Phase 15 migration adds a merchant-configurable low stock threshold', function () use ($assert): void {
+    $sql=(string)file_get_contents(BASE_PATH.'/database/migrations/014_phase15_low_stock_alerts.sql');
+    $assert(str_contains($sql,'low_stock_threshold')&&str_contains($sql,"DEFAULT 5"));
+});
+$test('low stock lookup only counts finite, tracked stock at or below threshold', function () use ($assert): void {
+    $repo=(string)file_get_contents(BASE_PATH.'/app/Repositories/ProductRepository.php');
+    $assert(str_contains($repo,'function lowStock')&&str_contains($repo,'stock_quantity IS NOT NULL')&&str_contains($repo,'stock_quantity<=?'));
+});
+$test('low stock alerts are a throttled digest, never able to break order placement', function () use ($assert): void {
+    $service=(string)file_get_contents(BASE_PATH.'/app/Services/LowStockAlertService.php');
+    $assert(str_contains($service,"tooMany('low_stock_alert'")&&str_contains($service,'86400'));
+    $orderService=(string)file_get_contents(BASE_PATH.'/app/Services/OrderService.php');
+    $assert(str_contains($orderService,'if($stockTouched)try{(new LowStockAlertService)->maybeNotify($storeId);}catch(\Throwable){}'));
+});
+$test('the low stock threshold is merchant-editable and scoped to the tenant store', function () use ($assert): void {
+    $controller=(string)file_get_contents(BASE_PATH.'/app/Controllers/MerchantController.php');
+    $assert(str_contains($controller,'updateLowStockThreshold')&&str_contains($controller,'TenantContext'));
+    $routes=(string)file_get_contents(BASE_PATH.'/routes/web.php');$assert(str_contains($routes,'/merchant/low-stock-threshold'));
+    $dashboard=(string)file_get_contents(BASE_PATH.'/resources/views/merchant/dashboard.php');$assert(str_contains($dashboard,'lowStock')&&str_contains($dashboard,'low_stock_threshold'));
+});
+
 echo "\n{$passed} passed, {$failed} failed.\n";
 exit($failed === 0 ? 0 : 1);
