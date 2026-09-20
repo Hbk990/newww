@@ -43,6 +43,7 @@ $router->post('/products/{id}/delete', [ProductController::class, 'delete']);
 $router->post('/products/{id}/images/{imageId}/delete', [ProductController::class, 'deleteImage']);
 $router->get('/merchant/orders', [OrderController::class, 'index']);
 $router->get('/merchant/orders/{reference}', [OrderController::class, 'show']);
+$router->get('/merchant/orders/{reference}/receipt', [OrderController::class, 'receipt']);
 $router->post('/merchant/orders/{reference}/status', [OrderController::class, 'status']);
 $router->get('/merchant/design', [StoreDesignController::class, 'form']);
 $router->post('/merchant/design', [StoreDesignController::class, 'update']);

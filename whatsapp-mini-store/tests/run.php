@@ -338,5 +338,19 @@ $test('the low stock threshold is merchant-editable and scoped to the tenant sto
     $dashboard=(string)file_get_contents(BASE_PATH.'/resources/views/merchant/dashboard.php');$assert(str_contains($dashboard,'lowStock')&&str_contains($dashboard,'low_stock_threshold'));
 });
 
+$test('printable receipts are tenant-scoped and reuse the server-computed order totals', function () use ($assert): void {
+    $controller=(string)file_get_contents(BASE_PATH.'/app/Controllers/OrderController.php');
+    $assert(str_contains($controller,'function receipt')&&str_contains($controller,'TenantContext')&&str_contains($controller,"'bare'"));
+    $routes=(string)file_get_contents(BASE_PATH.'/routes/web.php');$assert(str_contains($routes,'/merchant/orders/{reference}/receipt'));
+    $view=(string)file_get_contents(BASE_PATH.'/resources/views/merchant/orders/receipt.php');
+    foreach(['offer_discount_amount','discount_amount','free_delivery',"e(\$order['total'])"]as$needle)$assert(str_contains($view,$needle),"Missing {$needle}");
+});
+$test('the receipt page hides print controls and page chrome under print media', function () use ($assert): void {
+    $css=(string)file_get_contents(BASE_PATH.'/public/assets/css/app.css');
+    $assert(str_contains($css,'@media print{.no-print{display:none'));
+    $view=(string)file_get_contents(BASE_PATH.'/resources/views/merchant/orders/receipt.php');
+    $assert(str_contains($view,'no-print')&&str_contains($view,'window.print()'));
+});
+
 echo "\n{$passed} passed, {$failed} failed.\n";
 exit($failed === 0 ? 0 : 1);
