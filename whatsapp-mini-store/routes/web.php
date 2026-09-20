@@ -1,5 +1,5 @@
 <?php
-use App\Controllers\{AnalyticsController,AuthController,CategoryController,CheckoutController,ComingSoonController,CustomerController,ImportController,MerchantController,OnboardingController,OrderController,ProductController,SeoController,StoreDesignController,StorefrontAdminController,StorefrontController,StoreWorkspaceController,SubscriptionController,SuperAdminController,SuperAdminMerchantController,SuperAdminPlanController,SuperAdminStoreController,SuperAdminSystemController};
+use App\Controllers\{AnalyticsController,AuthController,CategoryController,CheckoutController,ComingSoonController,CustomerController,DiscountCodeController,ImportController,MerchantController,OnboardingController,OrderController,ProductController,SeoController,StoreDesignController,StorefrontAdminController,StorefrontController,StoreWorkspaceController,SubscriptionController,SuperAdminController,SuperAdminMerchantController,SuperAdminPlanController,SuperAdminStoreController,SuperAdminSystemController};
 use App\Core\{Auth, Request, Response};
 
 $router->get('/', static function (Request $request): void {
@@ -47,6 +47,12 @@ $router->get('/merchant/design', [StoreDesignController::class, 'form']);
 $router->post('/merchant/design', [StoreDesignController::class, 'update']);
 $router->get('/merchant/customers', [CustomerController::class, 'index']);
 $router->get('/merchant/customers/{id}', [CustomerController::class, 'show']);
+$router->get('/merchant/discounts', [DiscountCodeController::class, 'index']);
+$router->get('/merchant/discounts/create', [DiscountCodeController::class, 'create']);
+$router->post('/merchant/discounts', [DiscountCodeController::class, 'store']);
+$router->get('/merchant/discounts/{id}/edit', [DiscountCodeController::class, 'edit']);
+$router->post('/merchant/discounts/{id}', [DiscountCodeController::class, 'update']);
+$router->post('/merchant/discounts/{id}/toggle', [DiscountCodeController::class, 'toggle']);
 $router->get('/merchant/analytics', [AnalyticsController::class, 'index']);
 $router->get('/merchant/seo', [SeoController::class, 'form']);
 $router->post('/merchant/seo', [SeoController::class, 'update']);

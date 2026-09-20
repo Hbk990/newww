@@ -13,6 +13,8 @@ final class ProductRepository
         return array_map(static fn($v)=>(int)($v ?? 0),$row ?: []);
     }
 
+    public function allNames(int $storeId): array{$s=Database::connection()->prepare("SELECT id,name FROM products WHERE store_id=? AND deleted_at IS NULL ORDER BY name"); $s->execute([$storeId]); return $s->fetchAll();}
+
     public function publicReadyCount(int$storeId):int{$s=Database::connection()->prepare("SELECT COUNT(DISTINCT p.id) FROM products p LEFT JOIN categories c ON c.id=p.category_id AND c.store_id=p.store_id WHERE p.store_id=? AND p.status='ACTIVE' AND p.availability='AVAILABLE' AND p.deleted_at IS NULL AND (p.category_id IS NULL OR c.status='ACTIVE') AND (NOT EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id=p.id AND pv.store_id=p.store_id) OR EXISTS (SELECT 1 FROM product_variants pv WHERE pv.product_id=p.id AND pv.store_id=p.store_id AND pv.is_available=1 AND (pv.stock_quantity IS NULL OR pv.stock_quantity>0)))");$s->execute([$storeId]);return(int)$s->fetchColumn();}
 
     public function search(int $storeId, array $filters): array

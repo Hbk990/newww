@@ -23,8 +23,9 @@ final class CheckoutController
         $customer=['name'=>trim((string)$request->input('name')),'phone'=>trim((string)$request->input('phone')),'address'=>trim((string)$request->input('delivery_address')),'notes'=>trim((string)$request->input('notes'))];
         $errors=[];if(mb_strlen($customer['name'])<2||mb_strlen($customer['name'])>120)$errors[]='Name must be 2–120 characters.';if(!Validation::phone($customer['phone']))$errors[]='Enter a phone number in international format, such as +96171123456.';if(mb_strlen($customer['address'])<5||mb_strlen($customer['address'])>2000)$errors[]='Delivery address must be 5–2000 characters.';if(mb_strlen($customer['notes'])>1000)$errors[]='Notes cannot exceed 1000 characters.';
         $raw=(string)$request->input('cart');if(strlen($raw)>20000)$errors[]='The cart is too large.';$lines=json_decode($raw,true);if(!is_array($lines))$errors[]='Your cart could not be read. Return to the cart and try again.';
+        $discountCode=mb_substr(trim((string)$request->input('discount_code')),0,40);if($discountCode!==''&&!preg_match('/^[A-Za-z0-9_-]+$/',$discountCode))$errors[]='That discount code contains unsupported characters.';
         if($errors)$this->fail($slug,implode(' ',$errors),$request);
-        try{$order=(new OrderService)->create($store,$customer,$lines,$token);}catch(\DomainException$e){$this->fail($slug,$e->getMessage(),$request);}
+        try{$order=(new OrderService)->create($store,$customer,$lines,$token,$discountCode!==''?$discountCode:null);}catch(\DomainException$e){$this->fail($slug,$e->getMessage(),$request);}
         Response::redirect('/'.$slug.'/order/'.$order['reference'].'/continue?token='.rawurlencode($token),303);
     }
 

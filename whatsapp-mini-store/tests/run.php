@@ -254,5 +254,36 @@ $test('Phase 10 migration and operations scripts are safe and CLI-only', functio
     $sql=(string)file_get_contents(BASE_PATH.'/database/migrations/009_phase10_production_hardening.sql');$maintenance=(string)file_get_contents(BASE_PATH.'/bin/maintenance.php');$production=(string)file_get_contents(BASE_PATH.'/bin/production-check.php');$assert(str_contains($sql,'idx_orders_store_date')&&str_contains($sql,'idx_products_public_catalog')&&!preg_match('/DROP\s+(TABLE|COLUMN)/i',$sql));$assert(str_contains($maintenance,"PHP_SAPI!=='cli'")&&str_contains($maintenance,'maintenance.lock')&&str_contains($maintenance,'ANALYTICS_RETENTION_DAYS'));$assert(str_contains($production,'Database migrations')&&str_contains($production,'Upload execution protection'));
 });
 
+$test('Phase 12 migration adds a bounded cancellation reason to status history', function () use ($assert): void {
+    $sql=(string)file_get_contents(BASE_PATH.'/database/migrations/011_phase12_order_cancellation_reason.sql');$assert(str_contains($sql,'reason_code ENUM')&&str_contains($sql,'reason_note VARCHAR(300)')&&str_contains($sql,'order_status_history'));
+});
+$test('cancelling an order always requires a known reason code', function () use ($assert): void {
+    $controller=(string)file_get_contents(BASE_PATH.'/app/Controllers/OrderController.php');$assert(str_contains($controller,'CANCEL_REASONS')&&str_contains($controller,"'CANCELLED'"));
+    $view=(string)file_get_contents(BASE_PATH.'/resources/views/merchant/orders/show.php');$assert(str_contains($view,'cancel-order-form')&&str_contains($view,'name="reason_code"')&&str_contains($view,'required'));
+});
+$test('Phase 13 migration adds discount codes scoped and constrained per store', function () use ($assert): void {
+    $sql=(string)file_get_contents(BASE_PATH.'/database/migrations/012_phase13_discount_codes.sql');
+    foreach(['CREATE TABLE IF NOT EXISTS discount_codes','CREATE TABLE IF NOT EXISTS discount_code_redemptions','discount_code_id','discount_amount','discount_code_snapshot','free_delivery']as$needle)$assert(str_contains($sql,$needle),"Missing {$needle}");
+    $assert(str_contains($sql,'ON DELETE RESTRICT'),'orders->discount_codes FK must not risk nulling store_id');
+});
+$test('discount resolution is computed server-side for every supported type', function () use ($assert): void {
+    $service=(string)file_get_contents(BASE_PATH.'/app/Services/DiscountService.php');
+    foreach(['PERCENT_ORDER','FIXED_ORDER','PERCENT_PRODUCT','PERCENT_CATEGORY','FREE_DELIVERY']as$type)$assert(str_contains($service,$type),"Missing {$type} handling");
+    $assert(str_contains($service,'lockRedeemable')&&str_contains($service,'min_order_amount')&&str_contains($service,'usage_limit_per_customer'));
+});
+$test('discount codes are locked and redeemed inside the order transaction', function () use ($assert): void {
+    $orderService=(string)file_get_contents(BASE_PATH.'/app/Services/OrderService.php');
+    $assert(str_contains($orderService,'DiscountService')&&str_contains($orderService,'recordRedemption')&&str_contains($orderService,'category_id'));
+});
+$test('discount code management is tenant scoped and validated server-side', function () use ($assert): void {
+    $controller=(string)file_get_contents(BASE_PATH.'/app/Controllers/DiscountCodeController.php');
+    $assert(str_contains($controller,'store_id')&&str_contains($controller,"'23000'")&&str_contains($controller,'/^[A-Z0-9_-]{3,40}$/'));
+    $sql=(string)file_get_contents(BASE_PATH.'/database/migrations/012_phase13_discount_codes.sql');$assert(preg_match('/UNIQUE KEY[^\n]*store_id[^\n]*code/',$sql)===1,'code uniqueness must be enforced by the database, not a racy pre-check');
+    $routes=(string)file_get_contents(BASE_PATH.'/routes/web.php');$assert(str_contains($routes,'/merchant/discounts'));
+});
+$test('WhatsApp handoff message reflects applied discounts without trusting the client', function () use ($assert): void {
+    $wa=(string)file_get_contents(BASE_PATH.'/app/Services/WhatsAppService.php');$assert(str_contains($wa,'discount_code_snapshot')&&str_contains($wa,'discount_amount')&&str_contains($wa,'free_delivery'));
+});
+
 echo "\n{$passed} passed, {$failed} failed.\n";
 exit($failed === 0 ? 0 : 1);
