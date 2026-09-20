@@ -64,7 +64,7 @@ final class OrderRepository
         $s->execute([$storeId, $reference]); $order = $s->fetch();
         if (!$order) return null;
         $order['items'] = $this->items($storeId, (int) $order['id']);
-        $history = Database::connection()->prepare('SELECT h.status,h.created_at,u.name actor_name FROM order_status_history h LEFT JOIN users u ON u.id=h.changed_by_user_id WHERE h.store_id=? AND h.order_id=? ORDER BY h.created_at,h.id');
+        $history = Database::connection()->prepare('SELECT h.status,h.reason_code,h.reason_note,h.created_at,u.name actor_name FROM order_status_history h LEFT JOIN users u ON u.id=h.changed_by_user_id WHERE h.store_id=? AND h.order_id=? ORDER BY h.created_at,h.id');
         $history->execute([$storeId, $order['id']]); $order['history'] = $history->fetchAll();
         return $order;
     }
@@ -76,7 +76,7 @@ final class OrderRepository
         return['items'=>$items,'skipped'=>$skipped];
     }
 
-    public function updateStatus(int $storeId, string $reference, string $next, int $actorId): bool
+    public function updateStatus(int $storeId, string $reference, string $next, int $actorId, ?string $reasonCode = null, ?string $reasonNote = null): bool
     {
         $transitions = ['NEW'=>['CONFIRMED','CANCELLED'],'CONFIRMED'=>['PREPARING','CANCELLED'],'PREPARING'=>['READY','CANCELLED'],'READY'=>['COMPLETED','CANCELLED'],'COMPLETED'=>[],'CANCELLED'=>[]];
         $pdo = Database::connection(); $pdo->beginTransaction();
@@ -91,8 +91,8 @@ final class OrderRepository
             }
             $u = $pdo->prepare("UPDATE orders SET status=?,status_updated_at=UTC_TIMESTAMP(),stock_released_at=IF(?='CANCELLED',COALESCE(stock_released_at,UTC_TIMESTAMP()),stock_released_at),updated_at=UTC_TIMESTAMP() WHERE id=? AND store_id=?");
             $u->execute([$next,$next,$order['id'],$storeId]);
-            $h = $pdo->prepare('INSERT INTO order_status_history (store_id,order_id,status,changed_by_user_id,created_at) VALUES (?,?,?,?,UTC_TIMESTAMP())');
-            $h->execute([$storeId,$order['id'],$next,$actorId]);
+            $h = $pdo->prepare('INSERT INTO order_status_history (store_id,order_id,status,reason_code,reason_note,changed_by_user_id,created_at) VALUES (?,?,?,?,?,?,UTC_TIMESTAMP())');
+            $h->execute([$storeId,$order['id'],$next,$next==='CANCELLED'?$reasonCode:null,$next==='CANCELLED'?$reasonNote:null,$actorId]);
             $pdo->commit(); return true;
         } catch (\Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
     }
