@@ -48,18 +48,28 @@ final class ProductRepository
         } catch (\Throwable $e) { if($pdo->inTransaction())$pdo->rollBack(); throw $e; }
     }
 
-    public function update(int $storeId,int $id,array $data,array $options,array $variantInputs): bool
+    public function update(int $storeId,int $id,array $data,array $options,array $variantInputs): array
     {
         $pdo=Database::connection(); $pdo->beginTransaction();
         try {
             $s=$pdo->prepare('UPDATE products SET category_id=?,name=?,slug=?,sku=?,description=?,price=?,compare_price=?,availability=?,is_featured=?,status=?,updated_at=UTC_TIMESTAMP() WHERE id=? AND store_id=? AND deleted_at IS NULL');
             $s->execute([$data['category_id'],$data['name'],$data['slug'],$data['sku'],$data['description'],$data['price'],$data['compare_price'],$data['availability'],$data['is_featured'],$data['status'],$id,$storeId]);
-            $exists=$pdo->prepare('SELECT 1 FROM products WHERE id=? AND store_id=? AND deleted_at IS NULL'); $exists->execute([$id,$storeId]); if(!$exists->fetchColumn()){ $pdo->rollBack(); return false; }
-            $this->syncOptions($pdo,$storeId,$id,$options,$variantInputs); $pdo->commit(); return true;
+            $exists=$pdo->prepare('SELECT 1 FROM products WHERE id=? AND store_id=? AND deleted_at IS NULL'); $exists->execute([$id,$storeId]); if(!$exists->fetchColumn()){ $pdo->rollBack(); return ['ok'=>false,'variant_map'=>[],'removed_photos'=>[]]; }
+            ['id_map'=>$idMap,'removed_photos'=>$removed]=$this->syncOptions($pdo,$storeId,$id,$options,$variantInputs); $pdo->commit(); return ['ok'=>true,'variant_map'=>$idMap,'removed_photos'=>$removed];
         } catch (\Throwable $e) { if($pdo->inTransaction())$pdo->rollBack(); throw $e; }
     }
 
-    private function syncOptions(\PDO $pdo,int $storeId,int $productId,array $options,array $variantInputs): void
+    public function variantImagePath(int $storeId,int $variantId): ?string
+    {
+        $s=Database::connection()->prepare('SELECT image_path FROM product_variants WHERE id=? AND store_id=?'); $s->execute([$variantId,$storeId]); $path=$s->fetchColumn(); return $path===false?null:$path;
+    }
+
+    public function updateVariantImage(int $storeId,int $variantId,?string $path): void
+    {
+        Database::connection()->prepare('UPDATE product_variants SET image_path=?,updated_at=UTC_TIMESTAMP() WHERE id=? AND store_id=?')->execute([$path,$variantId,$storeId]);
+    }
+
+    private function syncOptions(\PDO $pdo,int $storeId,int $productId,array $options,array $variantInputs): array
     {
         $old=$pdo->prepare('SELECT * FROM product_variants WHERE product_id=? AND store_id=?'); $old->execute([$productId,$storeId]);
         $existing=[]; foreach($old->fetchAll() as $v)$existing[$v['label']]=$v;
@@ -70,13 +80,18 @@ final class ProductRepository
             $s=$pdo->prepare('INSERT INTO product_options (store_id,product_id,name,sort_order,created_at,updated_at) VALUES (?,?,?,?,UTC_TIMESTAMP(),UTC_TIMESTAMP())'); $s->execute([$storeId,$productId,$option['name'],$oi]); $optionId=(int)$pdo->lastInsertId();
             $values=[]; foreach($option['values'] as $vi=>$value){$v=$pdo->prepare('INSERT INTO product_option_values (store_id,option_id,value,sort_order,created_at) VALUES (?,?,?,?,UTC_TIMESTAMP())');$v->execute([$storeId,$optionId,$value,$vi]);$values[]=['id'=>(int)$pdo->lastInsertId(),'value'=>$value,'option'=>$option['name']];} $groups[]=$values;
         }
-        if(!$groups)return;
+        $idMap=[]; $removedPhotos=[]; $survivingLabels=[];
+        if(!$groups){foreach($existing as$label=>$v)if($v['image_path'])$removedPhotos[]=$v['image_path'];return['id_map'=>$idMap,'removed_photos'=>$removedPhotos];}
         foreach($this->combinations($groups) as $combo){
-            $label=implode(' / ',array_map(static fn($item)=>$item['option'].': '.$item['value'],$combo)); $previous=$existing[$label]??[]; $input=$variantInputs[(string)($previous['id']??'')]??[];
+            $label=implode(' / ',array_map(static fn($item)=>$item['option'].': '.$item['value'],$combo)); $survivingLabels[$label]=true; $previous=$existing[$label]??[]; $input=$variantInputs[(string)($previous['id']??'')]??[];
             $sku=$this->nullable($input['sku']??($previous['sku']??null)); $adjust=$input['price_adjustment']??($previous['price_adjustment']??'0.00'); $stock=$input['stock_quantity']??($previous['stock_quantity']??null); $available=isset($input['present'])?(isset($input['is_available'])?1:0):(int)($previous['is_available']??1);
-            $s=$pdo->prepare('INSERT INTO product_variants (store_id,product_id,label,sku,price_adjustment,stock_quantity,is_available,created_at,updated_at) VALUES (?,?,?,?,?,?,?,UTC_TIMESTAMP(),UTC_TIMESTAMP())');$s->execute([$storeId,$productId,$label,$sku,$adjust,$stock===''?null:$stock,$available]);$variantId=(int)$pdo->lastInsertId();
+            $image=$previous['image_path']??null; if(isset($input['present'])&&!empty($input['remove_photo'])){if($image)$removedPhotos[]=$image;$image=null;}
+            $s=$pdo->prepare('INSERT INTO product_variants (store_id,product_id,label,sku,image_path,price_adjustment,stock_quantity,is_available,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,UTC_TIMESTAMP(),UTC_TIMESTAMP())');$s->execute([$storeId,$productId,$label,$sku,$image,$adjust,$stock===''?null:$stock,$available]);$variantId=(int)$pdo->lastInsertId();
+            if(isset($previous['id']))$idMap[(int)$previous['id']]=$variantId;
             foreach($combo as $value)$pdo->prepare('INSERT INTO product_variant_values (store_id,variant_id,option_value_id) VALUES (?,?,?)')->execute([$storeId,$variantId,$value['id']]);
         }
+        foreach($existing as$label=>$v)if(!isset($survivingLabels[$label])&&$v['image_path'])$removedPhotos[]=$v['image_path'];
+        return['id_map'=>$idMap,'removed_photos'=>$removedPhotos];
     }
 
     private function combinations(array $groups): array
