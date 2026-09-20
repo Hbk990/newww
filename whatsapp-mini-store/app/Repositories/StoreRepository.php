@@ -41,8 +41,11 @@ final class StoreRepository
             $s->execute([$data['business_name'], $data['slug'], $data['whatsapp_number'], $data['country_code'], $data['currency_code'], $data['theme']]);
             $storeId = (int) $pdo->lastInsertId();
             $pdo->prepare('INSERT INTO store_users (store_id,user_id,role,status,created_at,updated_at) VALUES (?,?,\'MERCHANT_OWNER\',\'ACTIVE\',UTC_TIMESTAMP(),UTC_TIMESTAMP())')->execute([$storeId, $userId]);
-            $subscription = $pdo->prepare('INSERT INTO subscriptions (store_id,plan_id,status,started_at,created_at,updated_at) SELECT ?,id,\'ACTIVE\',UTC_TIMESTAMP(),UTC_TIMESTAMP(),UTC_TIMESTAMP() FROM plans WHERE code=\'FREE\' LIMIT 1');
-            $subscription->execute([$storeId]);
+            $topPlan = (new \App\Repositories\SubscriptionRepository)->topPlan($pdo);
+            $trialDays = (int) config('billing')['trial_days'];
+            $trialEndsAt = $trialDays > 0 ? gmdate('Y-m-d H:i:s', time() + $trialDays * 86400) : null;
+            $subscription = $pdo->prepare('INSERT INTO subscriptions (store_id,plan_id,status,started_at,trial_ends_at,created_at,updated_at) VALUES (?,?,\'TRIAL\',UTC_TIMESTAMP(),?,UTC_TIMESTAMP(),UTC_TIMESTAMP())');
+            $subscription->execute([$storeId, $topPlan['id'], $trialEndsAt]);
             if ($subscription->rowCount() !== 1) throw new \RuntimeException('Default plan is not configured.');
             $pdo->commit();
             return $storeId;

@@ -21,6 +21,11 @@ final class SubscriptionRepository
         $pdo??=Database::connection();$s=$pdo->prepare("SELECT * FROM plans WHERE code='FREE' AND is_active=1 LIMIT 1");$s->execute();$plan=$s->fetch();if(!$plan)throw new \RuntimeException('The FREE plan is not configured.');$this->decodePlan($plan);return$plan;
     }
 
+    public function topPlan(?PDO$pdo=null):array
+    {
+        $pdo??=Database::connection();$s=$pdo->prepare('SELECT * FROM plans WHERE is_active=1 AND is_public=1 ORDER BY sort_order DESC,id DESC LIMIT 1');$s->execute();$plan=$s->fetch();if(!$plan)throw new \RuntimeException('No public plan is configured.');$this->decodePlan($plan);return$plan;
+    }
+
     public function current(int$storeId,?PDO$pdo=null,bool$forUpdate=false):?array
     {
         $pdo??=Database::connection();$s=$pdo->prepare('SELECT sub.*,p.code plan_code,p.name plan_name,p.description plan_description,p.features plan_features,p.limits plan_limits,p.monthly_price,p.currency_code plan_currency,p.sort_order plan_sort_order,pp.code pending_plan_code,pp.name pending_plan_name FROM subscriptions sub JOIN plans p ON p.id=sub.plan_id LEFT JOIN plans pp ON pp.id=sub.pending_plan_id WHERE sub.store_id=? LIMIT 1'.($forUpdate?' FOR UPDATE':''));$s->execute([$storeId]);$row=$s->fetch();if(!$row)return null;$features=json_decode((string)$row['plan_features'],true);$limits=json_decode((string)$row['plan_limits'],true);$row['features']=is_array($features)?$features:[];$row['limits']=is_array($limits)?$limits:[];return$row;
