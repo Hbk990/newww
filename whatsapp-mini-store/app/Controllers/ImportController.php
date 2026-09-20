@@ -8,14 +8,28 @@ use App\Services\{ImageUploadService,PlanAccessService,ProductImportService,Spre
 final class ImportController
 {
     public function index(Request$request):void{$store=(new TenantContext)->store();$access=(new PlanAccessService)->context((int)$store['id']);View::render('merchant/import',['title'=>'Import','store'=>$store,'preview'=>null,'bulkReport'=>Session::get('_bulk_image_report'),'canImport'=>(bool)($access['features']['catalog_import']??false),'canBulkImages'=>(bool)($access['features']['bulk_image_import']??false)],'merchant');Session::forget('_bulk_image_report');}
-    public function template(Request$request):void{(new TenantContext)->store();header('Content-Type: text/csv; charset=UTF-8');header('Content-Disposition: attachment; filename="ministore-product-import.csv"');echo "SKU,Name,Category,Price,Compare Price,Description,Availability\r\n";echo "ABC123,Example product,Example category,10.00,12.00,Product description,AVAILABLE\r\n";exit;}
+    public function template(Request$request):void{
+        (new TenantContext)->store();header('Content-Type: text/csv; charset=UTF-8');header('Content-Disposition: attachment; filename="ministore-product-import.csv"');
+        $columns=['SKU','Name','Category','Price','Compare Price','Description','Availability','Option 1 Name','Option 1 Value','Option 2 Name','Option 2 Value','Option 3 Name','Option 3 Value','Variant SKU','Variant Price Adjustment','Variant Stock'];
+        $rows=[
+            ['ABC123','Example product','Example category','10.00','12.00','Product description','AVAILABLE','','','','','','','','',''],
+            // Variant example: rows sharing the same SKU are combined into one product. Only the first
+            // row of a group needs Name/Category/Price/etc — leave them blank on the rest. Options are
+            // sparse: any combination you don't list simply isn't created (no Blue/Small here).
+            ['TEE-001','Classic Tee','Apparel','20.00','','','AVAILABLE','Color','Red','Size','S','','','TEE-001-RED-S','0.00','10'],
+            ['TEE-001','','','','','','','Color','Red','Size','M','','','TEE-001-RED-M','0.00','8'],
+            ['TEE-001','','','','','','','Color','Blue','Size','M','','','TEE-001-BLUE-M','2.00','5'],
+        ];
+        echo implode(',',$columns)."\r\n";foreach($rows as$row)echo implode(',',$row)."\r\n";
+        exit;
+    }
     public function preview(Request$request):void
     {
         $store=(new TenantContext)->store();try{(new PlanAccessService)->requireFeature((int)$store['id'],'catalog_import','Catalog import is available on Pro and Business plans.');$parsed=(new SpreadsheetImportService)->parse($request->file('sheet')??[]);}catch(\DomainException$e){Session::flash('error',$e->getMessage());Response::redirect('/merchant/import',303);}$token=null;if($parsed['rows']&&!$parsed['report']['errors'])$token=(new ImportBatchRepository)->create((int)$store['id'],(int)Auth::id(),(string)($request->file('sheet')['name']??'import'),$parsed['rows'],$parsed['report']);View::render('merchant/import',['title'=>'Import preview','store'=>$store,'preview'=>$parsed+['token'=>$token],'bulkReport'=>null,'canImport'=>true,'canBulkImages'=>(new PlanAccessService)->feature((int)$store['id'],'bulk_image_import')],'merchant');
     }
     public function commit(Request$request):void
     {
-        $store=(new TenantContext)->store();$token=(string)$request->input('batch_token');try{(new PlanAccessService)->requireFeature((int)$store['id'],'catalog_import','Catalog import is available on Pro and Business plans.');$result=(new ImportBatchRepository)->commit((int)$store['id'],(int)Auth::id(),$token,fn(\PDO$pdo,array$rows)=>(new ProductImportService)->commit($pdo,(int)$store['id'],$rows));}catch(\DomainException$e){Session::flash('error',$e->getMessage());Response::redirect('/merchant/import',303);}(new AuditLogRepository)->record((int)Auth::id(),'products.imported','store',(int)$store['id'],$result);Session::flash('success',"Import complete: {$result['created']} created, {$result['updated']} updated, {$result['categories']} categories created. New products remain drafts for review.");Response::redirect('/products',303);
+        $store=(new TenantContext)->store();$token=(string)$request->input('batch_token');try{(new PlanAccessService)->requireFeature((int)$store['id'],'catalog_import','Catalog import is available on Pro and Business plans.');$result=(new ImportBatchRepository)->commit((int)$store['id'],(int)Auth::id(),$token,fn(\PDO$pdo,array$rows)=>(new ProductImportService)->commit($pdo,(int)$store['id'],$rows));}catch(\DomainException$e){Session::flash('error',$e->getMessage());Response::redirect('/merchant/import',303);}(new AuditLogRepository)->record((int)Auth::id(),'products.imported','store',(int)$store['id'],$result);Session::flash('success',"Import complete: {$result['created']} created, {$result['updated']} updated, {$result['categories']} categories created, {$result['variants']} variants synced. New products remain drafts for review.");Response::redirect('/products',303);
     }
     public function images(Request$request):void
     {

@@ -386,5 +386,21 @@ $test('reorder link generation happens outside the repository, which stays URL-f
     $assert(str_contains($controller,"store_url(\$store,'product/'.\$item['slug'])"));
 });
 
+$test('CSV import accepts optional variant columns without requiring product fields on every row of a group', function () use ($assert): void {
+    $service=(string)file_get_contents(BASE_PATH.'/app/Services/SpreadsheetImportService.php');
+    foreach(['option_1_name','option_1_value','variant_sku','variant_price_adjustment','variant_stock','REQUIRED_HEADERS','MAX_VARIANT_ROWS_PER_PRODUCT']as$needle)$assert(str_contains($service,$needle),"Missing {$needle}");
+    $assert(str_contains($service,'$isPrimary'),'Only the first row of a SKU group should require the full product fields');
+});
+$test('CSV variant import is additive: creates or updates variants matched by label, never deletes on re-import', function () use ($assert): void {
+    $service=(string)file_get_contents(BASE_PATH.'/app/Services/ProductImportService.php');
+    $assert(str_contains($service,'function syncImportedVariants'));
+    $assert(!preg_match('/DELETE FROM product_variants/',$service),'Import must never delete existing variants on re-import');
+    $assert(str_contains($service,"WHERE store_id=? AND product_id=? AND label=?"),'Variants must be matched by the same label format the manual editor builds, to upsert correctly on re-import');
+});
+$test('the CSV template documents the variant columns with a real sparse-combination example', function () use ($assert): void {
+    $controller=(string)file_get_contents(BASE_PATH.'/app/Controllers/ImportController.php');
+    foreach(['Option 1 Name','Variant SKU','Variant Price Adjustment','Variant Stock','TEE-001']as$needle)$assert(str_contains($controller,$needle),"Missing {$needle}");
+});
+
 echo "\n{$passed} passed, {$failed} failed.\n";
 exit($failed === 0 ? 0 : 1);
