@@ -352,5 +352,39 @@ $test('the receipt page hides print controls and page chrome under print media',
     $assert(str_contains($view,'no-print')&&str_contains($view,'window.print()'));
 });
 
+$test('wildcard subdomains resolve to a store slug only under the configured root domain', function () use ($assert): void {
+    $request=(string)file_get_contents(BASE_PATH.'/app/Core/Request.php');
+    foreach(["\$host === \$root", "'www.' . \$root", 'Validation::slug($slug)', 'Tenancy::setSubdomainSlug($slug)']as$needle)$assert(str_contains($request,$needle),"Missing {$needle}");
+});
+$test('store_url stays on the current host and never double-prefixes the slug on a subdomain', function () use ($assert): void {
+    $functions=(string)file_get_contents(BASE_PATH.'/app/Support/functions.php');
+    $assert(str_contains($functions,'function store_url')&&str_contains($functions,'Tenancy::isSubdomain()')&&str_contains($functions,"Tenancy::subdomainSlug() === \$store['slug']"));
+    $assert(str_contains($functions,'function store_absolute_url')&&str_contains($functions,"root_domain"));
+});
+$test('every internal storefront link is mode-aware, not a raw slug-prefixed path', function () use ($assert): void {
+    foreach(['app/Controllers/StorefrontController.php','app/Controllers/CheckoutController.php','app/Controllers/SeoController.php','resources/views/layouts/storefront.php','resources/views/storefront/home.php','resources/views/storefront/cart.php','resources/views/storefront/checkout.php','resources/views/storefront/product.php','resources/views/storefront/partials/product_card.php']as$file){
+        $code=(string)file_get_contents(BASE_PATH.'/'.$file);
+        $assert(!preg_match('/[\'"]\/[\'"]\s*\.\s*\$store\[[\'"]slug[\'"]\]/',$code),"{$file} still hand-builds a /{slug} path instead of using store_url()/store_absolute_url()");
+    }
+});
+$test('the storefront cart JS resolves URLs from a mode-aware base, not a hardcoded slug prefix', function () use ($assert): void {
+    $js=(string)file_get_contents(BASE_PATH.'/public/assets/js/storefront.js');
+    $assert(str_contains($js,'storeBase')&&!str_contains($js,'`/${storeSlug}/'));
+    $layout=(string)file_get_contents(BASE_PATH.'/resources/views/layouts/storefront.php');
+    $assert(str_contains($layout,'data-store-base'));
+});
+$test('redirects to an absolute URL are only allowed onto this app\'s own domain family, never an external host', function () use ($assert): void {
+    $response=(string)file_get_contents(BASE_PATH.'/app/Core/Response.php');
+    foreach(['isSafeRedirectTarget',"str_starts_with(\$path, '//')","str_starts_with(\$path, '/\\\\')",'root_domain']as$needle)$assert(str_contains($response,$needle),"Missing {$needle}");
+    $method=new ReflectionMethod(App\Core\Response::class,'isSafeRedirectTarget');$method->setAccessible(true);
+    foreach([['/dashboard',true],['//evil.com/phish',false],['http://evil.com',false],['http://evilmini.test',false],['javascript:alert(1)',false]]as[$input,$expected])$assert($method->invoke(null,$input)===$expected,"isSafeRedirectTarget({$input}) expected ".var_export($expected,true));
+});
+$test('reorder link generation happens outside the repository, which stays URL-format agnostic', function () use ($assert): void {
+    $repo=(string)file_get_contents(BASE_PATH.'/app/Repositories/OrderRepository.php');
+    $assert(!str_contains($repo,"'/'.\$storeSlug.'/product/'")&&str_contains($repo,"'slug'=>\$row['slug']"));
+    $controller=(string)file_get_contents(BASE_PATH.'/app/Controllers/CheckoutController.php');
+    $assert(str_contains($controller,"store_url(\$store,'product/'.\$item['slug'])"));
+});
+
 echo "\n{$passed} passed, {$failed} failed.\n";
 exit($failed === 0 ? 0 : 1);

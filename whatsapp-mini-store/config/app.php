@@ -20,6 +20,7 @@ $themeCatalog = [
 return [
     'name' => App\Support\Env::get('APP_NAME', 'MiniStore'),
     'url' => rtrim(App\Support\Env::get('APP_URL', 'http://localhost'), '/'),
+    'root_domain' => mb_strtolower(trim(App\Support\Env::get('APP_ROOT_DOMAIN', ''), " \t\n\r\0\x0B./")),
     'marketing_url' => rtrim(App\Support\Env::get('APP_MARKETING_URL', App\Support\Env::get('APP_URL', 'http://localhost')), '/'),
     'env' => App\Support\Env::get('APP_ENV', 'production'),
     'reserved_slugs' => [

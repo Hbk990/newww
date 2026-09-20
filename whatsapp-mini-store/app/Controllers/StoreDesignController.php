@@ -8,7 +8,7 @@ use App\Support\Validation;
 
 final class StoreDesignController
 {
-    public function form(Request$request):void{$store=(new TenantContext)->store();View::render('merchant/design',['title'=>'Store Design','store'=>$store,'app'=>config('app'),'storeUrl'=>config('app')['url'].'/'.$store['slug']],'merchant');}
+    public function form(Request$request):void{$store=(new TenantContext)->store();View::render('merchant/design',['title'=>'Store Design','store'=>$store,'app'=>config('app'),'storeUrl'=>store_absolute_url($store)],'merchant');}
 
     public function update(Request$request):void
     {

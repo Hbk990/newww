@@ -1,7 +1,7 @@
 <?php
 namespace App\Core;
 
-use App\Support\Http;
+use App\Support\{Http, Tenancy, Validation};
 
 final class Request
 {
@@ -18,7 +18,25 @@ final class Request
     public static function capture(): self
     {
         $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
-        return new self(strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET'), '/' . trim($path, '/'), $_POST, $_GET, $_SERVER, $_FILES);
+        $path = '/' . trim($path, '/');
+        $slug = self::subdomainSlug((string) ($_SERVER['HTTP_HOST'] ?? ''));
+        if ($slug !== null) {
+            Tenancy::setSubdomainSlug($slug);
+            $path = $path === '/' ? '/' . $slug : '/' . $slug . $path;
+        }
+        return new self(strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET'), $path, $_POST, $_GET, $_SERVER, $_FILES);
+    }
+
+    /** Returns the store slug implied by the Host header when it is a wildcard subdomain of the configured root domain, else null. */
+    private static function subdomainSlug(string $hostHeader): ?string
+    {
+        $root = config('app')['root_domain'];
+        if ($root === '') return null;
+        $host = mb_strtolower((string) preg_replace('/:\d+$/', '', $hostHeader));
+        if ($host === '' || $host === $root || $host === 'www.' . $root || !str_ends_with($host, '.' . $root)) return null;
+        $slug = substr($host, 0, -(mb_strlen($root) + 1));
+        if ($slug === '' || str_contains($slug, '.') || !Validation::slug($slug)) return null;
+        return $slug;
     }
 
     public function input(string $key, mixed $default = null): mixed { return $this->input[$key] ?? $default; }
