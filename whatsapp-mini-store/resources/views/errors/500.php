@@ -1,0 +1,1 @@
+<!doctype html><meta name="viewport" content="width=device-width"><title>Server error</title><link rel="stylesheet" href="/assets/css/app.css"><main class="error-page"><h1>Something went wrong</h1><p>The error was logged. Please try again later.</p><a class="button primary" href="/">Try again</a></main>

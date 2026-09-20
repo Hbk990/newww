@@ -1,0 +1,1 @@
+<section class="store-unavailable"><span class="store-logo" aria-hidden="true"><?= e(mb_strtoupper(mb_substr($store['name'],0,1))) ?></span><p class="store-kicker">Temporarily unavailable</p><h1>This store is taking a short break</h1><p>Please check again later. No account or administrative information is exposed.</p></section>

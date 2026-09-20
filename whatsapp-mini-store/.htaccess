@@ -1,0 +1,9 @@
+Options -Indexes
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^\.well-known/acme-challenge/ - [L]
+  RewriteRule ^(app|bin|config|database|docs|resources|routes|storage|tests|vendor)/ - [F,L,NC]
+  RewriteRule (^|/)\. - [F,L]
+  RewriteCond %{REQUEST_URI} !^/public/
+  RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>

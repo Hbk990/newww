@@ -1,0 +1,1 @@
+<!doctype html><meta name="viewport" content="width=device-width"><title>Forbidden</title><link rel="stylesheet" href="/assets/css/app.css"><main class="error-page"><h1>Access denied</h1><p>You do not have permission to view this area.</p><a class="button primary" href="/">Go home</a></main>

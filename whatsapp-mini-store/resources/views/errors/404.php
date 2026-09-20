@@ -1,0 +1,1 @@
+<!doctype html><meta name="viewport" content="width=device-width"><title>Not found</title><link rel="stylesheet" href="/assets/css/app.css"><main class="error-page"><h1>Page not found</h1><p>The requested page does not exist.</p><a class="button primary" href="/">Go home</a></main>
